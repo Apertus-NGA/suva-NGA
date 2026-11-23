@@ -69,7 +69,12 @@ https://hackapertus.notion.site/zurich-challenges-model-requirements
 
 ## Expected Outputs
 
-Summaries in a presentable UI (legal experts as customers), code for the whole project and documentation of your work.
+1. Summaries in a presentable UI (legal experts as customers), code for the whole project and documentation of your work.
+2. Git repo (URL)
+3. Technical Report (pdf)
+4. Demo video (URL)
+5. Pitch deck (pdf)
+
 
 ## Success Criteria
 
