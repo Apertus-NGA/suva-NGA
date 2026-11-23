@@ -1,11 +1,12 @@
-# Hack Apertus Zurich — Challenge Partner: Digitec Galaxus
+# Hack Apertus Zurich — Challenge Partner: Suva
 
 ## 🎯 The Challenge
 
-### Hack Apertus x Galaxus: product image classification
-https://www.kaggle.com/competitions/hackapertus-galaxus
+### Identification of relevant Federal Court judgements and preparation of a legal summary
 
 `Add your team name`
+<br>
+<br>
 
 Template repository for [Hack Apertus](https://hackapertus.ch/) submissions.
 Every project keeps the same layout, so organizers and judges find the same
@@ -57,7 +58,7 @@ The submission must:
 - Create your repo from this template (**Use this template**).
 - Keep the layout as it is: don't rename or move its files.
 - Set the repo to PUBLIC (Settings --> Collaborators --> Manage Visibility)
-- Submit the URL of YOUR Git repo.
+- Submit the URL of YOUR Git repo (keep it to 'public').
 
 ### Technical Report (pdf)
 - Update [technical_report.md](technical_report.md) in this repository with all the details for your submission.
