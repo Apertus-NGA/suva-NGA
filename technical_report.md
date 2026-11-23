@@ -3,8 +3,8 @@
 A deeper write-up than the README: what you built, how it works, and what the
 numbers say.
 
-- **Challenge partner:** Digitec Galaxus
-- **Challenge:** `challenge name`
+- **Challenge partner:** Suva
+- **Challenge:** Identification of relevant Federal Court judgements and preparation of a legal summary
 - **Event:** On-site Zurich
 - **Team:** `team name` — `member`, `member`, `member`
 - **Demo:** `link to video`
