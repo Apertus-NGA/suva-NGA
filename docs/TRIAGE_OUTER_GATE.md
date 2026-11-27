@@ -1,6 +1,7 @@
 # Triage outer gate: "possibly relevant"
 
-> **Status: PROPOSED (27 Nov 2026).** Not adopted by the team. Code: `src/triage/outer_gate.py`, tests: `tests/test_outer_gate.py`.
+> **Status: SUPERSEDED as the gate by D-060 (`docs/LAYER1.md`, `src/courts.py`), 28 Nov 2026.** `src/triage/outer_gate.py` stays for its area and header readers, which `src/signals/structural.py` uses; the measurements below describe the narrower three-area rule.
+> Original status: PROPOSED (27 Nov 2026), not adopted by the team. Code: `src/triage/outer_gate.py`, tests: `tests/test_outer_gate.py`.
 > It is one candidate answer to D-021 point 2 ("is a net needed, and what is clearly out of domain?") and sits next to the layer-1 proposal in `docs/TIPS_LAYER1_FILTER_HANDOFF.md`. Section 7 compares the two.
 
 ## 1. Open questions this touches
