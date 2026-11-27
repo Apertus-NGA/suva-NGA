@@ -1,0 +1,13 @@
+# Never in the image: secrets, private or Suva-derived data (mounted at runtime instead), caches, git.
+.git
+.env
+.env.*
+!.env.example
+data/private
+data/derived
+tmp
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+~$*
