@@ -81,6 +81,9 @@ make check          # lint and tests
 make smoke-llm      # optional: probe the endpoint, writes results/gateway_probe.json
 ```
 
+With Docker instead of a local Python: `docker compose run --rm app make run` (Postgres with pgvector starts
+with it; both images are pinned by digest).
+
 **Live or replayed:** how much of `make run` calls Apertus live is still open (D-032). The working default:
 a small live slice when the `LLM_*` variables are set, recorded answers for the rest, and every output
 labelled `LIVE` or `REPLAY`. The served model is checked on every answer; any Apertus v1.5 id is accepted in
