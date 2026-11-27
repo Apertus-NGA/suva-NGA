@@ -38,7 +38,7 @@ Generation ran against the hosted Apertus endpoint (a Swiss gateway, configurati
 
 - **Model:** Apertus v1.5 70B, id in `MODELS.md`, via the gateway.
 - **How it is used:** inference. The counter is code. Apertus does not grade its own fiches.
-- **Where it runs:** hosted endpoint. The client in this probe is `src/summarize/summarize.py`, which calls the gateway directly (`urllib`). The kit client is `src/llm/client.py`. The probe is not wired to it. It now sits under `src/`, so the G2 check (`tests/test_doctrines.py`) flags that file.
+- **Where it runs:** hosted endpoint. The measured run used a generator that called the gateway directly (`urllib`). Since `acd3f2d` (27 Nov, 21:05 CET), `src/summarize/summarize.py` calls it through the kit client `src/llm/client.py` (`client_from_env("live")`), so the G2 check (`tests/test_doctrines.py`) passes on that file.
 
 Temperature 0.1. German and French each from the ruling. The prompt carried two human fiches as style only, `8C_177/2025` and `8C_224/2025`, without the full rulings. Three one-line human fiches stayed out of the examples: `8C_21/2025`, `8C_44/2025`, `8C_455/2025`.
 
@@ -95,7 +95,7 @@ A fiche that passes this count can still invent a fact the program cannot check.
 
 ### HOW TO RUN
 
-The counter and the generator are in `src/summarize/` (`tally.py`, `summarize.py`, plus `glossary.json`). `tmp/pre-kit/` is empty. The generator still calls the gateway itself, outside `src/llm/`. Re-running the count needs the ruling texts and the fiches that were under `data/trial/`. Those files are not in the repository, and they are not on this working copy. The numbers in section 6 are the stdout of that one run.
+The counter and the generator are in `src/summarize/` (`tally.py`, `summarize.py`, plus `glossary.json`). `tmp/pre-kit/` is empty. The generator now calls the gateway through `src/llm/client.py`; the run measured here used the earlier version, which called it directly. Re-running the count needs the ruling texts and the fiches that were under `data/trial/`. Those files are not in the repository, and they are not on this working copy. The numbers in section 6 are the stdout of that one run.
 
 From the repo root, with the cache in `data/cache/` and `LLM_*` in `.env`:
 
@@ -104,7 +104,7 @@ python src/summarize/summarize.py 8C_78/2025
 python src/summarize/tally.py
 ```
 
-`make check` does not run this probe. It does scan `src/`, so G2 now flags `src/summarize/summarize.py` (`LLM_BASE_URL`, `/chat/completions`). On 27 November, while the probe scripts were outside `src/`, `make check` reported 73 passed.
+`make check` does not run this probe. It does scan `src/`: G2 flagged the version committed at 20:51 (`f140bb0`: `LLM_BASE_URL`, `LLM_API_KEY`, `/chat/completions`) and passes since `acd3f2d`. On 27 November `make check` reported 73 passed, both while the probe scripts were outside `src/` and at 21:11 CET with them under `src/`.
 
 ## LICENSE
 
