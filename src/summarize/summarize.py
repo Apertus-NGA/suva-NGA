@@ -19,9 +19,6 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "src"))
-
-from courts import passes
 CACHE = ROOT / "data" / "cache"
 GLOSSARY = json.loads((Path(__file__).parent / "glossary.json").read_text(encoding="utf-8"))
 # Ton seulement : une fiche courte (renvoi) et une fiche de rejet.
@@ -33,6 +30,16 @@ ORDER_MARKERS = (
     "Par ces motifs, le Tribunal fédéral prononce",
     "Per questi motivi, il Tribunale federale pronuncia",
 )
+
+
+def _court_passes(docket: str, area: str) -> bool:
+    """Le script est lancé depuis src/summarize : courts.py vit dans src/."""
+    src = str(ROOT / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    from courts import passes
+
+    return passes(docket, area)
 
 
 def load_env() -> None:
@@ -122,7 +129,8 @@ def directions(language: str, text: str) -> list[str]:
     if "Vermutung der Leistungspflicht gemäss Art. 6 Abs. 2 UVG" in norm:
         lines.append(
             "Art. 6 Abs. 2 UVG vermutet die Leistungspflicht. Sie ist umgestossen, weil die Läsion "
-            "zu mehr als 50 % auf Abnützung zurückgeht. Schreibe nicht, die Leistungspflicht bestehe nur bei Abnützung. "
+            "zu mehr als 50 % auf Abnützung zurückgeht. "
+            "Schreibe nicht, die Leistungspflicht bestehe nur bei Abnützung. "
             "Art. 4 ATSG bezeichnet den natürlichen Kausalzusammenhang, nicht diese Vermutung."
             if language == "de"
             else "L'art. 6 al. 2 LAA présume l'obligation de prester. Elle est renversée parce que la lésion "
@@ -189,7 +197,8 @@ def directions(language: str, text: str) -> list[str]:
         )
     if "erübrigt sich" in norm and "Art. 4 ATSG" in norm:
         lines.append(
-            "Fehlt der natürliche Kausalzusammenhang nach Art. 4 ATSG, erübrigt sich die Prüfung nach Art. 6 Abs. 2 UVG. "
+            "Fehlt der natürliche Kausalzusammenhang nach Art. 4 ATSG, "
+            "erübrigt sich die Prüfung nach Art. 6 Abs. 2 UVG. "
             "Art. 4 ATSG muss im Text stehen."
             if language == "de"
             else "Sans lien de causalité naturelle selon l'art. 4 LPGA, l'examen de l'art. 6 al. 2 LAA est superflu. "
@@ -238,7 +247,8 @@ def system_prompt(language: str) -> str:
             "Absatz 1: was geschehen ist, in einem Zug, ohne medizinische Details. "
             "Absatz 2: die Regel, die das Bundesgericht für diesen Fall ausspricht. "
             "Letzter Satz: das Dispositiv in einem Satz. "
-            "Kopiere nicht den Block «Demnach erkennt», keine Gerichtskosten, keine Unterschriften, kein Ort und kein Datum der Ausfertigung. "
+            "Kopiere nicht den Block «Demnach erkennt», keine Gerichtskosten, "
+            "keine Unterschriften, kein Ort und kein Datum der Ausfertigung. "
             "Die Beispiele zeigen nur Länge und Ton. Ihre Sachverhalte und ihre Ausgänge "
             "gehören zu anderen Fällen. "
             "Zitiere nur Artikel, die dieser Entscheid anwendet, in deutscher Form "
@@ -276,8 +286,7 @@ def user_prompt(language: str, examples: list[dict], target: dict) -> str:
         chunks.append("")
     chunks.append("Arrêt à résumer, et seulement celui-ci :")
     chunks.append(
-        f"{target['docket']} du {target['decision_date']}, "
-        f"cour {target['division']}, matière {target['area']}."
+        f"{target['docket']} du {target['decision_date']}, cour {target['division']}, matière {target['area']}."
     )
     chunks.append(target["text"])
     chunks.append("")
@@ -316,24 +325,14 @@ def user_prompt(language: str, examples: list[dict], target: dict) -> str:
     if order:
         sentence = outcome_sentence(language, order)
         if language == "de":
-            chunks.append(
-                "Ausgang dieses Entscheids, auf Deutsch, in einem Satz und nur einmal: "
-                f"{sentence}"
-            )
+            chunks.append(f"Ausgang dieses Entscheids, auf Deutsch, in einem Satz und nur einmal: {sentence}")
         else:
-            chunks.append(
-                "Issue de cet arrêt, en français, en une phrase et une seule fois : "
-                f"{sentence}"
-            )
+            chunks.append(f"Issue de cet arrêt, en français, en une phrase et une seule fois : {sentence}")
         chunks.append("")
     if language == "de":
-        chunks.append(
-            "Schreibe ausschliesslich Deutsch, auch wenn der Entscheid französisch oder italienisch ist."
-        )
+        chunks.append("Schreibe ausschliesslich Deutsch, auch wenn der Entscheid französisch oder italienisch ist.")
     else:
-        chunks.append(
-            "Écris exclusivement en français, même si l'arrêt est allemand ou italien."
-        )
+        chunks.append("Écris exclusivement en français, même si l'arrêt est allemand ou italien.")
     chunks.append(f"{label} :")
     return "\n".join(chunks)
 
@@ -569,7 +568,12 @@ def blocking(language: str, text: str, source: str) -> list[str]:
         found.append("critique: art. 17 confondu avec le statu quo")
     if language == "de" and "offensichtlich" in low and "offensichtlich" not in source_low:
         found.append("critique: manifestement infondé recopié")
-    if language == "fr" and "manifestement" in low and "manifestement" not in source_low and "offensichtlich" not in source_low:
+    if (
+        language == "fr"
+        and "manifestement" in low
+        and "manifestement" not in source_low
+        and "offensichtlich" not in source_low
+    ):
         found.append("critique: manifestement infondé recopié")
     if "demnach erkennt" in low or "par ces motifs" in low or "per questi motivi" in low:
         found.append("critique: bloc du jugement collé")
@@ -717,10 +721,8 @@ def summarize(docket: str) -> dict:
     target = row_for(rulings, docket)
     if docket in FEW_SHOT or docket in EXCLUDED:
         raise SystemExit(f"{docket} sert d'exemple ou est écarté du few-shot")
-    if not passes(target["docket"], target["area"]):
-        raise SystemExit(
-            f"{docket} ne passe pas le filtre ({target['division']}, {target['area']})"
-        )
+    if not _court_passes(target["docket"], target["area"]):
+        raise SystemExit(f"{docket} ne passe pas le filtre ({target['division']}, {target['area']})")
     out = {
         "docket": docket,
         "model": os.environ["LLM_NAME"],
@@ -728,9 +730,7 @@ def summarize(docket: str) -> dict:
         "languages": {},
     }
     for language in ("de", "fr"):
-        examples = [
-            {"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT
-        ]
+        examples = [{"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT]
         text = chat(
             [
                 {"role": "system", "content": system_prompt(language)},
