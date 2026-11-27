@@ -24,6 +24,8 @@
 | K15 | **Throughput on whole rulings** (~5,100 input tokens each), 4 concurrent calls: projected for 2,096 rulings, the 70B takes about 30 min with a score only (1 output token), about 1 h 50 with a JSON justification; the 8B about 25 min with a justification; about half at 8 concurrent calls | measured (projection from 66 calls on 33 rulings) | rerun on the first batch of the overnight run | this row |
 | K16 | Keera exposes **no price and no quota** (`/models` shows none): cost is counted in tokens | measured (27 Nov) | ask the organisers (Q-14) | this row |
 
+**Rerun with the repo's probe** (`make smoke-llm`, `src/llm/probe.py`; 27 Nov, 18:16 CET, one key, 27 sequential calls, synthetic prompts; `results/gateway_probe.json`). Confirms K1 (the same 4 ids), K3 (strict JSON keys in alphabetical order; `json_object` keeps the prompt's order), K5 (`top_logprobs` 20 on `/chat/completions`; "Ja" first at −0.014, "Nein" −4.26), K9 (served model = requested in 27 of 27 calls, `x-keera-model` header present in 27 of 27), K11 (two `system` messages: 400). Short calls: warm median 0.16 s (70B) and 0.11 s (8B), first call 0.44 s (70B): no cold start seen. Two identical short calls at T=0 with a seed gave identical outputs for both models (a 40-token output; K10's non-determinism was seen on longer outputs). 8B and 70B gave the same output on 1 of 5 greedy prompts (no aliasing alert). Not rerun yet: K6 (input sizes, `--sizes`), K7 long generation (`--long`), K8 concurrency ramp (`--ramp`, 16 only in an announced slot, D-030).
+
 ## 2. Apertus on Swiss law (other teams' measurements)
 
 - Closed-book (no text given), about **52 % of answers to Swiss-law questions were wrong**; with the relevant text in the prompt, **96 to 99 %** were right.
