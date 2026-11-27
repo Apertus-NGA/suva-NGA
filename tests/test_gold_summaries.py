@@ -1,4 +1,4 @@
-"""Gold-summary loader: parsing of the real exports (ARCHITECTURE 3.2) and the database contract."""
+"""Gold-summary loader: parsing of the real exports (DATA_LAYER 3.2) and the database contract."""
 
 from __future__ import annotations
 

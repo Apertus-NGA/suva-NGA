@@ -1,0 +1,25 @@
+NOTICE
+
+This repository was created from the HackApertus Zurich Suva template
+(https://github.com/HackApertus/zurich-suva).
+
+Our code is licensed under the Apache License, Version 2.0 (see LICENSE).
+The licence map for our documentation and the datasets we create is in
+README.md, section "Licences" (PROPOSED, D-048).
+
+Material in this repository that is not ours and not covered by our licences
+---------------------------------------------------------------------------
+
+- judgements/ (Suva's relevance list BG_Urteile_2025_Q4_2026_Q1.xlsx and its
+  55 summary exports) and "28112026 HackApertus – Challenge Pitch.pdf" are
+  Suva's material, supplied through the organisers' template. They are Suva's,
+  not ours to license, and they are kept unchanged where the template put them.
+- challenge_description.md is the organisers' text, kept unchanged.
+
+Third-party code
+----------------
+
+None copied so far. Every third-party file copied into this repository is
+listed here with its source, its licence and its copyright notice (D-036).
+Dependencies installed from package registries are declared in pyproject.toml
+and uv.lock, not copied.

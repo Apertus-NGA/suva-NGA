@@ -1,4 +1,4 @@
-"""Swiss Case Law (Hugging Face) source adapter: tier 3 (docs/ARCHITECTURE.md 3.4, 4, 6, 7).
+"""Swiss Case Law (Hugging Face) source adapter: tier 3 (docs/DATA_LAYER.md 3.4, 4, 6, 7).
 
 `fetch` verifies the two pinned originals in RAW_DIR and writes the window subset to SNAPSHOT_DIR.
 `parse` reads only that subset. Nothing is cleaned, collapsed or rejected here: the reconciler does that.

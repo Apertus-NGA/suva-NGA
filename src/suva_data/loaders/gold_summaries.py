@@ -1,4 +1,4 @@
-"""Loader for the human-written reference summaries (docs/ARCHITECTURE.md, section 3.2).
+"""Loader for the human-written reference summaries (docs/DATA_LAYER.md, section 3.2).
 
 `read_gold_summaries` is pure (HTML files -> dataclasses); `write_gold_summaries` attaches them to
 `rulings` in one transaction. Standard library only.

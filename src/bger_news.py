@@ -1,4 +1,4 @@
-"""Compatibility shim: the crawler now lives in suva_data.sources.bger_lists (docs/ARCHITECTURE.md 3.3).
+"""Compatibility shim: the crawler now lives in suva_data.sources.bger_lists (docs/DATA_LAYER.md 3.3).
 
 Kept so existing notebooks that import `bger_news` keep working. New code should use BgerListAdapter.
 """

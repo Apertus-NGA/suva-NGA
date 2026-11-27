@@ -1,4 +1,4 @@
-"""Labels loader: the three xlsx rules (ARCHITECTURE 3.1), the real-file numbers, and the database contract."""
+"""Labels loader: the three xlsx rules (DATA_LAYER 3.1), the real-file numbers, and the database contract."""
 
 from __future__ import annotations
 

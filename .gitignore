@@ -26,6 +26,21 @@ build/
 .idea/
 .vscode/
 
+# --- Added by the team (D-044). The template's lines above stay unchanged. ---
+# Suva material received outside the template (D-019) and artefacts derived from judgements/ while D-031 is open
+data/private/
+data/derived/
+# Scratch work and tool caches
+tmp/
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.log
+# Office lock files: Excel and Word write the user's name into them (G13)
+~$*
+
+# --- Data layer, web UI and research (appended) ---
 # Crawled bger.ch pages (re-creatable with src/bger_news.py)
 data/cache/
 

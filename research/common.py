@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parent
 CACHE = ROOT / "cache"
 OUT = ROOT / "out"
-DSN = "postgresql://postgres:suva@localhost:54329/suva"
+DSN = "postgresql://suva@localhost:54329/suva"
 LABELLED = ["2025 Q4", "2026 Q1"]
 
 SUVA = r"\b(?:Suva|SUVA|CNA|INSAI)\b|Unfallversicherungsanstalt|Caisse nationale suisse|Istituto nazionale svizzero"

@@ -1,4 +1,4 @@
-"""Text normalisation, hashing and the bad-text check shared by all sources (docs/ARCHITECTURE.md 6, 6.1)."""
+"""Text normalisation, hashing and the bad-text check shared by all sources (docs/DATA_LAYER.md 6, 6.1)."""
 
 from __future__ import annotations
 

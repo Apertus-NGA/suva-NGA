@@ -165,7 +165,7 @@ def cmd_dump(args) -> int:
     """pg_dump inside the db container -> gzip (no timestamp in the gzip header, so equal content gives equal bytes)."""
     config.DUMP_DIR.mkdir(parents=True, exist_ok=True)
     out = config.DUMP_DIR / DUMP_NAME
-    cmd = ["docker", "compose", "exec", "-T", "db", "pg_dump", "-U", "postgres", "--no-owner", "--no-privileges",
+    cmd = ["docker", "compose", "exec", "-T", "db", "pg_dump", "-U", "suva", "--no-owner", "--no-privileges",
            "--exclude-table-data=ingest_runs",
            "--restrict-key=suvadata",  # pg_dump otherwise writes a random key, so equal content would not give equal bytes
            "suva"]

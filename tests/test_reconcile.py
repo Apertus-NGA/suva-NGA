@@ -1,4 +1,4 @@
-"""The hierarchy of truth, duplicate handling and bad-text fallback (docs/ARCHITECTURE.md 4, 6, 6.1)."""
+"""The hierarchy of truth, duplicate handling and bad-text fallback (docs/DATA_LAYER.md 4, 6, 6.1)."""
 
 import pytest
 

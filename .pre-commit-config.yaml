@@ -1,0 +1,20 @@
+# Pre-commit hooks (docs/agents/platform.md step 3). Install once: `uvx pre-commit install`.
+# gitleaks catches keys and tokens; it does not catch Suva-derived content (D-031):
+# that is what data/derived/ in .gitignore and tests/test_no_suva_personal_fields.py are for.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: no-office-lock-files
+        name: no Office lock files (they hold a user name, G13)
+        entry: Office lock files (~$*) must never be committed
+        language: fail
+        files: (^|/)~\$
+      - id: no-private-or-derived-data
+        name: nothing from data/private/ or data/derived/ (D-019, D-031)
+        entry: data/private/ and data/derived/ are never committed while D-031 is open
+        language: fail
+        files: ^data/(private|derived)/

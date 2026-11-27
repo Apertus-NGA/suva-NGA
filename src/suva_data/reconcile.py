@@ -1,6 +1,6 @@
 """Build the canonical `rulings` table from `source_records`, applying the hierarchy of truth.
 
-docs/ARCHITECTURE.md sections 4, 6 and 6.1. In short:
+docs/DATA_LAYER.md sections 4, 6 and 6.1. In short:
 
 * One ruling per (docket, decision_date).
 * For every field, the value from the highest tier that has a VALID value wins. A lower tier never

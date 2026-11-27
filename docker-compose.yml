@@ -1,28 +1,48 @@
-# Suva data layer: PostgreSQL 16 (docs/ARCHITECTURE.md, section 9).
-#   docker compose up -d db
-# The port is published on localhost only and matches config.DATABASE_URL
-# (postgresql://postgres:suva@localhost:54329/suva).
+# Postgres with pgvector, and the app (docs/agents/platform.md step 9). Images pinned by digest.
+# Usage: docker compose run --rm app make run   (or: docker compose up)
+# Data layer only (docs/DATA_LAYER.md, section 9): docker compose up -d db
 services:
   db:
-    image: postgres:16
+    image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+    platform: linux/amd64
     environment:
-      POSTGRES_PASSWORD: suva
       POSTGRES_DB: suva
+      POSTGRES_USER: suva
+      # Local database, reachable from this machine only (the port below is bound to 127.0.0.1), so no
+      # password is stored here. On a shared host, set POSTGRES_PASSWORD in .env and drop this line.
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
+      # Localhost only; matches the default of suva_data.config.DATABASE_URL.
       - "127.0.0.1:54329:5432"
     volumes:
-      - suva_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       # Files here (the published dump) are loaded by Postgres on FIRST start only (empty volume).
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d suva"]
+      test: ["CMD-SHELL", "pg_isready -U suva -d suva"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 5s
 
-  # app: the application service (pipeline / later stages) goes here. It will use
-  #   DATABASE_URL=postgresql://postgres:suva@db:5432/suva  and  depends_on: db (condition: service_healthy).
+  app:
+    build: .
+    platform: linux/amd64
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://suva@db:5432/suva
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      # Suva-derived artefacts stay outside the image and outside git while D-031 is open.
+      - ./data/derived:/app/data/derived
+      - ./results:/app/results
+    command: ["make", "run"]
 
 volumes:
-  suva_pgdata:
+  pgdata:

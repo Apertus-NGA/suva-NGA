@@ -16,7 +16,7 @@ from suva_data import config
 HERE = Path(__file__).parent
 SNAPSHOT = config.SNAPSHOT_DIR / config.SWISS_CASELAW
 IDS = [
-    "bger_8C_72_2025",  # the ruling verified by hand in ARCHITECTURE 3.4
+    "bger_8C_72_2025",  # the ruling verified by hand in DATA_LAYER 3.4
     "bger_1C_359_2025",  # exact duplicate pair ...
     "bger_1C_359_2025-D20251201",  # ... its "-D" twin
     "bger_7B_1356_2025",  # two real rulings on one case number ...

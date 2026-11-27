@@ -3,7 +3,7 @@
 
 Every ruling of the Swiss Federal Supreme Court (Bundesgericht, BGer) **decided between 1 October 2025 and 30 June 2026** (6,032 rulings, all divisions), plus 23 earlier rulings that have a human reference summary: **6,055 rulings** with full text, metadata, Suva's relevance labels and Suva's human-written summaries.
 
-Built by team `suva-nga` for the Suva challenge at Hack Apertus Zurich. The code that builds it is in the team's GitHub repository (`Apertus-NGA/suva-NGA`, `src/suva_data/`, plan in `docs/ARCHITECTURE.md`).
+Built by team `suva-nga` for the Suva challenge at Hack Apertus Zurich. The code that builds it is in the team's GitHub repository (`Apertus-NGA/suva-NGA`, `src/suva_data/`, plan in `docs/DATA_LAYER.md`).
 
 ## What is in this repository
 

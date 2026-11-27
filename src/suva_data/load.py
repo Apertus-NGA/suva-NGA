@@ -1,4 +1,4 @@
-"""Load snapshot files and SourceRecords into Postgres (docs/ARCHITECTURE.md 5, 6, 6.1).
+"""Load snapshot files and SourceRecords into Postgres (docs/DATA_LAYER.md 5, 6, 6.1).
 
 Nothing is dropped here: every record with a usable (source, source_key) gets a `source_records` row.
 Records that fail validation are stored with status='rejected' and a status_reason starting with 'load: '.

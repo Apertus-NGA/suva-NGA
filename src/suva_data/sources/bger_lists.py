@@ -2,7 +2,7 @@
 
 One list per weekday. Each list gives, per ruling: decision date, case number, link to the full
 text, a publication star (BGE candidate), subject area (Sachgebiet) and a subject line. The list's
-own date is the ruling's publication date. See docs/ARCHITECTURE.md 3.3, 4 and 6.1.
+own date is the ruling's publication date. See docs/DATA_LAYER.md 3.3, 4 and 6.1.
 
 Snapshot layout: ``SNAPSHOT_DIR/bger_list/YYYYMMDD.html``, one file per requested calendar day,
 stored as UTF-8. A file with an empty body is evidence that the day had no list (weekends).

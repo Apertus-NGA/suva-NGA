@@ -1,6 +1,6 @@
 """Checks that the built database is what it should be, a content fingerprint, and the quality report.
 
-docs/ARCHITECTURE.md section 6 ("Invariants"), 6.1 (#4 accounting, #10 report) and 7 (reproducibility).
+docs/DATA_LAYER.md section 6 ("Invariants"), 6.1 (#4 accounting, #10 report) and 7 (reproducibility).
 """
 
 from __future__ import annotations

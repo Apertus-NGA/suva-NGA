@@ -1,6 +1,6 @@
 """Single place for paths, the decision-date window, pinned versions and the hierarchy of truth.
 
-Nothing else in the package may hard-code these values (docs/ARCHITECTURE.md, sections 2, 4, 11).
+Nothing else in the package may hard-code these values (docs/DATA_LAYER.md, sections 2, 4, 11).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ DUMP_DIR = DATA_DIR / "dump"
 MANIFEST_PATH = DATA_DIR / "manifest.json"  # committed
 QUALITY_REPORT_PATH = DATA_DIR / "quality_report.md"
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:suva@localhost:54329/suva")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://suva@localhost:54329/suva")
 
 # --- sources, in order of trust (tier 1 = ground truth) ---------------------------------------
 BGER_LIST = "bger_list"  # bger.ch daily "Neue Entscheide" lists

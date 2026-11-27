@@ -1,4 +1,4 @@
-"""Database plumbing: connection, migrations runner, ingest_runs bookkeeping (docs/ARCHITECTURE.md 5, 7).
+"""Database plumbing: connection, migrations runner, ingest_runs bookkeeping (docs/DATA_LAYER.md 5, 7).
 
 Transaction convention used by this package: `connect()` returns an AUTOCOMMIT connection and every
 multi-statement write is wrapped in `with conn.transaction():`. So a function either fully applies or

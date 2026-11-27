@@ -1,4 +1,4 @@
-"""Loader for Suva's relevance labels (docs/ARCHITECTURE.md, section 3.1).
+"""Loader for Suva's relevance labels (docs/DATA_LAYER.md, section 3.1).
 
 `read_labels` is pure (xlsx -> rows); `write_labels` attaches them to `rulings` in one transaction.
 

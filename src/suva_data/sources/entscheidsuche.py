@@ -1,6 +1,6 @@
 """entscheidsuche.ch source adapter (tier 2): bulk search API -> deterministic page files -> SourceRecords.
 
-docs/ARCHITECTURE.md 3.5, 4, 6, 7. `fetch` is the only method that uses the network; it talks to
+docs/DATA_LAYER.md 3.5, 4, 6, 7. `fetch` is the only method that uses the network; it talks to
 config.ENTSCHEIDSUCHE_SEARCH_URL only, sequentially, with a pause between requests.
 
 Snapshot layout (relative to SNAPSHOT_DIR):
