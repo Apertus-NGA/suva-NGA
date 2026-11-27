@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Design tokens. Every colour and typeface in the UI comes from here.
+   A near-black sidebar, a warm grey canvas with white cards on it, ink for text, data marks and the
+   primary action. One accent, Suva orange, used only for what is relevant (and the brand mark). */
+@theme {
+  --color-canvas: #f4f3ef;
+  --color-surface: #ffffff;
+  --color-wash: #f4f3ef;
+  --color-line: #ebe9e4;
+  --color-line-strong: #d8d5ce;
+  --color-ink: #161614;
+  --color-muted: #63615b;
+  --color-faint: #99968e;
+  --color-accent: #ff8200;
+  --color-accent-text: #a44e00; /* orange dark enough to read as text on white */
+  --color-accent-wash: #fff0dc;
+
+  --color-night: #0f0f0e;
+  --color-night-raised: #252523;
+  --color-night-line: #2a2a27;
+  --color-night-text: #edebe6;
+  --color-night-muted: #a19e96;
+
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-popover: 0 1px 2px rgb(22 22 20 / 0.05), 0 12px 32px rgb(22 22 20 / 0.10);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* One focus style everywhere. */
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}

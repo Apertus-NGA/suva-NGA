@@ -1,0 +1,41 @@
+[project]
+name = "suva-nga"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.165.0",
+    "huggingface-hub>=2.5.0",
+    "openpyxl>=3.1.5",
+    "psycopg[binary]>=3.3.9",
+    "pyarrow>=26.0.1",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "matplotlib>=3.11.2",
+    "nbconvert>=7.17.2",
+    "pandas>=3.1.1",
+    "pytest>=9.2.0",
+]
+research = [
+    "scikit-learn>=1.9.1",
+    "sentence-transformers>=6.3.0",
+    "xgboost>=3.4.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/suva_data", "src/suva_app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["db: needs the Postgres test database (docker compose up -d db)"]
+
+[tool.uv]
+# Keep the research packages installed whenever any session syncs the environment.
+default-groups = ["dev", "research"]
