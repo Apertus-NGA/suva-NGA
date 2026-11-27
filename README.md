@@ -48,6 +48,10 @@ LLM_BASE_URL — endpoint base URL
 LLM_API_KEY — your API key
 ```
 
+### How to run this project
+
+> Added by the team. Run instructions are in [technical_report.md](technical_report.md), section 6 "Reproducibility", "How to run". In short: set `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (live calls only), then `make run`.
+
 ## 📦 Submission Requirements & Deliverables
 
 The submission must:
@@ -81,6 +85,18 @@ The submission must:
 ## License
 
 All Hack Apertus projects are open-sourced. Please check our Terms & Conditions for specific licensing details (6. What you build is open source): https://hackapertus.ch/terms-and-conditions
+
+### Licences of this project (PROPOSED, D-048)
+
+> Added by the team. The organisers' text above is unchanged. Status: PROPOSED until the lead has read section 6 of the Terms & Conditions (D-048; Q-24 to the organisers if unclear).
+
+| What | Licence |
+| --- | --- |
+| Our code (`src/`, `tests/`, `eval/`, `Makefile`, Docker and CI files) | Apache-2.0 (`LICENSE`) |
+| Our documentation: `docs/`, `AGENTS.md`, `CLAUDE.md`, `MODELS.md`, `technical_report.md`, the report PDF | CC-BY-4.0 |
+| Datasets we create (`data/public/`) | CDLA-Permissive-2.0 |
+| Suva's material from the template (`judgements/`, the pitch PDF) and the organisers' `challenge_description.md` | not ours: their own terms (`NOTICE`) |
+| Other third-party material | its own licence (`NOTICE`) |
 
 ## Support
 

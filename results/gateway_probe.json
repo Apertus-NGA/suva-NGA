@@ -1,0 +1,982 @@
+{
+  "probe_version": "1",
+  "started_at": "2026-11-27T17:26:36+00:00",
+  "finished_at": "2026-11-27T17:27:55+00:00",
+  "mode": "LIVE",
+  "llm_name": "apertus-v1-5-70b",
+  "llm_name_small": "apertus-v1-5-8b",
+  "models_probed": [
+    "apertus-v1-5-70b",
+    "apertus-v1-5-8b"
+  ],
+  "allow_list": [
+    "apertus-v1-5-70b",
+    "apertus-v1-5-8b",
+    "swiss-ai/Apertus-v1.5-70B",
+    "swiss-ai/Apertus-v1.5-8B"
+  ],
+  "calls": 30,
+  "errors": 0,
+  "served_models_seen": [
+    "apertus-v1-5-70b",
+    "apertus-v1-5-8b"
+  ],
+  "served_rejected": 0,
+  "served_mismatch": 0,
+  "header_present": 30,
+  "header_missing": 0,
+  "items": {
+    "models": {
+      "status": 200,
+      "latency_s": 0.06,
+      "ids": [
+        "apertus-v1-5-70b",
+        "apertus-v1-5-70b-thinking",
+        "apertus-v1-5-8b",
+        "apertus-v1-5-8b-thinking"
+      ],
+      "fields": [
+        "capabilities",
+        "created",
+        "created_at",
+        "description",
+        "display_name",
+        "id",
+        "location",
+        "max_context_tokens",
+        "object",
+        "owned_by",
+        "type"
+      ]
+    },
+    "latency[apertus-v1-5-70b]": {
+      "first_call_s": 1.238,
+      "first_status": 200,
+      "warm_median_s": 0.172,
+      "warm_max_s": 0.242,
+      "warm_ok": 3,
+      "warm_calls": 3
+    },
+    "noise[apertus-v1-5-70b]": {
+      "identical": true,
+      "runs": 2
+    },
+    "latency[apertus-v1-5-8b]": {
+      "first_call_s": 1.261,
+      "first_status": 200,
+      "warm_median_s": 0.358,
+      "warm_max_s": 0.541,
+      "warm_ok": 3,
+      "warm_calls": 3
+    },
+    "noise[apertus-v1-5-8b]": {
+      "identical": true,
+      "runs": 2
+    },
+    "json_modes": {
+      "json_schema_strict": {
+        "status": 200,
+        "error": null,
+        "valid_json": true,
+        "key_order": [
+          "alpha",
+          "mid",
+          "zeta"
+        ],
+        "matches_schema_keys": true
+      },
+      "json_object": {
+        "status": 200,
+        "error": null,
+        "valid_json": true,
+        "key_order": [
+          "zeta",
+          "alpha",
+          "mid"
+        ],
+        "matches_schema_keys": true
+      }
+    },
+    "top_logprobs": {
+      "status": 200,
+      "error": null,
+      "first_token": "Ja",
+      "n_top": 20,
+      "top5": [
+        [
+          "Ja",
+          -0.007
+        ],
+        [
+          "Nein",
+          -5.007
+        ],
+        [
+          "Yes",
+          -11.507
+        ],
+        [
+          "Ne",
+          -12.007
+        ],
+        [
+          " Ja",
+          -12.757
+        ]
+      ],
+      "works": true
+    },
+    "streaming": {
+      "status": 200,
+      "ttft_s": 1.056,
+      "latency_s": 1.156,
+      "chunks": 8,
+      "finish_reason": "stop",
+      "error": null
+    },
+    "two_system_messages": {
+      "status": 400
+    },
+    "identity": {
+      "pairs": 5,
+      "identical": 1,
+      "alert": false
+    },
+    "long_generation[apertus-v1-5-70b]": {
+      "status": 200,
+      "latency_s": 43.545,
+      "ttft_s": 0.849,
+      "completion_tokens": null,
+      "tokens_per_s": null,
+      "finish_reason": "length"
+    },
+    "long_generation[apertus-v1-5-8b]": {
+      "status": 200,
+      "latency_s": 17.197,
+      "ttft_s": 0.125,
+      "completion_tokens": null,
+      "tokens_per_s": null,
+      "finish_reason": "stop"
+    },
+    "input_sizes": [
+      {
+        "target_tokens": 5000,
+        "prompt_tokens": 4701,
+        "status": 200,
+        "latency_s": 0.585,
+        "error": null
+      }
+    ]
+  },
+  "call_log": [
+    {
+      "item": "latency_first",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:36+00:00",
+      "latency_s": 1.238,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:37+00:00",
+      "latency_s": 0.242,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:37+00:00",
+      "latency_s": 0.172,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:37+00:00",
+      "latency_s": 0.164,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "noise",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:38+00:00",
+      "latency_s": 1.371,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "noise",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:39+00:00",
+      "latency_s": 0.172,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 51,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_first",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:39+00:00",
+      "latency_s": 1.261,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:40+00:00",
+      "latency_s": 0.541,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:41+00:00",
+      "latency_s": 0.18,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "latency_warm",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:41+00:00",
+      "latency_s": 0.358,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "noise",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:42+00:00",
+      "latency_s": 1.144,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "noise",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:43+00:00",
+      "latency_s": 0.524,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "json_schema_strict",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:43+00:00",
+      "latency_s": 0.829,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 48,
+        "total_tokens": 72,
+        "completion_tokens": 24,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "json_object",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:44+00:00",
+      "latency_s": 0.45,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 48,
+        "total_tokens": 72,
+        "completion_tokens": 24,
+        "prompt_tokens_details": {
+          "cached_tokens": 32,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "top_logprobs",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:44+00:00",
+      "latency_s": 0.257,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "length",
+      "usage": {
+        "prompt_tokens": 47,
+        "total_tokens": 48,
+        "completion_tokens": 1,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "streaming",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:45+00:00",
+      "chunks": 8,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "ttft_s": 1.056,
+      "finish_reason": "stop",
+      "latency_s": 1.156,
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "two_system_messages",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:46+00:00",
+      "latency_s": 0.064,
+      "status": 400,
+      "header": "apertus-v1-5-70b",
+      "error": "{\"error\":{\"message\":\"Invalid message role\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}",
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": null,
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:46+00:00",
+      "latency_s": 0.552,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "total_tokens": 72,
+        "completion_tokens": 30,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:47+00:00",
+      "latency_s": 0.639,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "total_tokens": 57,
+        "completion_tokens": 15,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:47+00:00",
+      "latency_s": 0.913,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "total_tokens": 49,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:48+00:00",
+      "latency_s": 1.139,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "total_tokens": 49,
+        "completion_tokens": 7,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:49+00:00",
+      "latency_s": 1.215,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 48,
+        "completion_tokens": 4,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:50+00:00",
+      "latency_s": 0.259,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 47,
+        "completion_tokens": 3,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:51+00:00",
+      "latency_s": 0.215,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:51+00:00",
+      "latency_s": 1.164,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 53,
+        "completion_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:52+00:00",
+      "latency_s": 1.074,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 40,
+        "total_tokens": 61,
+        "completion_tokens": 21,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "identity",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:26:53+00:00",
+      "latency_s": 0.975,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 40,
+        "total_tokens": 52,
+        "completion_tokens": 12,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "long_generation",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:26:54+00:00",
+      "chunks": 901,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "ttft_s": 0.849,
+      "finish_reason": "length",
+      "latency_s": 43.545,
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "long_generation",
+      "requested": "apertus-v1-5-8b",
+      "at": "2026-11-27T17:27:38+00:00",
+      "chunks": 627,
+      "status": 200,
+      "header": "apertus-v1-5-8b",
+      "served": "apertus-v1-5-8b",
+      "ttft_s": 0.125,
+      "finish_reason": "stop",
+      "latency_s": 17.197,
+      "served_check": {
+        "requested": "apertus-v1-5-8b",
+        "served": "apertus-v1-5-8b",
+        "header": "apertus-v1-5-8b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    },
+    {
+      "item": "size_5000",
+      "requested": "apertus-v1-5-70b",
+      "at": "2026-11-27T17:27:55+00:00",
+      "latency_s": 0.585,
+      "status": 200,
+      "header": "apertus-v1-5-70b",
+      "served": "apertus-v1-5-70b",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4701,
+        "total_tokens": 4704,
+        "completion_tokens": 3,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        }
+      },
+      "served_check": {
+        "requested": "apertus-v1-5-70b",
+        "served": "apertus-v1-5-70b",
+        "header": "apertus-v1-5-70b",
+        "header_present": true,
+        "accepted": true,
+        "mismatch": false,
+        "reason": "ok"
+      }
+    }
+  ]
+}
