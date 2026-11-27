@@ -1,12 +1,13 @@
 # STATE: where the project is now
 
-> **Last updated: Friday 27 Nov 2026, 18:00 CET (template facts added after the official template was read; provenance of the 2,096 list and measured populations added; the "Built so far" line still needs the platform owner's check), by `<handle>`.** Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
+> **Last updated: Friday 27 Nov 2026, 18:15 CET (template check of `docs/agents/platform.md` step 1 done: §1 "Visibility" and "Built so far", §3 template HEAD), by the platform agent working for `TheDiRocco`.** Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
 
 ## 1. Build
 
 - Hacking started Fri 11:30. Allocated challenge: Suva.
 - Repository: <https://github.com/Apertus-NGA/suva-NGA> (in the `Apertus-NGA` GitHub organisation), created from the organisers' Suva template.
-- Visibility: `<private/public>`. Who in `Apertus-NGA` can switch it to public: `<handle>`. Needed before submission; the repo then stays public (D-039).
+- Visibility: **public** already (GitHub API, Fri 27 Nov 18:12 CET): every push is published at once. Who in `Apertus-NGA` can change it: the organisation admins `TheDiRocco`, `Bananagoo`, `RabahSend` (GitHub API). It must stay public (D-039).
+- How the repo was created: with the template's full history (`main` = the template's commit `3359516` of 25 Nov), not through "Use this template": GitHub shows no "generated from" link (`template_repository` is empty). The template asks for "Use this template" (`docs/EVENT.md` §3): raise with the organisers if they check it (Q-22/Q-23 channel).
 - Registered team name (sprintd): `<to fill>`, used in `README.md`, `LICENSE`, the report header and the PDF name.
 - Template: <https://github.com/HackApertus/zurich-suva> (shown as "Public template" on GitHub), read at commit `c6e50ba` (Fri 27 Nov 11:30). Template files, never renamed or moved (D-039); never deleted (our rule, D-044):
   - `README.md` (the organisers' text; fill "Add your team name"), `challenge_description.md` (Suva's written challenge, never edited: our rule, D-044), `technical_report.md` (the report), `LICENSE` (Apache-2.0; its line "Copyright 2026 Your Team" is a placeholder, D-045), `.gitignore` (appended to, never replaced, D-044), `src/.gitkeep`;
@@ -14,7 +15,8 @@
   - `28112026 HackApertus – Challenge Pitch.pdf` at the root: Suva's deck (never edited: our rule, D-040). The name contains spaces and an en dash.
 - Not in the template, all ours: `Makefile`, `Dockerfile`, compose file, `.env.example` (the template's `.gitignore` already lets it through), CI, `docs/`, `data/`, tests. `make run` is our convention (D-042).
 - Imposed names: `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY`; `<TeamName>_Report.pdf` at the root (our registered team name, no spaces; Q-22); the **Demo** field at the top of `technical_report.md`. All template rules: `docs/EVENT.md` §3.
-- Built so far: the template files only `<check: repo created at <time>; pitch PDF present: yes/no; judgements/ manifest = aee08754…: yes/no>`. A repo created from the template before Fri 11:30 lacks the pitch PDF: copy it in unchanged from the template. This kit will be the first team commit (declared pre-existing material, D-029).
+- Template check (Fri 27 Nov 18:12 CET, `docs/agents/platform.md` step 1): `main` was at `3359516` (template state of 25 Nov) and lacked only the pitch PDF. It is brought in as the template's own commit `c6e50ba`, unchanged, at the base of branch `platform/first-two-hours`. Every template file is at its path. Hashes: pitch PDF `1ed75386…` yes; `challenge_description.md` `efdd0232…` yes; workbook `f7146cfd…` yes; `judgements/` manifest `aee08754…` yes, over its 58 tracked files. An Excel lock file (`judgements/~$BG_Urteile_2025_Q4_2026_Q1.xlsx`, created while someone has the workbook open in Excel; Excel writes that user's name into it) sat untracked in the working tree until 18:12: it changes the result of `sha256sum *`, and it must never be committed (G13). The layout test skips Office lock files and `.gitignore` ignores them.
+- Built so far: the kit, committed unchanged as one labelled commit tagged `kit-v0` (declared pre-existing material, D-029).
 - Next step: `docs/agents/platform.md` (check the repo against the template, then skeleton, contracts, gateway probe).
 
 ## 2. Inputs inventory
@@ -39,7 +41,7 @@ Every role starts by finding its input. Fill the blanks as soon as they are know
 | bger.ch from the venue, ordinary browser at human pace | `<not yet recorded>` | |
 | Hugging Face dataset from the venue | `<not yet recorded>` | |
 | Gateway probe (`make smoke-llm`) | `<not yet run>` with the repo's client → `results/gateway_probe.json`. A first test ran on 27 Nov, 16:26 to 16:46 CET, outside the repo (one key, 423 calls): results in `docs/LESSONS.md` §1, column "Ours", and §2b; its scripts are not in the repo yet (to commit with the lead's OK) | |
-| Template HEAD (`git ls-remote https://github.com/HackApertus/zurich-suva.git main`). Re-check at every sync. If it moved, bring the organisers' change into our repo exactly as they made it (D-039; Q-26 for `judgements/`) and record it here. | `c6e50ba` (the commit this kit was checked against) | Fri 27 Nov, 16:25 CET |
+| Template HEAD (`git ls-remote https://github.com/HackApertus/zurich-suva.git main`). Re-check at every sync. If it moved, bring the organisers' change into our repo exactly as they made it (D-039; Q-26 for `judgements/`) and record it here. | `c6e50ba` (the commit this kit was checked against); re-checked: unchanged. Our `main` was at `3359516`; the only difference was the pitch PDF, brought in unchanged as commit `c6e50ba` | Fri 27 Nov, 16:25 CET; re-checked 18:12 CET |
 | Publication dates of the 11 boundary dockets listed in D-050 (the single home of the list; T32), from the Neuheiten pages (authoritative, D-010). The HF dataset's publication date is unreliable (D-011): use it only to narrow which days to fetch, from each boundary to about 10 weeks after it | `<not yet run>`; the result goes to D-050 and Q-02 | |
 | Questions asked at the partner workshop (Fri 10:30) | `<to fill>`: which Q-ids, if any, and the answers (answers are recorded in `docs/DECISIONS.md` §3) | Fri 27 Nov, 10:30 |
 
