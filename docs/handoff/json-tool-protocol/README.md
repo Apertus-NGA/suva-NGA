@@ -19,6 +19,8 @@ team and the next agent can implement it from the repository.
 - **Where the brief and `BOOTSTRAP.md` say** the handoff sits in `tmp/json-tool-protocol/` and is
   never committed, read this folder instead. The rule that remains: never copy `upstream/`,
   `examples/`, `smoke/` or the reference `conftest.py` into the code tree.
+- **Layout (D-059):** `src/` holds code and the data it reads at run time, nothing else. The
+  import PR copies `reference/src/llm/tool_protocol/README.md` into `docs/`, never into `src/`.
 - **Status:** not implemented. In its own tree: 263 tests passed, 1 skipped, 6 live tests
   deselected. After the port, the two tool test paths should give 246 passed, 1 skipped,
   6 deselected.
