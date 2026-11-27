@@ -1,0 +1,12 @@
+# Added by the team (docs/agents/platform.md step 3). The template has no .gitattributes.
+# LF everywhere, so that hashes and diffs are the same on macOS, Linux and Windows.
+* text=auto eol=lf
+
+# Suva's material from the template is kept byte for byte (D-040): never converted,
+# so that the judgements/ manifest and the pitch PDF hash hold on every machine.
+judgements/** -text
+*.pdf binary
+*.xlsx binary
+*.parquet binary
+*.png binary
+*.jpg binary
