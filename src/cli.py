@@ -76,12 +76,6 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_smoke_llm(args: argparse.Namespace) -> int:
-    from src.llm import probe
-
-    return probe.main(args.rest)
-
-
 def cmd_warmup(args: argparse.Namespace) -> int:
     """Warm the large model before a demo or a measurement: 3 short calls, never cached (random nonce)."""
     from src.llm.client import LLMError, client_from_env
@@ -108,6 +102,11 @@ def cmd_warmup(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["smoke-llm"]:  # pass every flag through to the probe (argparse cannot, after a subcommand)
+        from src.llm import probe
+
+        return probe.main(argv[1:])
     ap = argparse.ArgumentParser(prog="python -m src.cli")
     sub = ap.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run", help="end-to-end pipeline (make run)")
@@ -115,8 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--limit", type=int)
     run.add_argument("--all", action="store_true")
     run.add_argument("--dry-run", action="store_true")
-    smoke = sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py)")
-    smoke.add_argument("rest", nargs=argparse.REMAINDER)
+    sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py); flags go to the probe")
     warm = sub.add_parser("warmup", help="warm the large model")
     warm.add_argument("--dry-run", action="store_true")
     stubs = {
@@ -136,8 +134,6 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "run":
         return cmd_run(args)
-    if args.cmd == "smoke-llm":
-        return cmd_smoke_llm(args)
     if args.cmd == "warmup":
         return cmd_warmup(args)
     return stub(args.cmd, args.would)

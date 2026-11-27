@@ -205,7 +205,9 @@ class Probe:
         return out
 
     def streaming(self, model: str) -> dict[str, Any]:
-        rec = self.chat(model, self.msgs(SHORT), "streaming", max_tokens=40, stream=True)
+        rec = self.chat(
+            model, self.msgs(SHORT), "streaming", max_tokens=40, stream=True, stream_options={"include_usage": True}
+        )
         return {k: rec.get(k) for k in ("status", "ttft_s", "latency_s", "chunks", "finish_reason", "error")}
 
     def two_system_messages(self, model: str) -> dict[str, Any]:
@@ -224,7 +226,14 @@ class Probe:
 
     def long_generation(self, model: str) -> dict[str, Any]:
         prompt = "Write about 600 words, in German, on the history of Swiss social insurance."
-        rec = self.chat(model, self.msgs(prompt), "long_generation", max_tokens=900, stream=True)
+        rec = self.chat(
+            model,
+            self.msgs(prompt),
+            "long_generation",
+            max_tokens=900,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
         tokens = ((rec.get("usage") or {}).get("completion_tokens")) or None
         lat = rec.get("latency_s")
         return {
