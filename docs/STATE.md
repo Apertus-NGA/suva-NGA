@@ -1,6 +1,6 @@
 # STATE: where the project is now
 
-> **Last updated: Friday 27 Nov 2026, 18:15 CET (template check of `docs/agents/platform.md` step 1 done: §1 "Visibility" and "Built so far", §3 template HEAD), by the platform agent working for `TheDiRocco`.** Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
+> **Last updated: Friday 27 Nov 2026, 20:30 CET** (summary measurement note, `docs/summary_measurement.md`). Previous update: 18:15 CET, platform template check. Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
 
 ## 1. Build
 
@@ -25,6 +25,7 @@
   - tests: contracts, client (declared mock, T25, T26), doctrines (G2, G3, no network at import), models registry, template layout (T28), D-051 output test (T31). `make check`: 73 passed.
 - Stubs (print STUB and what they will do): every pipeline stage of `make run` (S0 to S10 and the comparison with `expected/`), `serve`, `crawl`, `refit`, `eval`, `eval-private`, `claims`. Client still without: the AIMD limiter shared across processes, the circuit breaker, streaming, the JSON cascade and repair call. Not tested: the Docker image build (the daemon was not running); CI has not run (nothing pushed).
 - Next step: the lead reviews and merges `platform/first-two-hours` (freezing `src/schemas.py`); crawl starts DS1 and DS2 (`docs/DATA.md` §10, `docs/agents/crawl.md` step 0).
+- Summary probe, written up Fri 27 Nov 20:30 CET in `docs/summary_measurement.md`: one frozen prompt, ten rulings drawn before generation (seed `20261127`, outside Suva's list), then a counter compared with a human reading of the ruling. Agreement 20/20 fiches after the counter was corrected. On 134 fiches already written, 3 German texts are the operative sentence alone. This is not the hold-out of `docs/EVAL.md` §4. The per-fiche JSON was under `data/trial/` and is not in git; that directory is empty on this copy. The generator stays in `tmp/pre-kit/` so it is not inside `src/` (G2).
 
 ## 2. Inputs inventory
 
