@@ -39,7 +39,7 @@ def _gate(docket: str, area: object, text: str, title: object = None):
     from courts import area_for_gate, decide
 
     filled = area_for_gate(area, title)
-    return decide(docket, filled, text), filled
+    return decide(docket, area, text, title), filled
 
 
 def load_env() -> None:

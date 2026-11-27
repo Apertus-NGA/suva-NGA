@@ -9,6 +9,7 @@
 | Role | Model | Exact id / revision | Endpoint or source | Licence | Status |
 |---|---|---|---|---|---|
 | Core: relevance judgement on candidate rulings, key statement, summaries DE/FR | Apertus 1.5 70B (instruct, thinking off) | gateway `apertus-v1-5-70b`; Hugging Face `swiss-ai/Apertus-v1.5-70B` | Keera gateway (`LLM_BASE_URL`), or the endpoint the judges set in `LLM_BASE_URL` (CSCS possible) | check model card | DECIDED (Apertus mandatory); role split OPEN (D-021, D-022) |
+| Candidate gate: read a ruling's matter where code cannot (`src/area_judge.py`, D-060) | Apertus 1.5 70B (instruct, thinking off) | `LLM_NAME` (gateway `apertus-v1-5-70b`) | Keera gateway, through `src/llm/` | as the core row | PROPOSED (D-060) |
 | Light tasks: query translation, quick prioritisation, demo fallback | Apertus 1.5 8B | gateway `apertus-v1-5-8b`; Hugging Face `swiss-ai/Apertus-v1.5-8B` | Keera gateway, or the endpoint the judges set | check model card | OPEN (D-022); never excludes a ruling alone whatever the answer |
 | Embeddings for search and similar rulings | pplx-embed-context-v1-0.6b | `<revision>`; query-side model to fix | local; weights downloaded at image build time and never committed (the template's `.gitignore` excludes weight files), so a **build-time** external dependency listed in the report's Target architecture | MIT | DECIDED if search uses embeddings (D-005); whether it does is OPEN (D-033) |
 | Embedding baseline | bge-m3 | `<revision>` | local (weights downloaded at build time, as above) | MIT | OPEN (D-020) |
