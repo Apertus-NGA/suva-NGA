@@ -1,0 +1,55 @@
+"""The fiche prompt loads only the glossary of the ruling's matter."""
+
+from src.summarize.prompts import VERSION, category_of, glossary_block, system_prompt
+from src.summarize.summarize import blocking
+from src.summarize.v1.prompts import VERSION as V1
+from src.summarize.v1.prompts import system_prompt as system_v1
+
+
+def test_versions_are_easy_to_tell_apart():
+    assert V1 == "v1"
+    assert VERSION == "v2"
+    assert "UVG, ATSG, UVV" in system_v1("de")
+    assert "Unfallversicherung" in system_prompt("de", "uv")
+    assert "Invalidenversicherung" not in system_v1("de")
+
+
+def test_category_follows_the_neuheiten_subject():
+    assert category_of("Unfallversicherung") == "uv"
+    assert category_of("Assurance-invalidité*") == "iv"
+    assert category_of("Assicurazione malattie") == "kv"
+    assert category_of("Prévoyance professionnelle") == "bv"
+    assert category_of("Vertragsrecht") == "vvg"
+    assert category_of("Arbeitslosenversicherung") == "other"
+
+
+def test_glossary_stays_inside_the_category():
+    uv = glossary_block("fr", "uv")
+    iv = glossary_block("de", "iv")
+    vvg = glossary_block("fr", "vvg")
+    assert "LAA" in uv and "OLAA" in uv and "LPGA" in uv
+    assert "LAI" not in uv and "LAMal" not in uv and "LPP" not in uv
+    assert "IVG" in iv and "IVV" in iv and "ATSG" in iv
+    assert "UVG" not in iv
+    assert "LCA" in vvg and "LPGA" not in vvg and "LAA" not in vvg
+    assert "Art. 6" not in uv
+
+
+def test_operative_sentence_alone_is_a_problem():
+    bare = "Die Beschwerde wird abgewiesen."
+    found = blocking("de", bare, "Demnach erkennt das Bundesgericht: 1. " + bare)
+    assert "critique: fiche is only the operative sentence" in found
+    held = (
+        "Die Suva hatte Prämien für Fremdarbeiten aufgerechnet. "
+        "Das Bundesgericht wies die Beschwerde ab, weil die Feststellung nicht unrichtig war. "
+        "Die Beschwerde wird abgewiesen."
+    )
+    assert "critique: fiche is only the operative sentence" not in blocking("de", held, bare)
+
+
+def test_system_prompt_names_its_matter():
+    assert "Unfallversicherung" in system_prompt("de", "uv")
+    assert "Invalidenversicherung" in system_prompt("de", "iv")
+    assert "Art. 17 ATSG" in system_prompt("de", "uv")
+    assert "Art. 17" not in system_prompt("de", "vvg")
+    assert "LPP" in system_prompt("fr", "bv")

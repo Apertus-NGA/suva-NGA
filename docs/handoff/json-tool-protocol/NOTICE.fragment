@@ -1,0 +1,71 @@
+------------------------------------------------------------------------------
+Third-party code: ArchAI (MIT License)
+------------------------------------------------------------------------------
+Parts of the JSON tool protocol are adapted from ArchAI, a HackApertus 2026 project
+(https://github.com/kirtanp/hackpertus-archives, commit d22b5e601d5f93bb55c96a347ce5f3ff3426758f):
+
+  src/llm/tool_protocol/parse.py      adapted from src/archai/llm.py (extract_json)
+  src/llm/tool_protocol/validate.py   adapted from src/archai/agent.py (repair_args)
+  src/llm/tool_protocol/protocol.py   run_tools follows src/archai/agent.py (run_record_v4)
+  eval/tool_bench/cases.py, score.py  adapted from src/archai/tool_bench.py
+  eval/tool_bench/run.py              native call extraction and the thread-pool runner
+                                      adapted from src/archai/tool_bench.py (_calls_native, main)
+
+The adapted parts were changed (see the header of each file). ArchAI's licence:
+
+MIT License
+
+Copyright (c) 2026 The ArchAI contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
+Acknowledgements (design patterns studied; no code copied)
+------------------------------------------------------------------------------
+The following HackApertus 2026 projects documented patterns or findings that
+shaped this protocol. No code from them is included; they are credited for their
+ideas and reports.
+
+  AlpenRecht (github.com/Anakalypto/AlpenRecht, Apache-2.0): choose labels,
+    not list positions; keyword top-up only when the model failed.
+  apertus-qa (github.com/ventolabs-hq/apertus-qa, Apache-2.0): JSON generation
+    with a rule-based fallback and an explicit "refuse" action.
+  b2bern (github.com/Spaghetti-Overflow/hack-apertus-stregoni, Apache-2.0):
+    argument validation against a JSON schema, a name allow-list, a cap on
+    tool calls, de-duplicated ids, one repair turn that does not echo values.
+  Bern-Fit (github.com/Grozby/kinder-bueno, MIT, Copyright (c) 2026 Grozby):
+    a bounded native tool loop with recovery of calls written as text.
+  Connect-Bern (github.com/CPD9/bern-life, Apache-2.0, Copyright 2026 Peter
+    Dike and contributors): a JSON step protocol with one repair round.
+  gemeindesim (github.com/hatif03/gemeindesim, Apache-2.0): placeholder
+    examples instead of filled examples in the format prompt; dropping an
+    unclosed reasoning span (strip_reasoning_spans), rewritten in parse.py;
+    the report of a strict-mode whitespace runaway on another gateway.
+  mutz (github.com/beSaif/mutz, MIT, Copyright (c) 2026 beSaif and Jumainah
+    Khan): the report that -thinking variants refuse tool_choice.
+  rosetta-flow (github.com/anesask/rosetta-flow, Apache-2.0): nonce-fenced
+    data markers (the idea behind delimit()), and the report of template tokens
+    leaking into text.
+  apertus-fracture (RishiksaiP/BEA-16B; code Apache-2.0, report CC-BY-4.0 per
+    its listing; repository not read): reports of native tool-parser issues on
+    Apertus (tool_call_id dropped by the template, parallel results mixed up).
+  guptachetan1995/apertus (Apache-2.0, Copyright (c) 2026 Chetan Gupta): a
+    single invoke chokepoint; write actions are never registered.
+  Berkeley Function Calling Leaderboard (BFCL): the benchmark categories and
+    AST-style scoring, through ArchAI's tool_bench.

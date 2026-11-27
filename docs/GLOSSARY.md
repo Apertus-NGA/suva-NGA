@@ -12,8 +12,8 @@
 | **Neuheiten** (Liste der Neuheiten) | bger.ch's daily list of rulings newly put online; the only source of the publication date and the star |
 | **Star** (`*`) | mark in the Neuheiten list: ruling destined for publication in the official reports (BGE/ATF) |
 | **Publication date / decision date** | publication date: the date a ruling was put online (the Neuheiten page date), not the decision date. Decision date: the date the Court decided, written in the ruling and in its bger.ch `docid`. The gap is 9 days to about 10 weeks (`docs/CHALLENGE.md` §10). The deck defines Q2/2026 by publication date (D-009); Suva's list labels its quarters by decision date. Which date defines a quarter is open (D-050): every ruling carries both |
-| **Docket** | the case number, e.g. `8C_802/2023` (court 8C, number, year of filing) |
-| **8C, 9C, 4A…** | Federal Court divisions by docket prefix (`docs/DATA.md` §5) |
+| **Docket** | the case number, e.g. `8C_802/2023`: court digit, proceedings letter, sequence, year of filing (`docs/DATA.md` §3 and §5) |
+| **8C, 9C, 4A…** | court digit plus proceedings letter. The digit is the court, the letter the kind of proceedings; the subject is a separate Neuheiten field (`docs/DATA.md` §5) |
 | **E. / consid.** | a numbered consideration (reasoning paragraph) of a ruling. Suva's German examples mix `E.`, `Erw.` and `Erwägung`; its French examples almost always use `consid.` (one writes "voir point"). While Q-30 is open we render `E.` and `consid.` (D-037) |
 | **Signal** | an observable fact about a ruling computed by code, with the text span that proves it (e.g. "Suva is a party") |
 | **SR1-SR9** | Suva's nine example relevance rules (`docs/CHALLENGE.md` §7) |

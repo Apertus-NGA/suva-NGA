@@ -1,0 +1,28 @@
+{
+ "type": "object",
+ "properties": {
+  "a_evidence": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "b_key_statement": {
+   "type": "string"
+  },
+  "c_label": {
+   "type": "string",
+   "enum": [
+    "relevant",
+    "not_relevant",
+    "unclear"
+   ]
+  }
+ },
+ "additionalProperties": false,
+ "required": [
+  "a_evidence",
+  "b_key_statement",
+  "c_label"
+ ]
+}

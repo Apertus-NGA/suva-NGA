@@ -1,0 +1,20 @@
+{
+ "type": "object",
+ "properties": {
+  "a_consideration": {
+   "type": "string"
+  },
+  "b_quote": {
+   "type": "string"
+  },
+  "c_value": {
+   "type": "string"
+  }
+ },
+ "additionalProperties": false,
+ "required": [
+  "a_consideration",
+  "b_quote",
+  "c_value"
+ ]
+}

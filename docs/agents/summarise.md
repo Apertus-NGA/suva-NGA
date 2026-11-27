@@ -8,6 +8,8 @@ For each ruling D-047 names (while open: our top 10 by score; then every selecte
 ## You own
 `src/summarise/`, `src/verify/` (unless split), `prompts/summary_*`, `docs/GLOSSARY.md`, `docs/summary_style.md`.
 
+A probe of legal errors on fiches already written, and how a counter was made to match a human reading, is in `docs/SUMMARY_MEASUREMENT.md` (v1, one prompt). The v2 prompt, one glossary and one prompt per matter, was run on 50 rulings: `docs/SUMMARY_V2.md`. The scripts are `src/summarize/summarize.py` (generator, through `src/llm/client.py` since `acd3f2d`; v1 is `src/summarize/v1/`, v2 is `src/summarize/v2/`) and `src/summarize/tally.py` (counter). That directory is the probe, not the pipeline package `src/summarise/` above. It is not the hold-out of step 5.
+
 ## Inputs
 - Ruling records (considerations pre-split, operative part); triage decision (key statement, supporting considerations).
 - Suva's human summaries: `judgements/Export_*.html`, 55 files (template, read-only, D-040), each with a German and a French text. Counts per quarter and language, lengths and styles: `docs/SUVA_DATA.md` §3-4. Read them through the S0 parser of the crawl role (`docs/agents/crawl.md`): at parsing it keeps only docket, dates, `Text DE`, `Text FR` and the bger.ch link, and drops the author section, staff codes and every intranet link (D-051).

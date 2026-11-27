@@ -76,7 +76,7 @@ The `/live/{de,fr,it}/` path does not set the display language: always pass `lan
 ### Key and identifiers
 
 - **Key: (docket, decision date).** One docket can carry several decisions (an interim decision, then the final one).
-- Docket since 2007: `8C_802/2023` = court + register letter, number, **year the case was filed** (not the decision year). Before 2007: `U 457/06` (former Federal Insurance Court: U = accident insurance, I = disability, K = health, M = military…).
+- Docket since 2007: `8C_802/2023` = court digit + proceedings letter, sequence, **year the case was filed** (not the decision year). The digit is the court, the letter is the kind of proceedings; neither is the subject (§5). Before 2007: `U 457/06` (former Federal Insurance Court: U = accident insurance, I = disability, K = health, M = military…).
 - No official ECLI in Federal Court documents.
 
 ### Constraints for the crawler
@@ -107,16 +107,56 @@ The `/live/{de,fr,it}/` path does not set the display language: always pass `lan
 
 Fully worked example: 8C_802/2023 (decided 27 Mar 2026, became BGE 152 V 79): Suva party, accident insurance, five judges, > 25,000 characters, partly upheld.
 
-## 5. Courts and docket prefixes (do not filter on prefix alone)
+## 5. Courts and docket prefixes (do not filter on the digit alone)
 
-| Prefix | Court (since 1 Jan 2023) | Matters | For Suva |
+Since 2007 the Court builds the docket as `{digit}{letter}_{sequence}/{year}` ([Formation du numéro de procédure](https://www.bger.ch/fr/home/juridiction/jurisdiction-recht/bildung-der-verfahrensnummer.html), read 27 Nov 2026). `8C_177/2025` is court 8, a public-law appeal, the 177th case filed in 2025.
+
+The digit is the court. Digit 3 is reserved and unused. Digits 11 to 15 are special files, not ordinary rulings.
+
+| Digit | Court | Since |
+|---|---|---|
+| 1 | 1st public-law division | 2007 |
+| 2 | 2nd public-law division | 2007 |
+| 4 | 1st civil division | 2007 |
+| 5 | 2nd civil division | 2007 |
+| 6 | 1st criminal division | 1 Jul 2023 |
+| 7 | 2nd criminal division | 1 Jul 2023 |
+| 8 | 4th public-law division, Lucerne | 1 Jan 2023 (before that: 1st social-law division; the digit did not change) |
+| 9 | 3rd public-law division, Lucerne | 1 Jan 2023 (before that: 2nd social-law division; the digit did not change) |
+
+The letter is the kind of proceedings, on every court. C is a public-law appeal, A a civil appeal, B a criminal appeal, D a subsidiary constitutional appeal, F a revision, G an interpretation or a correction. Letters E and T to Z exist in the same note and almost never appear on the Neuheiten list.
+
+The subject is not in the number. It is the Neuheiten `Sachgebiet`, in the language of the decision, with a trailing `*` when the ruling is proposed for the official reporter (§3). Court 8 also hears unemployment insurance, supplementary benefits, family allowances and social assistance. Court 9 also hears old-age insurance, loss-of-earnings allowances and tax. Court 4 also hears general obligations, debt enforcement, company law and civil liability. On the Neuheiten pages of every day from 1 Aug 2025 to 31 Mar 2026 (243 pages, read 27 Nov in an ordinary browser): 209 rulings in 8C, of which 72 accident insurance, 62 disability insurance and 75 in the other subjects of that court (unemployment 30, supplementary benefits 26, social assistance 16, family allowances 3). Accident insurance is about a third of court 8. A gate on the digit 8 keeps the other two thirds, and it drops the six 9C rulings of Suva's list and `4A_106/2025`. Letters other than C are rare on that court in the same window (8F: 5, 8G: 1, no 8D). Military insurance is in this court's competence and in the signal list (§4); it did not appear on these pages.
+
+| Prefix | Court | Matters on the Neuheiten line | For Suva |
 |---|---|---|---|
-| **8C** | 4th public-law court, Lucerne | **accident insurance (exclusively here)**, disability insurance, unemployment, social assistance, military insurance, supplementary benefits, family allowances | priority 1, but 8C is not only accident insurance |
-| **9C** | 3rd public-law court, Lucerne | **taxes** (since 2023), old-age, disability, health insurance, occupational pensions | priority 2 (coordination); tax rulings are out |
-| 8D, 8F, 8G, 9D, 9F, 9G | same courts: subsidiary constitutional appeals, revisions, interpretations | can concern accident insurance (e.g. 8F_12/2026) | keep in scoring; Suva's view is Q-06 |
-| 4A | 1st civil-law court | insurance contracts, liability; Suva recourse actions (BGE 152 III 7) | outside 8C/9C, but can be relevant (`ASK-SUVA`). Suva summarised at least one 4A ruling (`judgements/Export_4A_106_2025.html`, private daily-allowance insurance) |
+| **8C** | 4th public-law court | **accident insurance (only on this court)**, disability insurance, unemployment, social assistance, military insurance, supplementary benefits, family allowances | accident and disability; the other subjects of the court are out |
+| **9C** | 3rd public-law court | **taxes** (since 2023; 96 of 203 rows in the window above), old-age, disability, health insurance, occupational pensions, loss-of-earnings allowances | disability, health insurance, occupational pensions; tax, old-age and loss-of-earnings are out |
+| 8D, 8F, 8G, 9D, 9F, 9G | same courts | D a subsidiary constitutional appeal, F a revision, G an interpretation or a correction. An 8F can be accident insurance (8F_12/2026) | same subjects as 8C and 9C; the letter does not add a subject |
+| 4A, 4D, 4F, 4G | 1st civil-law court | contract law, and separately liability, general obligations, debt enforcement, company law. Suva recourse actions exist (BGE 152 III 7) | contract law only. Suva summarised one 4A ruling, `judgements/Export_4A_106_2025.html`: daily sickness benefits under the Insurance Contract Act, filed under contract law (`Vertragsrecht`), not under its own rubric |
 
-Disability insurance is handled by both 8C and 9C: it cannot be sorted by prefix. Suva's own data confirms it: its list holds 53 rulings in 8C, 6 in 9C and 1 cantonal decision, and at least 7 of its 55 summaries concern disability insurance (`docs/SUVA_DATA.md` §2-3; scope: Q-06, Q-31).
+Disability insurance is handled by both 8C and 9C: it cannot be sorted by digit. Suva's own data confirms it: its list holds 53 rulings in 8C, 6 in 9C and 1 cantonal decision, and at least 7 of its 55 summaries concern disability insurance (`docs/SUVA_DATA.md` §2-3; scope: Q-06, Q-31).
+
+`src/courts.py` keeps a ruling when the digit, the letter and the subject line agree. The `*` is stripped before the comparison. Ingestion still stores every court (`docs/agents/crawl.md`); whether a net is used at all stays open (D-021). While Q-06 is open, this is the candidate gate, not a claim that no other court can be relevant.
+
+Courts 8 and 9, letters C, D, F and G:
+
+| DE | FR | IT |
+|---|---|---|
+| Unfallversicherung | Assurance-accidents | Assicurazione contro gli infortuni |
+| Invalidenversicherung | Assurance-invalidité | Assicurazione per l'invalidità |
+| Krankenversicherung | Assurance-maladie | Assicurazione malattie ⚠ |
+| Berufliche Vorsorge | Prévoyance professionnelle | Previdenza professionale |
+
+The Italian health-insurance line did not occur in the window above; the usual Tribunal rubric is kept so a later Italian ruling is not dropped. The site spelled occupational pensions `Previdenza professionnale` once: that spelling is accepted too.
+
+Court 4, letters A, D, F and G:
+
+| DE | FR | IT |
+|---|---|---|
+| Vertragsrecht | Droit des contrats | Diritto contrattuale |
+
+On those pages the insurance cases inside contract law are a sub-line (`Taggeldversicherung`, `Krankentaggeldversicherung`, `Versicherungsvertrag`, `contrat d'assurance`), not a separate subject. Keeping the whole subject is wide: 115 of 197 rows in 4A were contract law. Liability (`Haftpflichtrecht`, `Assurance responsabilité civile`) is a different line and is not kept.
 
 ## 6. Volumes (measured on 27 Nov where stated; the datasets of §10 confirm them)
 
