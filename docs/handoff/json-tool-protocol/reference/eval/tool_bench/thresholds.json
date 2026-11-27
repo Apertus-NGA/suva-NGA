@@ -1,0 +1,138 @@
+{
+ "status": "PROPOSED: pre-registered before the first full run. Changing a value after seeing results needs a DECISIONS entry that says so.",
+ "notes": [
+  "valid = the reply was usable after at most one repair turn (form tools) or in one step (loop tools): the pipeline's view.",
+  "exact = the validated calls equal the gold multiset, after the form tools' repair turn (the pipeline's view); exact_first = the same on the first reply only; exact_raw = as written by the model, before validation.",
+  "Native calls get no repair turn, so every native-vs-JSON comparison and the decision rule use exact_first.",
+  "Irrelevance: exact means the model emitted no call at all; a call that validation refused still counts as a call.",
+  "accepted_invalid_ids is computed from the case data, independently of the IdTable that validated the call: it must be 0.",
+  "Every criterion is evaluated per repetition and the worst repetition counts (EVAL 1.4).",
+  "With n = 20 evidence cases per language and 2 repetitions, a Wilson 95 % interval is about +/- 0.10 around 0.9: the bench is a gate against gross failure, not a precise estimate."
+ ],
+ "criteria": [
+  {
+   "id": "T1",
+   "description": "70B form replies usable after <= 1 repair, per language",
+   "filter": {
+    "model": "70b",
+    "config": "json_strict",
+    "category": "evidence"
+   },
+   "group_by": "lang",
+   "metric": "valid",
+   "op": ">=",
+   "value": 0.99
+  },
+  {
+   "id": "T2",
+   "description": "8B form replies usable after <= 1 repair, per language (the judges may set the 8B)",
+   "filter": {
+    "model": "8b",
+    "config": "json_strict",
+    "category": "evidence"
+   },
+   "group_by": "lang",
+   "metric": "valid",
+   "op": ">=",
+   "value": 0.97
+  },
+  {
+   "id": "T3",
+   "description": "Fail closed: no id that was not offered is ever accepted, in any configuration",
+   "filter": {},
+   "group_by": "config",
+   "metric": "accepted_invalid_ids",
+   "op": "==",
+   "value": 0
+  },
+  {
+   "id": "T4",
+   "description": "70B evidence choice correct after the pipeline's repair turn, per language (point estimate)",
+   "filter": {
+    "model": "70b",
+    "config": "json_strict",
+    "category": "evidence"
+   },
+   "group_by": "lang",
+   "metric": "exact",
+   "op": ">=",
+   "value": 0.85
+  },
+  {
+   "id": "T4b",
+   "description": "70B evidence, lower Wilson bound, reported (not blocking)",
+   "filter": {
+    "model": "70b",
+    "config": "json_strict",
+    "category": "evidence"
+   },
+   "group_by": "lang",
+   "metric": "exact_wilson_low",
+   "op": ">=",
+   "value": 0.7,
+   "blocking": false
+  },
+  {
+   "id": "T5",
+   "description": "70B emits no call at all when no tool fits (JSON configurations)",
+   "filter": {
+    "model": "70b",
+    "config": [
+     "json_strict",
+     "json_object"
+    ],
+    "category": "irrelevance"
+   },
+   "group_by": "config",
+   "metric": "exact",
+   "op": ">=",
+   "value": 0.9
+  },
+  {
+   "id": "T6",
+   "description": "8B evidence choice, reported (the 8B never excludes a ruling alone)",
+   "filter": {
+    "model": "8b",
+    "config": "json_strict",
+    "category": "evidence"
+   },
+   "group_by": "lang",
+   "metric": "exact",
+   "op": ">=",
+   "value": 0.75,
+   "blocking": false
+  },
+  {
+   "id": "T7",
+   "description": "json_strict requests accepted by the gateway (no silent fallback measured as strict)",
+   "filter": {
+    "config": "json_strict"
+   },
+   "group_by": "model",
+   "metric": "request_errors",
+   "op": "==",
+   "value": 0,
+   "blocking": false
+  }
+ ],
+ "decision_rule": {
+  "question": "Native tool calling or the JSON protocol for the pipeline's form calls?",
+  "rule": "Keep the JSON protocol unless native_forced beats json_strict on evidence by >= 0.10 exact_first for the 70B, with a paired 95 % cluster-bootstrap interval entirely above 0, in each of de, fr and it with at least 20 cases each, AND native tool calling is confirmed on the judges' endpoint (portability). Otherwise JSON stays.",
+  "why": "Burden of proof on the change: JSON is portable to any OpenAI-compatible endpoint, keeps the score call a plain chat call, replays byte for byte, and works with -thinking variants that refuse tool_choice.",
+  "computed": {
+   "model": "70b",
+   "base": "json_strict",
+   "challenger": "native_forced",
+   "category": "evidence",
+   "metric": "exact_first",
+   "min_gain": 0.1,
+   "languages": [
+    "de",
+    "fr",
+    "it"
+   ],
+   "min_cases_per_language": 20
+  },
+  "computed_note": "score.decide() computes the verdict (keep_json, native_candidate or insufficient_n); the portability check stays manual."
+ }
+}

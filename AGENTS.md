@@ -75,15 +75,17 @@ Files of the official template are marked `[T]`: never renamed or moved (D-039);
     <TeamName>_Report.pdf   the report PDF, committed at the root before submission (D-039)
     AGENTS.md  CLAUDE.md  MODELS.md  NOTICE  Makefile
     .env.example  .gitattributes  .pre-commit-config.yaml
-    docs/            STATE, EVENT, CHALLENGE, SUVA_DATA, DATA, DOCTRINE, DECISIONS, LESSONS, ARCHITECTURE, EVAL,
-                     GLOSSARY, summary_style (written by the summary role), agents/,
-                     diagrams/ (figures referenced by technical_report.md)
+    docs/            all our documentation (D-059): STATE, EVENT, CHALLENGE, SUVA_DATA, DATA, DOCTRINE,
+                     DECISIONS, LESSONS, ARCHITECTURE, EVAL, GLOSSARY, summary_style (written by the
+                     summary role), agents/, diagrams/ (figures referenced by technical_report.md),
+                     handoff/ (handoff kits; their reference code is never imported, run or linted)
     data/public/     crawl manifests, snapshot of public rulings (≤ 100 MB in git)
     data/derived/    artefacts derived from judgements/ (labels per docket, digests, prompts, caches,
                      fixtures) while D-031 is open (git-ignored; make run reads it or regenerates it)
     data/private/    Suva material received outside the template (git-ignored, D-019)
     prompts/         versioned prompts (owner: triage or summarise)
-[T] src/             "Your code" (the template's words); keep src/.gitkeep
+[T] src/             "Your code" (the template's words): code and the data it reads at run time, nothing
+                     else (D-059); keep src/.gitkeep
     src/schemas.py   the frozen contracts
     src/crawl/       populations (DS1, DS2), Neuheiten lists, ruling pages, HF texts, cross-check
     src/signals/     deterministic signals (Suva's example rules SR1-SR9 and neighbours)
@@ -100,7 +102,12 @@ Files of the official template are marked `[T]`: never renamed or moved (D-039);
     tmp/             scratch work (git-ignored)
 ```
 
-The template calls `src/` "Your code": every runnable package lives under `src/`. The evaluation runners may move from `eval/` to `src/eval/` if the team agrees (PROPOSED). `tests/`, `prompts/`, `results/` and `expected/` stay at the root: they are tests and data, not code.
+**Layout rule (DECIDED, D-059): `src/` is code, `docs/` is documentation.**
+- `src/` holds our runnable source code and the data files that code reads at run time (such as `src/summarize/glossary.json`). No Markdown, notes, reports or diagrams in `src/`: docstrings and comments stay with the code, everything else goes in `docs/`.
+- `docs/` holds all our documentation; diagrams go in `docs/diagrams/`. A handoff kit may keep reference code in `docs/handoff/<topic>/reference/` as long as nothing imports, runs or lints it there. Its import PR copies the code and its data into `src/`, `eval/` and `tests/`, and its documentation into `docs/`.
+- Why: the template calls `src/` "Your code" and its report template says "Put diagrams in `docs/` and reference them here"; it never asks for documentation in `src/` (checked 27 Nov, D-059). `make check` treats every file of `src/` as code (ruff, the G2 test, the import test, the models registry): documents moved there turn it red. The licence map gives `src/` Apache-2.0 and `docs/` CC-BY-4.0 (D-048). Every reading order in this file points to `docs/` (§2).
+
+Every runnable package lives under `src/`. The evaluation runners may move from `eval/` to `src/eval/` if the team agrees (PROPOSED). `tests/`, `prompts/`, `results/` and `expected/` stay at the root: they are tests and data, not code.
 
 ## 5. Ownership
 
@@ -143,10 +150,12 @@ The CLI never does an expensive action by default: it requires `--limit N` or `-
 - [ ] Tested end to end on 3 real rulings: at least one German, one French, and one Italian if the code path can see Italian.
 - [ ] Output stored, non-empty, and checked by an assertion.
 - [ ] No golden rule broken; `make check` green.
+- [ ] Nothing but code and its run-time data added under `src/` (D-059).
 - [ ] Any new model listed in `MODELS.md`; any new choice in `docs/DECISIONS.md`; `docs/STATE.md` updated if an input or a test result changed.
 
 **Docs, prompt or pitch PR:**
 - [ ] Statuses and section references consistent with `docs/DECISIONS.md`.
+- [ ] Documentation in `docs/`, nothing but code and its run-time data in `src/` (D-059).
 - [ ] Every number from `results/`, or labelled as an estimate or another team's measurement.
 - [ ] Team members' names only where G13 allows them; no person from a ruling (D-038); no Suva author or staff code (D-051). No copy of Suva's texts beyond what D-031 allows (while open: none in `docs/`).
 
