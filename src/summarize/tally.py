@@ -9,7 +9,10 @@ import json
 import re
 from pathlib import Path
 
-from summarize import blocking, flat, load_tables, row_for
+try:
+    from summarize import blocking, flat, load_tables, row_for
+except ModuleNotFoundError:
+    from src.summarize.summarize import blocking, flat, load_tables, row_for
 
 ROOT = Path(__file__).resolve().parents[2]
 TRIAL = ROOT / "data" / "trial"

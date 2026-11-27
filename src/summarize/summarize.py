@@ -11,12 +11,7 @@ import json
 import os
 import re
 import sys
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
-
-import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "data" / "cache"
@@ -367,44 +362,22 @@ def repair_prompt(
 
 
 def chat(messages: list[dict]) -> str:
-    base = os.environ["LLM_BASE_URL"].rstrip("/")
-    payload = {
-        "model": os.environ["LLM_NAME"],
-        "temperature": 0.1,
-        "max_tokens": 1200,
-        "messages": messages,
-    }
-    request = urllib.request.Request(
-        base + "/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={
-            "Authorization": "Bearer " + os.environ["LLM_API_KEY"],
-            "Content-Type": "application/json",
-        },
-    )
-    last_error = ""
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(request, timeout=240) as response:
-                body = json.loads(response.read().decode())
-            break
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")[:500]
-            last_error = f"passerelle HTTP {exc.code}: {detail}"
-            if exc.code not in (502, 503, 504) or attempt == 2:
-                raise SystemExit(last_error) from exc
-            time.sleep(8)
-        except (urllib.error.URLError, TimeoutError) as exc:
-            last_error = f"passerelle injoignable: {exc}"
-            if attempt == 2:
-                raise SystemExit(last_error) from exc
-            time.sleep(8)
-    else:
-        raise SystemExit(last_error)
-    return body["choices"][0]["message"]["content"].strip()
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from src.llm.client import LLMError, client_from_env
+
+    client = client_from_env("live")
+    try:
+        return client.chat(messages, max_tokens=1200, prompt_version="summarize-probe").content
+    except LLMError as exc:
+        raise SystemExit(f"passerelle: {exc}") from exc
+    finally:
+        client.close()
 
 
-def load_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_tables():
+    import pandas as pd
+
     rulings_path = CACHE / "rulings.parquet"
     gold_path = CACHE / "gold_summaries.parquet"
     if not rulings_path.exists() or not gold_path.exists():
@@ -415,7 +388,7 @@ def load_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     return rulings, gold
 
 
-def row_for(rulings: pd.DataFrame, docket: str) -> dict:
+def row_for(rulings, docket: str) -> dict:
     found = rulings[rulings.docket == docket]
     if found.empty:
         raise SystemExit(f"arrêt absent du cache : {docket}")
@@ -429,7 +402,7 @@ def row_for(rulings: pd.DataFrame, docket: str) -> dict:
     }
 
 
-def gold_body(gold: pd.DataFrame, docket: str, language: str) -> str:
+def gold_body(gold, docket: str, language: str) -> str:
     found = gold[(gold.docket == docket) & (gold.language == language)]
     if found.empty:
         return ""
@@ -782,7 +755,7 @@ def main() -> None:
         print(f"{index}/{len(dockets)} {docket}", flush=True)
         try:
             result = summarize(docket)
-        except (SystemExit, TimeoutError, urllib.error.URLError) as exc:
+        except (SystemExit, TimeoutError) as exc:
             failed.append(f"{docket}: {exc}")
             print(f"échec {docket}: {exc}", flush=True)
             continue
