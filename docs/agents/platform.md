@@ -26,6 +26,8 @@ The skeleton: `Makefile`, `Dockerfile`, `docker-compose.yml`, `.env.example`, `.
      .ruff_cache/
      .mypy_cache/
      *.log
+     # Office lock files: Excel and Word write the user's name into them (G13)
+     ~$*
      ```
      Not ignored on purpose: `judgements/` (template, tracked), `results/` and `expected/` (written by `make claims` and `make run`), `<TeamName>_Report.pdf` (our registered team name, no spaces; Q-22), `docs/`. Check that `dist/` and `build/` hide nothing `make run` needs (the UI is built inside the image, `docs/agents/ui.md`). Weights are downloaded at image build time, never committed.
    - `NOTICE`: third-party code (D-036), and a line saying that `judgements/` and the pitch PDF are Suva's material supplied through the organisers' template, not covered by our licences (D-045).
