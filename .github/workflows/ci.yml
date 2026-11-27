@@ -1,0 +1,27 @@
+# CI on every push and PR, on linux/amd64 (AGENTS.md §8; docs/agents/platform.md step 8).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check-and-run:
+    runs-on: ubuntu-latest  # linux/amd64
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.4.0
+      - name: Install
+        run: uv sync --frozen
+      - name: make check (lint, unit, doctrine, models registry, template layout, D-051)
+        run: make check
+      - name: make run, stages that need no Suva-derived artefact (no key in CI)
+        run: SERVE=0 MODE=replay make run
+      # Blocked by D-031 (hard due Fri 22:00): a fresh clone has no data/derived/ and no replay cache,
+      # so the full replay of `make run` (T27) cannot run here until D-031 settles what may be committed.
+      - name: make run replay with Suva-derived artefacts (blocked by D-031)
+        if: ${{ false }}
+        run: SERVE=0 MODE=replay make run

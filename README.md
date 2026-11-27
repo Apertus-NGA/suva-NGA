@@ -48,6 +48,10 @@ LLM_BASE_URL — endpoint base URL
 LLM_API_KEY — your API key
 ```
 
+### How to run this project
+
+> Added by the team. Run instructions are in [technical_report.md](technical_report.md), section 6 "Reproducibility", "How to run". In short: set `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (live calls only), then `make run`.
+
 ## 📦 Submission Requirements & Deliverables
 
 The submission must:

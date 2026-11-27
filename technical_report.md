@@ -54,6 +54,40 @@ Where it breaks, what you did not test, and known failure modes.
 What a judge needs to get your numbers back: hardware, runtime, seeds, and the
 exact commit.
 
+### How to run
+
+> Draft by the platform owner, to finish with the pitch owner (`docs/agents/platform.md` step 8). Status on
+> Fri 27 Nov: **skeleton**. The commands below work; the pipeline stages are stubs that print what they will
+> do. This block is updated as stages land.
+
+**Prerequisites:** git; either Docker with compose (images for `linux/amd64`, no GPU needed), or Python 3.12+
+with [uv](https://docs.astral.sh/uv/). Network at runtime: the Apertus endpoint only.
+
+**Configuration:** copy `.env.example` to `.env` and set the three variables the template imposes:
+
+```
+LLM_NAME      name and version of the model: an Apertus v1.5 id, 8B or 70B, gateway or Hugging Face form
+LLM_BASE_URL  endpoint base URL (OpenAI-compatible)
+LLM_API_KEY   your API key
+```
+
+They are needed for live calls only. A replayed run needs none of them.
+
+**Run:**
+
+```
+make run            # end-to-end, then serves the app; SERVE=0 make run to stop after the pipeline
+make check          # lint and tests
+make smoke-llm      # optional: probe the endpoint, writes results/gateway_probe.json
+```
+
+**Live or replayed:** how much of `make run` calls Apertus live is still open (D-032). The working default:
+a small live slice when the `LLM_*` variables are set, recorded answers for the rest, and every output
+labelled `LIVE` or `REPLAY`. The served model is checked on every answer; any Apertus v1.5 id is accepted in
+either form.
+
+**Expected duration:** `<to measure once the stages exist>`.
+
 
 ## License
 
