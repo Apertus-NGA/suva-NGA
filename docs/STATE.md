@@ -1,6 +1,6 @@
 # STATE: where the project is now
 
-> **Last updated: Friday 27 Nov 2026, 20:50 CET** (summary probe moved to `src/summarize/`). Previous update: 20:30 CET, summary measurement note. Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
+> **Last updated: Friday 27 Nov 2026, 21:11 CET** (JSON tool protocol handoff, `docs/handoff/json-tool-protocol/`). Previous update: 20:50 CET, summary probe moved to `src/summarize/`. Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
 
 ## 1. Build
 
@@ -26,6 +26,7 @@
 - Stubs (print STUB and what they will do): every pipeline stage of `make run` (S0 to S10 and the comparison with `expected/`), `serve`, `crawl`, `refit`, `eval`, `eval-private`, `claims`. Client still without: the AIMD limiter shared across processes, the circuit breaker, streaming, the JSON cascade and repair call. Not tested: the Docker image build (the daemon was not running); CI has not run (nothing pushed).
 - Next step: the lead reviews and merges `platform/first-two-hours` (freezing `src/schemas.py`); crawl starts DS1 and DS2 (`docs/DATA.md` §10, `docs/agents/crawl.md` step 0).
 - Summary probe, written up Fri 27 Nov 20:30 CET in `docs/summary_measurement.md`: one frozen prompt, ten rulings drawn before generation (seed `20261127`, outside Suva's list), then a counter compared with a human reading of the ruling. Agreement 20/20 fiches after the counter was corrected. On 134 fiches already written, 3 German texts are the operative sentence alone. This is not the hold-out of `docs/EVAL.md` §4. The per-fiche JSON was under `data/trial/` and is not in git; that directory is empty on this copy. Generator, counter and glossary now live in `src/summarize/` (`summarize.py`, `tally.py`, `glossary.json`); `tmp/pre-kit/` is empty. `summarize.py` still calls the gateway itself (`urllib`, `LLM_BASE_URL` + `/chat/completions`). It is not wired to `src/llm/client.py`. The pipeline package named in the kit stays `src/summarise/` (not created). Because the probe sits under `src/`, `tests/test_doctrines.py` (G2) flags `src/summarize/summarize.py`.
+- JSON tool protocol (tool-calling area, D-058 pending its first PR): handoff committed Fri 27 Nov 21:11 CET in `docs/handoff/json-tool-protocol/` (reference v0.2.1, not implemented yet). Start or resume its agent with `docs/handoff/json-tool-protocol/REONBOARD.md`.
 
 ## 2. Inputs inventory
 

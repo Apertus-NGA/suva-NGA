@@ -1,0 +1,24 @@
+# Reference settings for the tool_protocol tests. Merge into the repo's pyproject.toml (owner: platform, with the lead):
+# APPEND the two testpaths to the repo's list (do not replace it), add the "live" marker, and keep the
+# repo's own addopts (add -m 'not live' to them). This file has no [project] table on purpose.
+# Ruff: the repo either sets line-length = 120 or ignores E501 on these paths (docs/agents/tool-calling.md).
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests/tool_protocol", "tests/tool_bench"]
+markers = [
+  "live: calls the gateway; run with RUN_LIVE=1 pytest -m live",
+]
+addopts = "-m 'not live'"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "D"]
+ignore = ["D105", "D107", "D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]

@@ -1,0 +1,59 @@
+{
+ "type": "object",
+ "properties": {
+  "a_claims": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "a_cites": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "b_text": {
+      "type": "string"
+     },
+     "c_section": {
+      "type": "string",
+      "enum": [
+       "facts",
+       "law",
+       "outcome"
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "a_cites",
+     "b_text",
+     "c_section"
+    ]
+   }
+  },
+  "b_outcome": {
+   "type": "string",
+   "enum": [
+    "upheld",
+    "partly_upheld",
+    "dismissed",
+    "inadmissible",
+    "remanded",
+    "other"
+   ]
+  },
+  "c_unknown": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "additionalProperties": false,
+ "required": [
+  "a_claims",
+  "b_outcome",
+  "c_unknown"
+ ]
+}
