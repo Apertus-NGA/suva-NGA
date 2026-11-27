@@ -28,6 +28,7 @@ build/
 
 # --- Added by the team (D-044). The template's lines above stay unchanged. ---
 # Suva material received outside the template (D-019) and artefacts derived from judgements/ while D-031 is open
+data/
 data/private/
 data/derived/
 # Scratch work and tool caches

@@ -1,5 +1,7 @@
 # TECHNICAL REPORT — SUMMARY MEASUREMENT
 
+This note is the v1 prompt (one glossary, one prompt). The v2 run, one prompt per matter on 50 rulings, is `docs/SUMMARY_V2.md`.
+
 A measurement of generated Suva fiches, written so a reader of the technical report finds the same sections in the same order. One run, 27 November 2026. The official summary hold-out remains `docs/EVAL.md` §4. Thresholds there stay unset.
 
 Open questions left open, with the "While open" line of `docs/DECISIONS.md`: D-047 (which rulings are summarised: top 10 first), Q-30 (style follows the ruling's language), Q-08 / D-053 (length follows the 55 exports; this run used no character band), Q-27 (same paragraph plan in both languages; parity was not scored), D-031 (nothing derived from Suva's files is committed here; the lead decides before Friday 22:00).

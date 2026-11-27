@@ -1,6 +1,6 @@
-"""Compte des erreurs lisibles sur l'arrêt, sans note de qualité.
+"""Count errors a reader can check against the ruling, with no quality score.
 
-Ne relance pas le modèle. Lit les fiches déjà écrites dans data/trial.
+Does not call the model again. Reads fiches already written in data/trial.
 """
 
 from __future__ import annotations
@@ -10,36 +10,20 @@ import re
 from pathlib import Path
 
 try:
-    from summarize import blocking, flat, load_tables, row_for
+    from summarize import blocking, flat, load_tables, operative_only, row_for
 except ModuleNotFoundError:
-    from src.summarize.summarize import blocking, flat, load_tables, row_for
+    from src.summarize.summarize import blocking, flat, load_tables, operative_only, row_for
 
 ROOT = Path(__file__).resolve().parents[2]
 TRIAL = ROOT / "data" / "trial"
 
-# Ce que la lecture des dix arrêts a relevé, avant de lancer ce compte.
-# Lecture corrigée : ces deux arrêts disent eux-mêmes « offensichtlich unbegründet ».
+# What the reading of the ten rulings found, before this count was run.
+# Corrected reading: these rulings themselves say "offensichtlich unbegründet".
 READ = {
     ("8C_54/2025", "de"): {"pas_un_resume"},
     ("9C_63/2025", "de"): {"pas_un_resume"},
     ("9C_719/2025", "de"): {"pas_un_resume"},
 }
-
-DISPOSITION = re.compile(
-    r"die beschwerde wird teilweise gutgeheissen"
-    r"|die beschwerde wird gutgeheissen"
-    r"|die beschwerde wird abgewiesen(?:, soweit darauf eingetreten wird)?"
-    r"|auf die beschwerde wird nicht eingetreten"
-    r"|le recours est partiellement admis"
-    r"|le recours est admis"
-    r"|le recours est rejeté(?: dans la mesure où il est recevable)?"
-    r"|le recours (?:est|doit être déclaré) irrecevable"
-    r"|le recours est irrecevable"
-    r"|il ricorso è parzialmente accolto"
-    r"|il ricorso è accolto"
-    r"|il ricorso è respinto",
-    re.IGNORECASE,
-)
 
 
 def operative_block(source: str) -> str:
@@ -72,7 +56,7 @@ def kind_of_sentence(sentence: str) -> str:
 
 
 def focus(text: str) -> str:
-    """Le point 1 du dispositif, ou la dernière phrase qui dit le sort du recours."""
+    """Point 1 of the outcome, or the last sentence that states the fate of the appeal."""
     low = flat(text).lower()
     point = re.search(r"(?:^|:)\s*1\.\s+([^.]{0,240})", low)
     if point and re.search(r"beschwerde|recours|ricorso", point.group(1)):
@@ -86,11 +70,6 @@ def focus(text: str) -> str:
 
 def kind_of(text: str) -> str:
     return kind_of_sentence(focus(text))
-
-
-def residue(text: str) -> str:
-    stripped = DISPOSITION.sub(" ", text)
-    return re.sub(r"\s+", " ", stripped).strip(" .")
 
 
 def tally_one(language: str, text: str, source: str) -> list[str]:
@@ -112,18 +91,18 @@ def tally_one(language: str, text: str, source: str) -> list[str]:
         found.append("manifestement_invente")
     if language == "de" and "offensichtlich unbegründet" in low and not obvious:
         found.append("manifestement_invente")
-    if len(residue(text)) < 80:
+    if operative_only(text):
         found.append("pas_un_resume")
     for item in blocking(language, text, source):
         if not str(item).startswith("critique"):
             continue
         if item.startswith("critique: article"):
             found.append("article_invente")
-        elif "Suva absente" in item:
+        elif "Suva absent" in item:
             found.append("partie_absente")
-        elif "sigle" in item:
+        elif "sigil" in item:
             found.append("sigle_mauvaise_langue")
-        elif "invers" in item:
+        elif "inverted" in item:
             found.append("condition_inversee")
     return found
 
@@ -157,7 +136,7 @@ def main() -> None:
     for path in files:
         all_rows.extend(score_file(path, rulings))
 
-    print("Essai figé, dix arrêts")
+    print("Frozen trial, ten rulings")
     missed = []
     extra = []
     for docket, language, flags in all_rows:
@@ -165,15 +144,15 @@ def main() -> None:
             continue
         expected = READ.get((docket, language), set())
         got = set(flags)
-        mark = "ok" if got == expected else "écart"
+        mark = "ok" if got == expected else "gap"
         if got != expected:
             missed.extend(sorted(expected - got))
             extra.extend(f"{docket} {language}: {name}" for name in sorted(got - expected))
-        print(f"  {docket} {language}: {sorted(got) or '—'}  lu: {sorted(expected) or '—'}  {mark}")
+        print(f"  {docket} {language}: {sorted(got) or '—'}  read: {sorted(expected) or '—'}  {mark}")
 
     print()
     print(
-        "accord avec la lecture:",
+        "agreement with the reading:",
         sum(
             1
             for docket, language, flags in all_rows
@@ -183,12 +162,12 @@ def main() -> None:
         sum(1 for docket, _, _ in all_rows if docket in holdout),
     )
     if extra:
-        print("en trop:", "; ".join(extra))
+        print("extra:", "; ".join(extra))
     if missed:
-        print("manqué:", ", ".join(missed))
+        print("missed:", ", ".join(missed))
 
     print()
-    print("Toutes les fiches déjà écrites")
+    print("Every fiche already written")
     counts: dict[str, int] = {}
     fiches = 0
     touched = 0
@@ -201,7 +180,7 @@ def main() -> None:
         if flags:
             print(f"  {docket} {language}: {', '.join(flags)}")
     print()
-    print(f"{fiches} fiches, {touched} avec au moins une erreur comptée")
+    print(f"{fiches} fiches, {touched} with at least one counted error")
     for name in sorted(counts):
         print(f"  {name}: {counts[name]}")
 
