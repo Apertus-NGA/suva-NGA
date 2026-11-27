@@ -8,7 +8,7 @@ For each ruling D-047 names (while open: our top 10 by score; then every selecte
 ## You own
 `src/summarise/`, `src/verify/` (unless split), `prompts/summary_*`, `docs/GLOSSARY.md`, `docs/summary_style.md`.
 
-A probe of legal errors on fiches already written, and how a counter was made to match a human reading, is in `docs/summary_measurement.md`. It is not the hold-out of step 5.
+A probe of legal errors on fiches already written, and how a counter was made to match a human reading, is in `docs/summary_measurement.md`. The scripts are `src/summarize/summarize.py` (generator, calls the gateway directly, not `src/llm/`) and `src/summarize/tally.py` (counter). That directory is the probe, not the pipeline package `src/summarise/` above. It is not the hold-out of step 5.
 
 ## Inputs
 - Ruling records (considerations pre-split, operative part); triage decision (key statement, supporting considerations).
