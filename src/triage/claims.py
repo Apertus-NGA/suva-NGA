@@ -78,7 +78,10 @@ _ZERO = "Antworte mit genau einem Wort: Ja oder Nein."
 
 
 def _two_lines(second: str, numbers: list[str]) -> str:
-    return f"Antworte in genau zwei Zeilen:\nZeile 1: Ja oder Nein\nZeile 2: {second}, gewählt aus dieser Liste: " + ", ".join(numbers)
+    return (
+        f"Antworte in genau zwei Zeilen:\nZeile 1: Ja oder Nein\nZeile 2: {second}, gewählt aus dieser Liste: "
+        + ", ".join(numbers)
+    )
 
 
 def answer_format(arm: str, numbers: list[str]) -> str:
@@ -120,7 +123,9 @@ def read_claim(client: Any, ruling_text: str, claim: Claim, arm: str, size: str 
     try:
         result = client.chat(
             _messages(ruling_text, f"{claim.question}\n\n{answer_format(arm, numbers)}"),
-            max_tokens=1 if first_only else 80,  # the 70B adds a sentence after the number; 24 cut 123 of 298 answers (G3)
+            max_tokens=1
+            if first_only
+            else 80,  # the 70B adds a sentence after the number; 24 cut 123 of 298 answers (G3)
             size=size,
             prompt_version=f"claim_{claim.name}_{arm}@1",
             logprobs=True,
@@ -147,7 +152,9 @@ def read_claim(client: Any, ruling_text: str, claim: Claim, arm: str, size: str 
 # -- Apertus locates the deciding consideration; code measures it -----------------------------------------------
 
 _CASE_LAW = re.compile(r"\b(?:bge|atf|dtf) \d+ [ivx]+ \d+|\b\d[a-z]_\d+/\d{4}|\b[a-z]{1,2} \d+/\d{2}\b")
-_ARTICLE = re.compile(r"\bart\.?\s*(\d+[a-z]*(?:bis|ter|quater)?)(?:\s*(?:abs|al|cpv|lit|let|lett|ziff|ch|satz|phr)\.?\s*\w+)*\s+([a-zäöü]{2,6})\b")
+_ARTICLE = re.compile(
+    r"\bart\.?\s*(\d+[a-z]*(?:bis|ter|quater)?)(?:\s*(?:abs|al|cpv|lit|let|lett|ziff|ch|satz|phr)\.?\s*\w+)*\s+([a-zäöü]{2,6})\b"
+)
 LAW_FAMILY = {
     **dict.fromkeys(("atsg", "lpga", "atsv", "opga"), "atsg"),
     **dict.fromkeys(("uvg", "laa", "lainf", "uvv", "olaa", "oainf", "mvg", "lam"), "uvg"),
@@ -208,8 +215,12 @@ def whole_ruling(ruling_text: str) -> dict[str, float]:
     return measure(p.sections(ruling_text)["reasoning"] or ruling_text)
 
 
-ARTICLE_QUESTION = "Frage: Welche Gesetzesbestimmung ist für den Entscheid der eigentlichen Streitfrage ausschlaggebend?\n\n"
-_ARTICLE_FORM = "in der Form: Art. <Nummer> <Abkürzung des Gesetzes>"  # no example article: the 8B repeated the example (28 Nov)
+ARTICLE_QUESTION = (
+    "Frage: Welche Gesetzesbestimmung ist für den Entscheid der eigentlichen Streitfrage ausschlaggebend?\n\n"
+)
+_ARTICLE_FORM = (
+    "in der Form: Art. <Nummer> <Abkürzung des Gesetzes>"  # no example article: the 8B repeated the example (28 Nov)
+)
 _ARTICLE_ZERO = "Antworte nur mit der Bestimmung, " + _ARTICLE_FORM
 
 
@@ -224,7 +235,11 @@ def read_article(client: Any, ruling_text: str, arm: str, size: str = "small") -
     fmt = (
         _ARTICLE_ZERO
         if arm == "zero"
-        else "Antworte in genau zwei Zeilen:\nZeile 1: die Bestimmung, " + _ARTICLE_FORM + "\nZeile 2: die Nummer der Erwägung, in der das Gericht sie anwendet, gewählt aus dieser Liste: " + ", ".join(numbers) + "."
+        else "Antworte in genau zwei Zeilen:\nZeile 1: die Bestimmung, "
+        + _ARTICLE_FORM
+        + "\nZeile 2: die Nummer der Erwägung, in der das Gericht sie anwendet, gewählt aus dieser Liste: "
+        + ", ".join(numbers)
+        + "."
     )
     try:
         result = client.chat(

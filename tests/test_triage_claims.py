@@ -96,7 +96,10 @@ def test_measure_is_deterministic_and_reads_markers_citations_and_laws():
 
 def test_articles_map_french_and_italian_law_names_to_one_family():
     assert cl.articles("Art. 16 ATSG, art. 16 LPGA et art. 28 al. 1 LAI; art. 6 cpv. 1 LAINF") == [
-        ("16", "atsg"), ("16", "atsg"), ("28", "ivg"), ("6", "uvg"),
+        ("16", "atsg"),
+        ("16", "atsg"),
+        ("28", "ivg"),
+        ("6", "uvg"),
     ]
 
 
