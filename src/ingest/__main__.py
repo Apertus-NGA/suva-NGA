@@ -1,8 +1,12 @@
-"""Ingest commands (docs/DB_DDL_PLANNING.md §8). Needs DATABASE_URL.
+"""Ingest commands (docs/DB_DDL_PLANNING.md §8). Needs DATABASE_URL; runs as DB_PIPELINE_ROLE (src.db.pg).
 
 python -m src.ingest registry               load step versions, rules and profiles (src/*/registry, src/db/seed)
-python -m src.ingest base --parquet PATH    the HF base dataset (pinned voilaj/swiss-caselaw data/bger.parquet)
+python -m src.ingest base --parquet PATH    the HF base dataset (pinned voilaj/swiss-caselaw data/bger.parquet);
+                                            every row of the file loaded or excluded with its reason (F-04)
 python -m src.ingest gold                   Suva's labels from judgements/ (columns A-B, export links; D-051)
+python -m src.ingest closure [--out PATH]   every snapshot's closure (F-04): file rows = loaded refs + exclusions,
+                                            aggregates of corpus.v_ingest_closure only (no docket); exit 1 if
+                                            no snapshot is loaded or one does not close
 """
 
 from __future__ import annotations
@@ -40,6 +44,45 @@ def load_registries(conn) -> list[str]:
     return loaded
 
 
+_CLOSURE_SQL = """
+SELECT source::text, revision, file_sha256, row_count, loaded_refs, base_refs, twin_refs, exclusions,
+       exclusions_by_reason, exclusions_by_row_index, unaccounted_rows, closure_ok
+FROM corpus.v_ingest_closure ORDER BY source, revision, file_sha256
+"""
+_CLOSURE_KEYS = (
+    "source",
+    "revision",
+    "file_sha256",
+    "file_rows",
+    "loaded_refs",
+    "base_refs",
+    "twin_refs",
+    "exclusions",
+    "exclusions_by_reason",
+    "exclusions_by_row_index",
+    "unaccounted_rows",
+    "closure_ok",
+)
+
+
+def closure_report(conn) -> dict:
+    """Per snapshot, every row of the source file accounted for (F-04): read from corpus.v_ingest_closure.
+
+    Counts only: no docket, no external id. `closure_ok` overall = at least one snapshot and every one closes.
+    """
+    with conn.cursor() as cur:
+        cur.execute(_CLOSURE_SQL)
+        snapshots = [dict(zip(_CLOSURE_KEYS, row, strict=True)) for row in cur.fetchall()]
+    conn.rollback()
+    for snap in snapshots:
+        snap["exclusions_by_reason"] = dict(sorted(snap["exclusions_by_reason"].items()))
+    return {
+        "view": "corpus.v_ingest_closure",
+        "closure_ok": bool(snapshots) and all(s["closure_ok"] for s in snapshots),
+        "snapshots": snapshots,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m src.ingest")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -47,8 +90,28 @@ def main(argv: list[str] | None = None) -> int:
     base = sub.add_parser("base")
     base.add_argument("--parquet", required=True, type=Path)
     sub.add_parser("gold")
+    clo = sub.add_parser("closure")
+    clo.add_argument("--out", type=Path, default=ROOT / "results" / "ingest_closure.json")
     args = ap.parse_args(argv)
     with connect(actor="ingest-cli") as conn:
+        if args.cmd == "closure":
+            conn.read_only = True
+            report = closure_report(conn)
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            for snap in report["snapshots"]:
+                print(
+                    f"{snap['source']} {(snap['revision'] or '-')[:12]}: {snap['file_rows']} file rows = "
+                    f"{snap['loaded_refs']} refs + {snap['exclusions']} exclusions "
+                    f"({snap['unaccounted_rows']} unaccounted), closure_ok {snap['closure_ok']}"
+                )
+            if not report["snapshots"]:
+                print(
+                    "closure: no snapshot has refs or exclusions (load one: python -m src.ingest base)", file=sys.stderr
+                )
+            print(f"wrote {args.out}")
+            print("closure: OK" if report["closure_ok"] else "closure: FAILED")
+            return 0 if report["closure_ok"] else 1
         if args.cmd == "registry":
             print("\n".join(load_registries(conn)))
         elif args.cmd == "base":

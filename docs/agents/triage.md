@@ -8,6 +8,8 @@ Give every ruling of a candidate population (a scored or labelled window under e
 ## You own
 `src/signals/`, `src/triage/`, `prompts/triage_*`, the decision records, the delivered list and the ranked export (D-046).
 
+Layer 1, the first filter before Apertus (`src/layer1/`), is described in `docs/LAYER1.md`. Every ruling it drops keeps its reason code and the outcome of every rule of its version (`triage.v_layer1_ledger`, D-081). Every row of the source file outside every window is recorded as `OUT_OF_WINDOW` in `corpus.ingest_exclusion` (D-081). Its open points are D-084.
+
 ## Inputs
 - Ruling records from crawl, each with its decision date and its publication date (D-050).
 - Suva's relevance list `judgements/BG_Urteile_2025_Q4_2026_Q1.xlsx` (template, read-only, D-040), read through the S0 parser of the crawl role (`docs/agents/crawl.md`), which keeps only the fields D-051 allows. It holds 28 positives for Q4/2025 and 31 Federal Court positives for Q1/2026, plus one cantonal row that a Federal Court crawl cannot reach (Q-28). Counts and quirks: `docs/SUVA_DATA.md` §2.

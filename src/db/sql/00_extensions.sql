@@ -60,6 +60,7 @@ BEGIN
     ('schema_subject',         ARRAY['step_config','rule_definition','preset_config','review_payload']),
     ('model_role',             ARRAY['judge','generator','repair']),
     ('rule_kind',              ARRAY['keep','drop','flag','signal','check']),
+    ('rule_outcome',           ARRAY['fired','not_fired','not_applicable','blocked']),
     ('reason_domain',          ARRAY['triage','verify','ingest','work','summary']),
     ('source_kind',            ARRAY['hf_bger','hf_erwaegungen','hf_structure','bger_neuheiten','bger_ruling_page','judgements_workbook','judgements_export','models_md','team_list_2096','registry_seed']),
     ('span_status',            ARRAY['running','ok','error','skipped','cancelled']),
@@ -106,6 +107,7 @@ END $$;
 
 COMMENT ON TYPE ops.in_suva_scope IS 'The scope label (D-063): in_scope = True, out_of_scope = False (always with a reason code), potentially = passed layer 1 and not decided yet, or failed and waiting for a retry.';
 COMMENT ON TYPE ops.pipeline_step IS 'Pipeline steps in pipeline order (docs/DB_DDL_PLANNING.md §7.3). Views sort on this order.';
+COMMENT ON TYPE ops.rule_outcome IS 'What one rule of a step version did for one assessment (triage.assessment_reason): fired = condition true, its effect applies; not_fired = evaluated, condition false; not_applicable = a precondition failed (detail.why); blocked = condition true but neutralised by another rule (detail.blocked_by). F-01, F-02.';
 
 -- ---------------------------------------------------------------------------
 -- Shared functions
@@ -191,3 +193,15 @@ CREATE OR REPLACE FUNCTION ops.current_actor() RETURNS text
 CREATE OR REPLACE FUNCTION ops.current_run_id() RETURNS uuid
   LANGUAGE sql STABLE
   RETURN nullif(btrim(current_setting('app.run_id', true)), '')::uuid;
+
+-- True when a row the caller can see (its xmin) was inserted by the current transaction or one of its
+-- subtransactions (savepoints included): a visible row whose inserting transaction is still in progress can only be
+-- ours. The 32-bit xmin is widened to the 64-bit id nearest to the current transaction's (within 2^31, the window
+-- PostgreSQL keeps unfrozen ids in). Used to seal what a transaction certified at its commit (rule ledgers, F-10).
+CREATE OR REPLACE FUNCTION ops.inserted_in_current_xact(p_xmin xid) RETURNS boolean
+  LANGUAGE sql VOLATILE
+  RETURN (SELECT pg_xact_status((c.cur + ((((p_xmin::text::bigint - (c.cur & 4294967295)) + 2147483648) & 4294967295)
+                                          - 2147483648))::text::xid8) = 'in progress'
+          FROM (SELECT pg_current_xact_id()::text::bigint AS cur) c);
+COMMENT ON FUNCTION ops.inserted_in_current_xact(xid) IS
+  'True when the row whose xmin is given was inserted by the current transaction (or a savepoint of it). Only meaningful for a row the caller can see. Seals a committed rule ledger (triage.check_assessment_reason, F-10).';

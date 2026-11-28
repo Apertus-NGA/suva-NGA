@@ -8,10 +8,10 @@ ARGS ?=
 # DB target: DATABASE_URL when set (CI), else psql inside the compose service db (docs/DB_DDL_PLANNING.md §15)
 DB_TARGET ?= $(if $(DATABASE_URL),,--compose)
 
-.PHONY: help run run-live serve smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall
+.PHONY: help run run-live serve smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall layer1-golden layer1-verify layer1-validate
 
 help: ## list the targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
 run: ## end-to-end run from the committed snapshot (MODE=replay|live, SERVE=0 to skip serving)
 	$(PY) -m src.cli run --mode $(MODE) $(ARGS)
@@ -75,6 +75,15 @@ layer1: ## run layer 1 on the default profile (PROFILE=..., POPULATION=...): fil
 
 layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 	$(PY) -m src.layer1 recall --profile $(or $(PROFILE),default)
+
+layer1-golden: ## certified layer-1 and ingest decisions, in memory, no DB: make layer1-golden PARQUET=path [WRITE=1]
+	$(PY) -m src.layer1 golden --parquet $(PARQUET) $(if $(WRITE),--write)
+
+layer1-verify: ## a layer-1 run's files equal its DB rows, read-only: make layer1-verify RUN=<run_id>
+	$(PY) -m src.layer1 verify --run $(RUN)
+
+layer1-validate: ## run two profiles, recall, compare; fails on a removal: make layer1-validate BASE=... PROFILE=...
+	$(PY) -m src.layer1 validate --baseline-profile $(or $(BASE),layer1_reference) --profile $(or $(PROFILE),default)
 
 # --- Cluster (docs/DEPLOY.md). The compose jobs call the first four targets inside the app image; the cluster-*
 # targets wrap docker compose on the host. Never `docker compose down -v` (G12): volumes hold the database.

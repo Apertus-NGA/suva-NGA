@@ -5,19 +5,19 @@
     "schema_code": "layer1_filter.config",
     "version": [
       1,
-      0,
+      1,
       0
     ],
-    "changelog": "Initial: courts, letters and rubrics kept, rubric sources, title head, normalisation, accident/contract/closed regexes."
+    "changelog": "V1.1.0 (D-083): adds the optional title_rubric (the characters that cut the title head of the title_rubric_kept check). Absent in layer1_filter V1.0.0 and V1.1.0, whose configurations validate unchanged."
   },
   "rule_schema": {
     "schema_code": "layer1_filter.rule",
     "version": [
       1,
-      0,
+      1,
       0
     ],
-    "changelog": "Initial: a rule names one check of src/layer1/engine.py."
+    "changelog": "V1.1.0 (D-083): adds the checks text_unavailable and title_rubric_kept (both keep). Existing rule definitions validate unchanged."
   },
   "rules": [
     {
@@ -145,6 +145,34 @@
       },
       "description": "No rubric field was filled: the matter was read from the start of the Gegenstand line.",
       "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_KEEP_TEXT_UNAVAILABLE",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "text_unavailable"
+      },
+      "description": "The ruling has no text, so no term check could keep it: kept on any court, so that no ruling is dropped on its docket prefix alone (G5).",
+      "changelog": "Initial (D-083): audit F-03; V1.0.0 and V1.1.0 drop a ruling without text on a court outside the list."
+    },
+    {
+      "rule_code": "L1_KEEP_TITLE_RUBRIC",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "title_rubric_kept"
+      },
+      "description": "Allowed court and letter, and the matter at the start of the Gegenstand line (cut at the first of the characters of config.title_rubric) is in the court's keep set.",
+      "changelog": "Initial (D-083): audit F-06 (a title such as 'Haftpflichtrecht; Revision' read as one rubric) and F-08 (an umbrella HF rubric hiding the title's matter)."
     }
   ],
   "versions": [
@@ -242,7 +270,9 @@
         "L1_DROP_RUBRIC_OUT",
         "L1_SIGNAL_RUBRIC_FROM_TITLE"
       ],
-      "changelog": "Reproduces src/courts.py at 4c246a8 decision for decision (subject OR text; title fallback; closed rubrics block contract terms)."
+      "changelog": "Reproduces src/courts.py at 4c246a8 decision for decision (subject OR text; title fallback; closed rubrics block contract terms).",
+      "decision": "D-073",
+      "validation": "expected/layer1/V1.0.0.json"
     },
     {
       "version": [
@@ -342,7 +372,118 @@
         "L1_DROP_RUBRIC_OUT",
         "L1_SIGNAL_RUBRIC_FROM_TITLE"
       ],
-      "changelog": "NFKC, typographic apostrophes and no-break spaces normalised before matching; accident terms widened to the plural and compound forms of PR #36 (Unfallversicherungsgesetz, Unfallversicherer, assureur-accidents, assicuratore infortuni). Same rules; outputs may change, so re-measured (D-064 minor)."
+      "changelog": "NFKC, typographic apostrophes and no-break spaces normalised before matching; accident terms widened to the plural and compound forms of PR #36 (Unfallversicherungsgesetz, Unfallversicherer, assureur-accidents, assicuratore infortuni). Same rules; outputs may change, so re-measured (D-064 minor).",
+      "decision": "D-073",
+      "validation": "expected/layer1/V1.1.0.json"
+    },
+    {
+      "version": [
+        1,
+        2,
+        0
+      ],
+      "name": "layer-1 gate, no-text keep, title rubric, wider vocabulary",
+      "bump_kind": "minor",
+      "previous": [
+        1,
+        1,
+        0
+      ],
+      "config": {
+        "courts": {
+          "4": {
+            "letters": "ADFG",
+            "rubrics": [
+              "assurance responsabilité civile",
+              "diritto contrattuale",
+              "droit des contrats",
+              "haftpflichtrecht",
+              "vertragsrecht"
+            ]
+          },
+          "8": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione contro le malattie",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          },
+          "9": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione contro le malattie",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          }
+        },
+        "rubric_sources": [
+          "neuheiten",
+          "hf_legal_area",
+          "gegenstand_head"
+        ],
+        "title_head": {
+          "cut_at": "(",
+          "strip_trailing": ",;"
+        },
+        "title_rubric": {
+          "cut_at": "(;,:"
+        },
+        "normalise": {
+          "casefold": true,
+          "nfkc": true,
+          "apostrophes": true,
+          "nbsp": true
+        },
+        "accident_terms": "\\b(?:suva|cna|insai|uvg|laa|lainf|mvg|unfallversicherung(?:sgesetz|en)?|unfallversicherers?|unfallversicherern|unfallversicherungsanstalt|militärversicherung|assurance[- ]accidents?|assureurs?-accidents?|assurance militaire|assicurazione (?:contro gli )?infortuni|assicuratore infortuni|assicurazione militare)\\b",
+        "contract_terms": "(?:taggeldversicherung|\\bvvg\\b|\\blca\\b|versicherungsvertragsgesetz|loi sur le contrat d['’]assurance|legge (?:federale )?sul contratto d['’]assicurazione)",
+        "closed_rubrics": "arbeitslos|chômage|chomage|disoccupaz|alters- und hinterlassenen|vieillesse|vecchiaia|ergänzungsleistung|prestations complémentaires|prestazion\\w* complementar|sozialhilfe|aide sociale|assistenza sociale|familienzulag|allocations familiales|assegni familiari|erwerbsersatz|erwerbersatz|perte de gain|perdita di guadagno|finanzen & abgabe|finances publiques|finanze pubbliche|impôt|imposta|umsatzabgabe|droit fiscal|diritto tributario"
+      },
+      "rules": [
+        "L1_KEEP_RUBRIC",
+        "L1_KEEP_RUBRIC_MISSING",
+        "L1_KEEP_ACCIDENT_TERM",
+        "L1_KEEP_CONTRACT_TERM",
+        "L1_FLAG_CLOSED_RUBRIC",
+        "L1_DROP_WRONG_COURT",
+        "L1_DROP_WRONG_LETTER",
+        "L1_DROP_RUBRIC_OUT",
+        "L1_SIGNAL_RUBRIC_FROM_TITLE",
+        "L1_KEEP_TEXT_UNAVAILABLE",
+        "L1_KEEP_TITLE_RUBRIC"
+      ],
+      "changelog": "Two keep rules appended after the V1.1.0 ordinals, so the decisive rule of every ruling V1.1.0 keeps is unchanged: L1_KEEP_TEXT_UNAVAILABLE (no text: kept on any court, G5) and L1_KEEP_TITLE_RUBRIC (the title head cut at '(', ';', ',' or ':' in the court's keep set; audit F-06, F-08). 'assicurazione contro le malattie' added to the keep sets of courts 8 and 9 (F-07). Accident terms widened to Suva's legal name 'Unfallversicherungsanstalt' and the unhyphenated 'assurance accident(s)'. Pinned only by profile layer1_candidate until validated against default (D-083).",
+      "decision": "D-083",
+      "validation": "expected/layer1/V1.2.0.json"
     }
   ]
 }

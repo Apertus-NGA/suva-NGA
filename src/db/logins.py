@@ -44,7 +44,7 @@ def apply(passwords: dict[str, str | None], url: str | None = None) -> list[str]
     from src.db.pg import connect
 
     changed: list[str] = []
-    with connect(url, actor="deploy") as conn, conn.cursor() as cur:
+    with connect(url, actor="deploy", pipeline=False) as conn, conn.cursor() as cur:
         for login, password in passwords.items():
             if password is None:
                 continue
@@ -68,7 +68,7 @@ def verify(login: str, url: str | None = None) -> list[str]:
     from src.db.pg import connect
 
     allowed: list[str] = []
-    with connect(url, actor="verify") as conn:
+    with connect(url, actor="verify", pipeline=False) as conn:
         user = conn.execute("SELECT current_user").fetchone()[0]
         if user != login:
             raise SystemExit(f"connected as {user}, expected {login}")
