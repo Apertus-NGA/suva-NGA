@@ -378,3 +378,15 @@ def test_the_sentence_before_is_given_and_is_part_of_the_entailment_premise():
     assert before in prompt and "The parties: …" in prompt
     premise = next(m for v, m in fake.sent if v.startswith("entail@1/write"))[-1]["content"]
     assert before in premise and sentence.text in premise
+
+
+def test_a_rule_made_stronger_or_weaker_is_refused_by_code():
+    assert write.strength("l'appréciation des juges cantonaux doit être confirmée", "l'appréciation des juges cantonaux peut être confirmée")
+    assert write.strength("Die Rente kann gekürzt werden.", "La rente doit être réduite.")
+    assert not write.strength("Die Rente muss gekürzt werden.", "Die Rente ist zu kürzen.")
+    assert not write.strength("Das Gericht bestätigt die Kürzung.", "Le Tribunal confirme la réduction.")
+
+
+def test_the_admissibility_qualifier_has_its_variants():
+    source = RULING.replace("1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf eingetreten werden kann.")
+    assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith("soweit darauf einzutreten ist.")

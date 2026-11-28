@@ -30,6 +30,7 @@ from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, 
 from src.summarize.refine.steps.common import CALQUES, NAME, new_terms, polish
 
 VERSION = "write@5"
+CHECKS_VERSION = "write-checks@2"  # modal strength, quoted foreign words, admissibility variants
 TRIM_VERSION = "trim@1"
 TRIM_SHARE = 0.9  # of the upper end of Suva's band (checks.LENGTH_BAND)
 _KEEP_ORDER = {"fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
@@ -159,6 +160,28 @@ def uses_term(text: str, term: str) -> bool:
     return True
 
 
+# How strongly a sentence states its rule. Run x4: "peut être confirmée" became "doit être confirmée" and the
+# entailment reading let it through (8C_311/2025). Code compares the two classes in source and new sentence.
+_MUST = re.compile(r"\b(?:muss|müssen|musste|hat zu|ist zu|sind zu|darf nicht|doit|doivent|devait|il faut|il y a lieu"
+                   r"|deve|devono|occorre|è tenut)\w*", re.IGNORECASE)  # fmt: skip
+_MAY = re.compile(r"\b(?:kann|können|konnte|darf|dürfen|peut|peuvent|pouvait|il est possible|può|possono)\b",
+                  re.IGNORECASE)  # fmt: skip
+# A word in quotation marks inside the sentence: in a translation it is the source language's (run x4: «allseitig»
+# in a French fiche). Code takes "(«…»)" out and refuses a quoted word left in the text.
+_QUOTED = re.compile(r"\s*\((?:«|„|\"|“)[^»“”\"]{1,40}(?:»|“|”|\")\)|(?:«|„|“)\s*[^»“”]{1,40}?\s*(?:»|“|”)")
+
+
+def strength(new: str, sentence: str) -> list[str]:
+    """A rule made stronger or weaker: "may" in the source and only "must" in the new sentence, or the reverse."""
+    src_must, src_may = bool(_MUST.search(sentence)), bool(_MAY.search(sentence))
+    new_must, new_may = bool(_MUST.search(new)), bool(_MAY.search(new))
+    if new_must and not src_must and src_may:
+        return ["stronger than the ruling: 'must' where the ruling says 'may'"]
+    if new_may and not src_may and src_must and not new_must:
+        return ["weaker than the ruling: 'may' where the ruling says 'must'"]
+    return []
+
+
 def _problems(new: str, sentence: str, language: str, source: str, terms: list[tuple[str, str]]) -> list[str]:
     problems = []
     if not new.strip():
@@ -176,6 +199,17 @@ def _problems(new: str, sentence: str, language: str, source: str, terms: list[t
     ratio = len(new) / max(1, len(_REF_PARENTHESIS.sub("", sentence)))
     if not MIN_RATIO <= ratio <= MAX_RATIO:
         problems.append(f"length changed by a factor {ratio:.2f}")
+    problems += strength(new, sentence)
+    if (
+        terms is not None
+        and _QUOTED.search(new)
+        and checks.language_of(_QUOTED.search(new).group(0))
+        not in (
+            None,
+            language,
+        )
+    ):
+        problems.append(f"a quoted word of another language: {_QUOTED.search(new).group(0).strip()}")
     missing = [dst for _, dst in terms if not uses_term(new, dst)]
     if missing:
         problems.append("glossary term missing: " + ", ".join(missing))
@@ -214,6 +248,8 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
             written.problems.append(str(exc))
             break
         new = polish(answer["a_sentence"], SimpleNamespace(language=language, source=ruling["text"]))
+        if not same:  # "(«allseitig»)" after its translation: the source language's word comes out
+            new = re.sub(r"\s*\((?:«|„|\"|“)[^»“”\"]{1,40}(?:»|“|”|\")\)", "", new)
         problems = _problems(new, candidate.text, language, ruling["text"], terms)
         if not problems:
             try:  # the sentence before may say what a pronoun refers to, so it is part of the premise
@@ -278,8 +314,11 @@ def flow(texts: list[str], language: str, ruling: dict, model: Model) -> tuple[l
     return out, log
 
 
-_SO_FAR = re.compile(r"soweit (?:darauf )?einzutreten ist|dans la mesure o(?:ù|u) (?:il est recevable|il est "
-                     r"recevable)|nella misura in cui (?:è )?ammissibile", re.IGNORECASE)  # fmt: skip
+_SO_FAR = re.compile(
+    r"soweit (?:darauf|auf sie|auf ihn)? ?(?:einzutreten ist|eingetreten werden kann)|dans la mesure o(?:ù|u) "
+    r"(?:il est recevable|il est recevable|elle est recevable)|nella misura in cui (?:è )?ammissibile",
+    re.IGNORECASE,
+)
 _QUALIFIED = {
     "de": ("Die Beschwerde wird abgewiesen.", "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist."),
     "fr": ("Le recours est rejeté.", "Le recours est rejeté dans la mesure où il est recevable."),
