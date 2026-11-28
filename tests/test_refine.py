@@ -251,7 +251,7 @@ def test_holding_inserts_the_rule_with_the_reference_added_by_code():
 
 def test_holding_is_skipped_without_a_checked_record():
     result = refine(DRAFT, ctx_for(Fake(), {"rules": [], "status": "needs_review"}), [Holding()])
-    assert result.trace[0].status == "passed" and result.calls == 0
+    assert result.trace[0].status == "skipped" and result.calls == 0
 
 
 def test_terms_swaps_a_glossary_term_and_refuses_an_unattested_replacement():
@@ -362,7 +362,7 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
     for language in ("de", "fr"):
         refine = params["refine"][language]
         assert [s["step"] for s in refine["steps"]] == [
-            "form", "facts", "holding", "economy", "terms", "language", "length", "form_final",
+            "form", "facts", "context", "holding", "economy", "terms", "language", "length", "form_final",
         ]  # fmt: skip
         assert refine["draft"] and stored[language] == result["languages"][language]["text"]
     assert params["refine"]["record"]["status"] == "ok"
@@ -425,3 +425,20 @@ def test_economy_takes_a_restated_outcome_out_of_another_sentence():
         [Economy()],
     )
     assert "still states the outcome" in refused.trace[0].findings[0]["why_not"]
+
+
+def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_sentence():
+    from src.summarize.refine.steps.context import ContextStep
+
+    short = "Das Bundesgericht bestätigte die Leistungseinstellung.\n\nDie Beschwerde wird abgewiesen."
+    answer = {"a_label": "facts", "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
+              "c_text": "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter; die Suva stellte ihre Leistungen per 30. Juni 2023 ein."}
+    recheck = {"items": [{"a_sentence": "s1", "b_label": "facts", "c_opening": "Der Versicherte stürzte am 7. Mai 2023", "d_verdict": "same"}]}
+    fake = Fake(**{"context@1": [answer], "facts@4__recheck": [recheck]})
+    result = refine(short, ctx_for(fake), [ContextStep()])
+    assert result.text.startswith("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter")
+    assert result.trace[0].status == "corrected" and result.trace[0].findings[0]["evidence"] == "facts"
+    invented = {"a_label": "facts", "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
+                "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe."}
+    refused = refine(short, ctx_for(Fake(**{"context@1": [invented]})), [ContextStep()])
+    assert "number 2021 not in the ruling" in refused.trace[0].findings[0]["why_not"]

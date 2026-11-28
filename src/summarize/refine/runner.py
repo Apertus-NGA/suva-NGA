@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from src.summarize.refine import checks
 from src.summarize.refine.draft import Draft, PatchRefused
 from src.summarize.refine.model import ModelFailed
-from src.summarize.refine.step import Candidate, Context, Outcome, Step
+from src.summarize.refine.step import Candidate, Context, Outcome, Skip, Step
 
 VERSION = "refine@1"
 
@@ -75,6 +75,9 @@ def run_step(step: Step, draft: Draft, ctx: Context) -> tuple[Draft, Outcome]:
     start, calls_before = time.perf_counter(), ctx.model.calls
     try:
         candidates = step.propose(draft, ctx)
+    except Skip as exc:
+        ms = int((time.perf_counter() - start) * 1000)
+        return draft, Outcome(step.id, step.version, "skipped", [], ctx.model.calls - calls_before, ms, str(exc))
     except ModelFailed as exc:
         ms = int((time.perf_counter() - start) * 1000)
         return draft, Outcome(step.id, step.version, "needs_review", [], ctx.model.calls - calls_before, ms, str(exc))

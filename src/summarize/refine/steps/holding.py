@@ -13,7 +13,7 @@ from __future__ import annotations
 from src.summarize.refine import evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
-from src.summarize.refine.step import Candidate, Context, Step
+from src.summarize.refine.step import Candidate, Context, Skip, Step
 from src.summarize.refine.steps.common import NAME, guarded, with_reference, written_sentence_problems
 
 VERSION = "holding@1"
@@ -56,7 +56,7 @@ class Holding(Step):
     def propose(self, draft: Draft, ctx: Context) -> list[Candidate]:
         rule, answer = _rule(ctx.record or {}), (ctx.record or {}).get("answer")
         if rule is None or answer is None:
-            return []
+            raise Skip("the record has no checked rule and answer: " + "; ".join((ctx.record or {}).get("issues", [])))
         ids = draft.ids(editable_only=False)
         found = self._detect(draft, ids, rule, answer, ctx, "detect")
         has_rule, has_answer = found["a_rule_sentence"] != NONE, found["b_answer_sentence"] != NONE

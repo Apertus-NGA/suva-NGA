@@ -61,6 +61,10 @@ class Candidate:
         return {k: v for k, v in out.items() if v not in (None, "", {}, [])}
 
 
+class Skip(Exception):  # noqa: N818  a control signal, not an error
+    """Raised by `propose` when the step cannot run on this draft; the trace records it as `skipped` with why."""
+
+
 class Step:
     """Subclasses set `id`, `version`, `kind` and implement `propose`."""
 

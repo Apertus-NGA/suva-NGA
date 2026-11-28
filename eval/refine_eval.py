@@ -115,6 +115,13 @@ def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None
     transport = gateway(client=client)
 
     def one(ruling: dict) -> list[dict]:
+        try:
+            return _one(ruling)
+        except Exception as exc:  # noqa: BLE001  one ruling's failure is reported, the others go on
+            print(f"{ruling['docket']}: FAILED {type(exc).__name__}: {exc}", flush=True)
+            return []
+
+    def _one(ruling: dict) -> list[dict]:
         model = Model(transport, budget=40)
         record = read_record(ruling["text"], evidence.passages(ruling["text"]), model)
         rows = []
@@ -126,8 +133,8 @@ def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None
                                   ruling["lexicon"][lang], ruling["language"], chosen)  # fmt: skip
             rows.append({"docket": ruling["docket"], "language": lang, "record": record, **result.as_dict(),
                          "model_log": per.log})  # fmt: skip
-            steps = " ".join(f"{o.step}:{o.status}" for o in result.trace)
-            print(f"{ruling['docket']} {lang}: {result.calls} calls, {steps}", flush=True)
+            statuses = " ".join(f"{o.step}:{o.status}" for o in result.trace)
+            print(f"{ruling['docket']} {lang}: {result.calls} calls, {statuses}", flush=True)
         return rows
 
     with ThreadPoolExecutor(WORKERS) as pool:
@@ -217,15 +224,43 @@ def report(name_set: str, name: str) -> dict:
     return result
 
 
+def show(name_set: str, name: str, docket: str | None = None) -> None:
+    """Per summary: the draft, the refined text, each step's findings, and the judge's verdicts before and after."""
+    refined = _jsonl(OUT / f"refined_{name_set}_{name}.jsonl")
+    try:
+        before, after = _detail(f"refine_{name_set}_before"), _detail(f"refine_{name_set}_{name}")
+    except FileNotFoundError:
+        before = after = {}
+    for row in refined:
+        if docket and row["docket"] != docket:
+            continue
+        key = (row["docket"], row["language"])
+        print(f"\n===== {row['docket']} {row['language']}  calls {row['calls']}")
+        if key in before and key in after:
+            was, now = before[key]["verdicts"], after[key]["verdicts"]
+            changed = {c: f"{was.get(c)}->{now.get(c)}" for c in was if was.get(c) != now.get(c)}
+            print(f"judge {before[key]['score']['score']} -> {after[key]['score']['score']}  {changed}")
+        print("--- draft:\n" + row["draft"] + "\n--- refined:\n" + row["text"])
+        for outcome in row["trace"]:
+            for f in outcome.get("findings", []):
+                mark = "KEPT" if f.get("accepted") else "REFUSED"
+                patch = (f.get("patch") or {}).get("text", "")
+                print(f"  [{outcome['step']}] {mark} {f['reason'][:90]} {('-> ' + patch[:160]) if patch else ''}"
+                      f"{('  WHY: ' + f['why_not'][:160]) if f.get('why_not') else ''}")  # fmt: skip
+            if outcome.get("note"):
+                print(f"  [{outcome['step']}] {outcome['status']}: {outcome['note'][:160]}")
+
+
 def main() -> None:
     from src.summarize import summarize
 
     summarize.load_env()
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("command", choices=["sample", "drafts", "refine", "judge", "report"])
+    parser.add_argument("command", choices=["sample", "drafts", "refine", "judge", "report", "show"])
     parser.add_argument("--set", default="iterate", choices=["iterate", "holdout"])
     parser.add_argument("--name", default="r1")
     parser.add_argument("--steps", nargs="*")
+    parser.add_argument("--docket")
     args = parser.parse_args()
     if args.command == "sample":
         print(json.dumps(sets(), indent=1))
@@ -235,6 +270,8 @@ def main() -> None:
         refine_all(args.set, args.name, args.steps)
     elif args.command == "judge":
         judge(args.set, args.name)
+    elif args.command == "show":
+        show(args.set, args.name, args.docket)
     else:
         report(args.set, args.name)
 

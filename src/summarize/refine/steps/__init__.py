@@ -2,6 +2,7 @@
 
 1. form      code    citation forms, abbreviations, spelling, invented references, repeats
 2. facts     model   every sentence backed by the ruling (F1, F2)
+2b. context  model   under Suva's word band: the facts a reader needs, from the ruling (R1, C2)
 3. holding   model   the deciding rule and the court's answer stated (C1, C2, R1)
 3b. economy  model   the outcome stated once (T4): code finds a restatement, Apertus takes it out
 4. terms     model   established Swiss legal terms (T1), checked against attested terms
@@ -10,6 +11,7 @@
 7. form      code    the same code clean-up again, over whatever the model wrote
 """
 
+from src.summarize.refine.steps.context import ContextStep
 from src.summarize.refine.steps.economy import Economy
 from src.summarize.refine.steps.facts import Facts
 from src.summarize.refine.steps.form import Form
@@ -20,7 +22,17 @@ from src.summarize.refine.steps.terms import Terms
 
 
 def default_steps():
-    return [Form("form"), Facts(), Holding(), Economy(), Terms(), Language(), Length(), Form("form_final")]
+    return [
+        Form("form"),
+        Facts(),
+        ContextStep(),
+        Holding(),
+        Economy(),
+        Terms(),
+        Language(),
+        Length(),
+        Form("form_final"),
+    ]
 
 
 STEPS = default_steps()
