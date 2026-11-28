@@ -12,8 +12,7 @@ export function Sidebar({ current, onSelect, placeholderScores }: Props) {
     <aside className="flex w-[208px] shrink-0 flex-col bg-night text-night-text xl:w-[228px]">
       <div className="flex h-[76px] items-center px-5">
         <span className="mr-2.5 size-2.5 rounded-full bg-accent" aria-hidden />
-        <span className="font-serif text-[21px] leading-none tracking-[-0.01em]">Suva</span>
-        <span className="ml-2.5 border-l border-night-line pl-2.5 text-[12px] text-night-muted">{t("app.name")}</span>
+        <span className="font-serif text-[21px] leading-none tracking-[-0.01em]">{t("app.name")}</span>
       </div>
       <nav aria-label={t("nav.title")} className="flex flex-col gap-px px-2.5">
         {VIEWS.map((view) => {

@@ -26,7 +26,7 @@ const COLUMNS: Column[] = [
   { title: "col.decided", width: 108, sort: "decision_date", firstOrder: "desc" },
   { title: "col.published", width: 108, sort: "publication_date", firstOrder: "desc" },
   { title: "col.outcome", width: 176, wide: true },
-  { title: "col.status", width: 236 },
+  { title: "col.status", width: 268, sort: "status", firstOrder: "desc" },
 ];
 
 export function RulingsTable({ rulings, sort, order, onSort, onDecide, onOpen }: Props) {

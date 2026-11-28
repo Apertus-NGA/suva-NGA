@@ -1,6 +1,6 @@
 // The list's state: filters, sort and page. It lives in the URL, so a filtered view can be bookmarked or shared.
 
-export type SortKey = "score" | "docket" | "area" | "decision_date" | "publication_date";
+export type SortKey = "score" | "docket" | "area" | "decision_date" | "publication_date" | "status"; // status: by tier
 export type Order = "asc" | "desc";
 
 export type Filters = {
@@ -53,7 +53,7 @@ export const DEFAULT_FILTERS: Filters = {
 
 const TEXT_KEYS = ["q", "decided_from", "decided_to", "published_from", "published_to", "score_min", "score_max"] as const;
 const LIST_KEYS = ["topic", "area", "division", "language", "outcome", "label", "status"] as const;
-const SORT_KEYS: SortKey[] = ["score", "docket", "area", "decision_date", "publication_date"];
+const SORT_KEYS: SortKey[] = ["score", "docket", "area", "decision_date", "publication_date", "status"];
 
 /** Query string for the address bar: only what differs from the defaults. */
 export function toUrlParams(f: Filters): URLSearchParams {

@@ -4,7 +4,8 @@
     S0 db         start the local compose database when DATABASE_URL points at it, connect, apply migrations
     S1 ingest     only when `rulings` is empty: `suva_data pull` (if data/snapshot is missing) then `build`
     S2 triage     layer 1 + layer 2 (src/triage/pipeline.py); a full run writes the predictions
-    S3 summarise  the German and French fiches of the top N suspected-relevant rulings without a summary
+    S3 summarise  the German and French fiches (writer v3) of every ruling with a current prediction that lacks
+                  them, the rulings layer 2 calls relevant first (src/summarize/batch.py); SUMMARY_LIMIT caps it
     S4 serve      the API and the UI on 127.0.0.1:8000 (skipped with --no-serve, `make run SERVE=0`)
 A stage that cannot run stops the run with its name and the reason, and the exit code is non-zero.
 
@@ -33,13 +34,14 @@ from src.llm.served_model import REPO_ROOT
 
 COMPOSE_DB_PORT = 54329  # docker-compose.yml publishes the db service on 127.0.0.1:54329
 WEB_DIR = REPO_ROOT / "src" / "web"
-DEFAULT_SUMMARY_LIMIT = 5
+SUMMARY_WRITER = "v3"  # the summariser of record (docs/V3.md); v2 stands in for a language it cannot write
+NAMED = 10  # dockets named in a stage's line; the rest are counted
 
 STAGES = [
     ("S0 db", "start the local compose database if DATABASE_URL points at it, connect, apply db/migrations"),
     ("S1 ingest", "only if `rulings` is empty: suva_data pull (if data/snapshot is missing), then build"),
     ("S2 triage", "layer 1 + layer 2 (src/triage/pipeline.py); a full run writes the predictions"),
-    ("S3 summarise", "German and French fiches of the top N suspected-relevant rulings without a summary"),
+    ("S3 summarise", "German and French fiches (v3) of every ruling with a current prediction that lacks them"),
     ("S4 serve", "the API and the UI (uvicorn suva_app.main:app on 127.0.0.1:8000)"),
 ]
 
@@ -166,23 +168,21 @@ class Stages:
             return line + f"; smoke run of the first {limit}: nothing written"
         return line + f"; predictions written as model run {s['run_id']}; {tp.RESULTS.relative_to(REPO_ROOT)}"
 
-    def summary_candidates(self, conn, n: int) -> tuple[bool, list[tuple[int, str]]]:
-        """(any current prediction?, the top n suspected-relevant rulings without a current summary)."""
-        from suva_app.queries import _BASE  # the status the interface shows
+    def summary_candidates(self, conn, n: int | None) -> tuple[bool, list[tuple[int, str]]]:
+        """(any current prediction?, the first n (None: all) rulings with a current prediction that lack a v3 fiche
+        in German or French; relevant by layer 2 first, then by score)."""
+        from src.summarize import batch
 
         any_prediction = conn.execute("SELECT EXISTS (SELECT 1 FROM predictions WHERE is_current)").fetchone()[0]
-        rows = conn.execute(
-            _BASE + "SELECT id, docket FROM list WHERE status = 'ai_relevant' AND NOT has_summary "
-            "ORDER BY score DESC NULLS LAST, decision_date DESC LIMIT %s",
-            (n,),
-        ).fetchall()
-        return bool(any_prediction), [(int(r[0]), r[1]) for r in rows]
+        rows = batch.pending(conn, SUMMARY_WRITER, limit=n)
+        return bool(any_prediction), [(r[0], r[1]) for r in rows]
 
-    def summarise(self, conn, mode: str, n: int) -> str:
+    def summarise(self, conn, mode: str, n: int | None) -> str:
         from src.summarize import pipeline as sp
 
         # The summariser gains a `mode` argument in a parallel change; until then it can only call live.
-        accepts_mode = "mode" in inspect.signature(sp.summarise_ruling).parameters
+        accepted = inspect.signature(sp.summarise_ruling).parameters
+        accepts_mode = "mode" in accepted
         if mode == "replay" and not accepts_mode:
             raise StageError(
                 "the summariser has no replay mode yet (src/summarize/pipeline.summarise_ruling takes no `mode`), "
@@ -192,15 +192,30 @@ class Stages:
         if not any_prediction:
             raise StageError("no current prediction to rank by: S2 triage has written none (a --limit run writes none)")
         if not todo:
-            return f"nothing to do: every suspected-relevant ruling already has a current summary (asked for {n})"
+            return "nothing to do: every ruling with a current prediction already has its German and French fiche"
+        if mode == "live" and n is None:  # the full live run: parallel workers, one connection each
+            from src.summarize import batch
+
+            s = batch.run(mode, SUMMARY_WRITER)
+            written = len(s["done"]) + len(s["fallback"])
+            if s["failed"] and not written:
+                raise StageError(f"{len(s['failed'])} of {s['pending']} failed: " + ", ".join(s["failed"][:NAMED]))
+            return (
+                f"{written} rulings summarised in German and French ({len(s['fallback'])} with v2 standing in for a "
+                f"language), {len(s['failed'])} failed, {len(s['skipped'])} skipped"
+            )
         extra = {"mode": mode} if accepts_mode else {}
+        if "writer" in accepted:
+            extra["writer"] = SUMMARY_WRITER
         from src.llm.client import ReplayMiss
 
         done: list[str] = []
         uncached: list[str] = []  # replay only: no cached answer is not an error, the run still reaches the UI
         failed: list[str] = []
         for index, (ruling_id, docket) in enumerate(todo, start=1):
-            print(f"  {index}/{len(todo)} {docket}", flush=True)
+            if len(todo) <= 50 or index % 50 == 0 or index == len(todo):
+                print(f"  {index}/{len(todo)} {docket} ({len(done)} written, {len(uncached)} not cached, "
+                      f"{len(failed)} failed)", flush=True)  # fmt: skip
             try:
                 sp.summarise_ruling(conn, ruling_id, **extra)
                 done.append(docket)
@@ -211,13 +226,20 @@ class Stages:
                     uncached.append(docket)
             except (Exception, SystemExit) as exc:  # noqa: BLE001  the gateway client exits with SystemExit
                 failed.append(f"{docket}: {type(exc).__name__}: {exc}")
+        if failed and not (done or uncached):
+            raise StageError(f"{len(failed)} of {len(todo)} failed: " + "; ".join(failed[:NAMED]))
+
+        def named(dockets: list[str]) -> str:
+            more = f" and {len(dockets) - NAMED} more" if len(dockets) > NAMED else ""
+            return (", ".join(dockets[:NAMED]) or "none") + more
+
+        line = f"{len(done)} rulings summarised in German and French: {named(done)}"
         if failed:
-            raise StageError(f"{len(failed)} of {len(todo)} failed: " + "; ".join(failed))
-        line = f"{len(done)} rulings summarised in German and French: {', '.join(done) or 'none'}"
+            line += f"; {len(failed)} failed and left as they were ({named([f.split(':')[0] for f in failed])})"
         if uncached:
             line += (
-                f"; {len(uncached)} not in the replay cache, left without a summary ({', '.join(uncached)}): "
-                '`make run-live ARGS="--limit N"` writes them'
+                f"; {len(uncached)} not in the replay cache, left without a summary ({named(uncached)}): "
+                '`make run-live ARGS="--limit N"` or `make summaries MODE=live` writes them'
             )
         return line
 
@@ -261,7 +283,9 @@ def cmd_run(args: argparse.Namespace, stages=None) -> int:
     mode = args.mode
     tag = f"[{mode.upper()}]"
     limit = args.limit
-    n_summaries = min(limit, args.summary_limit) if limit else args.summary_limit
+    n_summaries = args.summary_limit  # None: every ruling that lacks its fiches
+    if limit:
+        n_summaries = limit if n_summaries is None else min(limit, n_summaries)
     if mode == "live":
         if not (args.all or limit):
             print(f"run {tag}: pass --limit N or --all (no expensive action by default)", file=sys.stderr)
@@ -297,7 +321,7 @@ def cmd_run(args: argparse.Namespace, stages=None) -> int:
         current = "S2 triage"
         say(current, stages.triage(conn, mode, limit))
         current = "S3 summarise"
-        if n_summaries <= 0:
+        if n_summaries is not None and n_summaries <= 0:
             say(current, "skipped (SUMMARY_LIMIT=0)")
         else:
             say(current, stages.summarise(conn, mode, n_summaries))
@@ -333,23 +357,32 @@ def cmd_replay_cache(args: argparse.Namespace) -> int:
         if any(failed):
             print(f"replay-cache: FAILED: triage is missing answers {failed}; run `make triage MODE=live` first")
             return 1
+        # each ruling with the writer its latest model run asked for (v3 since 28 Nov; older runs: SUMMARY_WRITER)
         ids = conn.execute(
-            "SELECT DISTINCT s.ruling_id, r.docket FROM summaries s JOIN rulings r ON r.id = s.ruling_id "
-            "WHERE s.origin = 'model' ORDER BY r.docket"
+            "SELECT DISTINCT ON (s.ruling_id) s.ruling_id, r.docket, m.params ->> 'requested_writer' "
+            "FROM summaries s JOIN rulings r ON r.id = s.ruling_id LEFT JOIN model_runs m ON m.id = s.run_id "
+            "WHERE s.origin = 'model' ORDER BY s.ruling_id, s.run_id DESC NULLS LAST"
         ).fetchall()
         replayed, missing = 0, []
-        for ruling_id, docket in ids:
+        for index, (ruling_id, docket, writer) in enumerate(ids, start=1):
+            if index % 100 == 0:
+                print(f"replay-cache: {index}/{len(ids)} summaries replayed", flush=True)
             try:
                 with conn.transaction(force_rollback=True):
-                    sp.summarise_ruling(conn, ruling_id, mode="replay")
+                    sp.summarise_ruling(conn, ruling_id, mode="replay", writer=writer or None)
                 replayed += 1
-            except ReplayMiss:
+            except (ReplayMiss, sp.NotSummarisable):
                 missing.append(docket)
     added = export_answers(SHIPPED_STORE)
     total = sum(1 for _ in (SHIPPED_STORE / "cache").rglob("*.json"))
     print(
         f"replay-cache: {added} answers added, {total} in {SHIPPED_STORE.relative_to(REPO_ROOT)}; "
-        f"summaries replayable: {replayed} of {len(ids)}" + (f"; not cached: {', '.join(missing)}" if missing else "")
+        f"summaries replayable: {replayed} of {len(ids)}"
+        + (
+            f"; not cached: {len(missing)} ({', '.join(missing[:NAMED])}{' …' if len(missing) > NAMED else ''})"
+            if missing
+            else ""
+        )  # fmt: skip
     )
     return 0
 
@@ -393,6 +426,10 @@ def main(argv: list[str] | None = None) -> int:
         from src.llm import probe
 
         return probe.main(argv[1:])
+    if argv[:1] == ["summaries"]:  # the batch summariser parses its own flags
+        from src.summarize import batch
+
+        return batch.main(argv[1:])
     ap = argparse.ArgumentParser(prog="python -m src.cli")
     sub = ap.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run", help="end-to-end pipeline (make run)")
@@ -404,11 +441,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--summary-limit",
         type=int,
-        default=int(os.environ.get("SUMMARY_LIMIT") or DEFAULT_SUMMARY_LIMIT),
-        help="summarise at most N rulings (SUMMARY_LIMIT, default %(default)s; 0 skips)",
+        default=int(os.environ["SUMMARY_LIMIT"]) if os.environ.get("SUMMARY_LIMIT") else None,
+        help="summarise at most N rulings (SUMMARY_LIMIT; default: every ruling that lacks its fiches; 0 skips)",
     )
     sub.add_parser("serve", help="serve the API and the UI (builds src/web/dist first when missing)")
     sub.add_parser("replay-cache", help="fill replay/llm with the cached answers one full run reads (no gateway)")
+    sub.add_parser("summaries", help="batch summaries (src/summarize/batch.py); flags go to it", add_help=False)
     sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py); flags go to the probe")
     warm = sub.add_parser("warmup", help="warm the large model")
     warm.add_argument("--dry-run", action="store_true")

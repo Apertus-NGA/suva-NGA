@@ -74,3 +74,17 @@ def test_replay_miss_is_503_with_a_clear_message(api, db_conn, monkeypatch):
     assert r.status_code == 503
     assert "no cached answer" in r.json()["detail"]
     assert _stored(db_conn) == 0
+
+
+def test_the_export_and_list_routes_answer(api, db_conn):
+    rid = _ruling(db_conn)
+    workspace.generate(db_conn, rid, ask=FakeModel(), model="m")
+    assert api.post(f"/api/rulings/{rid}/relevance", json={"action": "mark_not_relevant"}).status_code == 200
+    events = api.get("/api/relevance-events", params={"ruling_id": rid}).json()
+    # (a ruling decided in a quarter Suva listed starts as a derived "not relevant": the decision is still recorded)
+    assert [(e["action"], e["status_after"]) for e in events["items"]] == [("mark_not_relevant", "not_relevant")]
+    assert api.put(f"/api/rulings/{rid}/summaries/de", json={"body": "Neu."}).json()["summaries"]["de"]["version"] == 2
+    edits = api.get("/api/summary-events", params={"kind": "edit"}).json()
+    assert edits["total"] == 1 and edits["items"][0]["after_text"] == "Neu."
+    listed = api.get("/api/rulings", params={"sort": "status", "has_summary": "true", "status": "not_relevant"}).json()
+    assert [r["id"] for r in listed["items"]] == [rid]

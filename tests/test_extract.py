@@ -197,7 +197,9 @@ def test_the_fiche_ends_with_codes_outcome_sentence():
     choice = choose.Choice("Ende der Leistungspflicht", chosen, len(found.kept), found.reasons())
     fake = Echo()  # answers by content: sentences are written in parallel, so an answer queue would mix them up
     fiche = write.write_fiche(
-        choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False},
+        choice,
+        "de",
+        {"text": RULING, "language": "de", "category": "uv", "starred": False},
         Model(fake, budget=60, labeler=fake.label),
     )
     assert fiche.text.startswith(

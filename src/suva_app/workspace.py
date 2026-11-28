@@ -7,6 +7,7 @@ A confirmed summary is gold: it is the expert's word, whether they edited the te
 
 from __future__ import annotations
 
+import re
 import sys
 from collections.abc import Callable
 
@@ -18,7 +19,7 @@ if str(config.REPO) not in sys.path:  # src/summarize lives at the repository ro
     sys.path.insert(0, str(config.REPO))
 
 from src.llm.client import ReplayMiss  # noqa: E402, F401  (main.py maps it to 503)
-from src.llm.config import ConfigError  # noqa: E402, F401  (main.py maps it to 503)
+from src.llm.config import ConfigError, LLMConfig  # noqa: E402, F401  (main.py maps ConfigError to 503)
 from src.summarize import finish, pipeline, summarize  # noqa: E402
 from src.summarize.prompts import VERSION as PROMPT_VERSION  # noqa: E402
 from src.summarize.prompts import system_prompt  # noqa: E402
@@ -127,6 +128,84 @@ def refine_checks(steps: list[dict] | None) -> list[dict]:
     return out
 
 
+def _utf16(text: str, index: int) -> int:
+    """A Python index as the browser counts it (JavaScript strings count UTF-16 units)."""
+    return len(text[:index].encode("utf-16-le")) // 2
+
+
+def locate(text: str | None, quote: str) -> tuple[int | None, int | None]:
+    """Where `quote` stands in `text`, as (start, end) offsets for the browser; (None, None) when it does not.
+    Tried as written first, then with any run of white space in the quote matching any run in the text."""
+    words = quote.split()
+    if not text or not words:
+        return None, None
+    start, end = text.find(quote), -1
+    if start >= 0:
+        end = start + len(quote)
+    else:
+        found = re.search(r"\s+".join(re.escape(w) for w in words), text)
+        if found is None:
+            return None, None
+        start, end = found.span()
+    return _utf16(text, start), _utf16(text, end)
+
+
+def _parts(value, separator: str) -> list[str]:
+    return [part.strip() for part in (value or "").split(separator) if part.strip()]
+
+
+def sentences(steps: list[dict] | None, text: str | None) -> list[dict]:
+    """The v3 fiche sentence by sentence, from the `verify` step of its trace (docs/V3.md §3): the considerations
+    and the ruling sentence(s) each one rests on, located in `text` (the ruling text the page shows), and why a
+    sentence was refused. A removed sentence is listed too (status "removed", accepted false): it is not in the
+    summary's body. Empty for a summary without that trace (the prompt writer, a revision, an expert's text)."""
+    out = []
+    for step in steps or []:
+        if step.get("step") != "verify":
+            continue
+        for finding in step.get("findings", []):
+            if not finding.get("text"):  # "P4 not stated": a missing point, not a sentence (see `checks`)
+                continue
+            sources = []
+            for quote in _parts(finding.get("quote"), " … "):
+                start, end = locate(text, quote)
+                sources.append({"quote": quote, "start": start, "end": end})
+            status = finding.get("status") if finding.get("status") in ("written", "repaired", "removed") else "written"
+            out.append({
+                "text": finding["text"],
+                "status": status,
+                "accepted": bool(finding.get("accepted", status != "removed")),
+                "considerations": _parts(finding.get("evidence"), ", "),
+                "sources": sources,
+                "why_not": _parts(finding.get("why_not"), "; "),
+            })  # fmt: skip
+    return out
+
+
+def _summary(row, text: str | None) -> dict:
+    """One current summary as the page shows it (see ruling_page for the columns of `row`)."""
+    steps, confidence, origin, confirmed = row[8], row[9] or {}, row[2], row[4] is not None
+    checks = refine_checks(steps)
+    has_run = row[12] is not None
+    return {
+        "id": row[0], "version": row[1], "origin": origin, "body": row[3],
+        "confirmed": confirmed, "validated": confirmed, "confirmed_at": row[4], "created_at": row[5],
+        "category": row[6], "problems": row[7] or [], "checks": checks,
+        # which writer wrote it: "v3" (checked sentence by sentence) or "v2" (the prompt writer); None = an expert
+        "writer": (row[10] or "v2") if origin == "model" and has_run else None,
+        "mode": {"live": "LIVE", "replay": "REPLAY"}.get(row[11]),
+        # how far the fiche was verified, 0..100 (src/summarize/v3/confidence.py); None for a fiche without a trace
+        "confidence": confidence.get("score"),
+        "confidence_level": confidence.get("level"),
+        "confidence_reasons": confidence.get("reasons") or [],
+        # a step of the trace asks for an expert's eye (without a trace: the checker found problems); settled
+        # once the expert validated the text
+        "needs_review": not confirmed
+        and (any(c["status"] == "needs_review" for c in checks) if checks else bool(row[7])),
+        "sentences": sentences(steps, text),
+    }  # fmt: skip
+
+
 def ruling_page(conn, ruling_id: int) -> dict:
     """Everything the ruling page shows: facts, status, full text, both summaries, Suva's own summary if any."""
     from . import queries, relevance
@@ -141,23 +220,19 @@ def ruling_page(conn, ruling_id: int) -> dict:
     text = conn.execute(
         "SELECT text, source FROM ruling_texts WHERE ruling_id = %s AND is_canonical", (ruling_id,)
     ).fetchone()
+    shown = queries.display_text(text[0]) if text else None  # tidied for reading; the stored text is untouched
     summaries = {}
     for language in LANGUAGES:
         current = conn.execute(
             """SELECT s.id, s.version, s.origin, s.body, s.confirmed_at, s.created_at,
                       m.params ->> 'category', m.params -> 'problems' -> %s, m.params -> 'refine' -> %s -> 'steps',
-                      m.params -> 'refine' -> %s -> 'confidence', m.params -> 'writer' ->> %s
+                      m.params -> 'refine' -> %s -> 'confidence', m.params -> 'writer' ->> %s,
+                      m.params ->> 'mode', s.run_id
                FROM summaries s LEFT JOIN model_runs m ON m.id = s.run_id
                WHERE s.ruling_id = %s AND s.language = %s AND s.is_current""",
             (language, language, language, language, ruling_id, language),
         ).fetchone()
-        summaries[language] = current and {
-            "id": current[0], "version": current[1], "origin": current[2], "body": current[3],
-            "confirmed": current[4] is not None, "confirmed_at": current[4], "created_at": current[5],
-            "category": current[6], "problems": current[7] or [], "checks": refine_checks(current[8]),
-            # how far the fiche was verified (src/summarize/v3/confidence.py); None for a fiche without a trace
-            "confidence": current[9], "writer": current[10],
-        }  # fmt: skip
+        summaries[language] = current and _summary(current, shown)
     # Suva's own summary: the texts only. Its author and file name are never sent to the interface.
     reference = dict(
         conn.execute(
@@ -166,7 +241,7 @@ def ruling_page(conn, ruling_id: int) -> dict:
     )
     return {
         "ruling": ruling,
-        "text": queries.display_text(text[0]) if text else None,  # tidied for reading; the stored text is untouched
+        "text": shown,
         "text_source": text[1] if text else None,
         "prompt_category": pipeline.route(ruling["area"]),
         "relevance": relevance.explain(conn, ruling_id),  # why this score, built by code from the stored run
@@ -179,10 +254,31 @@ def ruling_page(conn, ruling_id: int) -> dict:
 # --- writing -----------------------------------------------------------------------------------------------
 
 
-def generate(conn, ruling_id: int, ask: Ask | None = None, model: str | None = None) -> dict:
-    """Write both summaries with the pipeline (version 1) and record it."""
+def _generate_v3(conn, ruling_id: int, model: str | None) -> dict:
+    summarize.load_env()
     try:
-        result = pipeline.summarise_ruling(conn, ruling_id, ask or _default_ask, model)
+        LLMConfig.from_env("live")
+        mode, unconfigured = "live", None
+    except ConfigError as e:
+        mode, unconfigured = "replay", e
+    try:
+        return pipeline.summarise_ruling(conn, ruling_id, model=model, mode=mode, writer="v3")
+    except ReplayMiss as miss:
+        if unconfigured is None:
+            raise
+        # Not configured and nothing stored to replay: say both, the first is what the operator can fix.
+        raise ConfigError(f"{unconfigured} Replay was tried instead: {miss}") from miss
+
+
+def generate(conn, ruling_id: int, ask: Ask | None = None, model: str | None = None) -> dict:
+    """Write both summaries and record it. From the page (no `ask`): the v3 writer through the shared client,
+    live when the LLM_* settings are there, else replayed from the stored answers; ConfigError when neither can
+    be done. With `ask` (tests): the prompt writer answered by that function."""
+    try:
+        if ask is not None:
+            result = pipeline.summarise_ruling(conn, ruling_id, ask, model)
+        else:
+            result = _generate_v3(conn, ruling_id, model)
     except pipeline.NotSummarisable as e:
         raise NotFound(str(e)) from e
     with conn.transaction():

@@ -1,17 +1,21 @@
-import { ArrowLeft, Check, ExternalLink, LoaderCircle, Undo2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, Check, ExternalLink, Undo2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  confirmSummary, decideRelevance, fetchRuling, generateSummaries, reviseSummary, saveSummary, unconfirmSummary,
+  ApiError, confirmSummary, decideRelevance, fetchRuling, generateSummaries, reviseSummary, saveSummary, unconfirmSummary,
   type RelevanceAction, type RulingDetail, type Status, type SummaryLanguage,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { locate, merge, sentencesOf, type Range } from "../lib/provenance";
 import { RelevanceCard } from "./RelevanceCard";
-import { Button, SummaryCard } from "./SummaryCard";
+import { Button, SummaryCard, Working } from "./SummaryCard";
 import { cn } from "./ui/cn";
 
 type Props = { rulingId: number; onBack: () => void; onChanged: () => void; onShowScoring: () => void };
 
 const LANGUAGES: SummaryLanguage[] = ["de", "fr"];
+/** A summary sentence: the one whose sources are marked in the ruling text. */
+type Sentence = { language: SummaryLanguage; index: number };
+type Busy = { scope: "all" | SummaryLanguage | null; writing: boolean };
 const STATUS_STYLE: Record<Status, string> = {
   expert_confirmed: "bg-accent-wash text-accent-text",
   ai_relevant: "border border-line-strong text-ink",
@@ -25,39 +29,64 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
   const { t, tx, formatDate } = useI18n();
   const [detail, setDetail] = useState<RulingDetail | null>(null);
   const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState<"all" | SummaryLanguage | null>(null);
-  const [actionFailed, setActionFailed] = useState(false);
+  const [busy, setBusy] = useState<Busy | null>(null);
+  /** A failed action: `unavailable` when the model could not be used (502/503), with the server's reason. */
+  const [actionError, setActionError] = useState<{ unavailable: boolean; detail: string | null } | null>(null);
+  const [selected, setSelected] = useState<Sentence | null>(null);
+  const [hovered, setHovered] = useState<Sentence | null>(null);
+  const [scrollTo, setScrollTo] = useState(0); // counts selections: each one scrolls the ruling text to its source
 
   useEffect(() => {
     const controller = new AbortController();
     setDetail(null);
     setFailed(false);
+    setActionError(null);
+    setSelected(null);
+    setHovered(null);
     fetchRuling(rulingId, controller.signal).then(setDetail).catch(() => !controller.signal.aborted && setFailed(true));
     return () => controller.abort();
   }, [rulingId]);
 
-  /** Run an action that returns the refreshed page; show a short notice if it fails. */
+  /** Run an action that returns the refreshed page; show a short notice if it fails. `writing`: Apertus is called. */
   const act = useCallback(
-    (scope: "all" | SummaryLanguage | null, action: () => Promise<RulingDetail>) => {
-      setBusy(scope);
-      setActionFailed(false);
+    (scope: "all" | SummaryLanguage | null, action: () => Promise<RulingDetail>, writing = false) => {
+      setBusy({ scope, writing });
+      setActionError(null);
       action()
         .then((next) => {
           setDetail(next);
+          setSelected(null);
+          setHovered(null);
           onChanged();
         })
-        .catch(() => setActionFailed(true))
+        .catch((e: unknown) => {
+          const status = e instanceof ApiError ? e.status : 0;
+          setActionError({ unavailable: status === 502 || status === 503, detail: e instanceof ApiError ? e.detail : null });
+        })
         .finally(() => setBusy(null));
     },
     [onChanged],
   );
   const decide = (action: RelevanceAction) => act(null, () => decideRelevance(rulingId, action).then(() => fetchRuling(rulingId)));
 
+  // The passages of the ruling the hovered (else the selected) summary sentence rests on.
+  const focus = hovered ?? selected;
+  const marks = useMemo<Range[]>(() => {
+    const text = detail?.text;
+    if (!focus || !text) return [];
+    const sentence = sentencesOf(detail.summaries?.[focus.language])[focus.index];
+    return merge((sentence?.sources ?? []).map((source) => locate(text, source)).filter((r): r is Range => r !== null));
+  }, [detail, focus]);
+
   if (failed) return <Centered>{t("page.loadError")}</Centered>;
   if (!detail) return <Centered>{null}</Centered>;
 
-  const { ruling, summaries } = detail;
+  const { ruling } = detail;
+  const summaries = detail.summaries ?? { de: null, fr: null };
   const hasSummary = LANGUAGES.some((l) => summaries[l]);
+  const officialUrl = ruling.official_url && /^https?:\/\/\S+$/.test(ruling.official_url) ? ruling.official_url : null;
+  const busyFor = (language: SummaryLanguage) =>
+    busy && (busy.scope === language || busy.scope === "all") ? (busy.writing ? "writing" : "saving") : false;
   const decidedHere = ruling.label_basis === "expert_override";
   const facts = [
     [t("page.decided"), formatDate(ruling.decision_date)],
@@ -81,7 +110,7 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
             <p className="text-[12px] leading-5 text-faint">{ruling.title ? ruling.area : ""}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2.5">
-            <span className={cn("inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium", STATUS_STYLE[ruling.status])}>
+            <span title={tx("statusHint", ruling.status)} className={cn("inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium", STATUS_STYLE[ruling.status])}>
               {ruling.status === "expert_confirmed" && <Check size={12} strokeWidth={2.5} aria-hidden />}
               {tx("status", ruling.status)}
               {ruling.score !== null && <span className="ml-1 font-normal tabular-nums opacity-70">· {ruling.score}</span>}
@@ -125,8 +154,8 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-surface">
           <header className="flex h-12 shrink-0 items-center justify-between border-b border-line px-5">
             <h2 className="text-[13px] font-medium text-ink">{t("page.ruling")}</h2>
-            {ruling.official_url && (
-              <a href={ruling.official_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12px] text-muted hover:text-ink">
+            {officialUrl && (
+              <a href={officialUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12px] text-muted hover:text-ink">
                 {t("page.source")}
                 <ExternalLink size={12} strokeWidth={1.75} aria-hidden />
               </a>
@@ -134,7 +163,7 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {detail.text ? (
-              <div className="mx-auto max-w-[68ch] whitespace-pre-wrap font-serif text-[14px] leading-[23px] text-ink">{detail.text}</div>
+              <RulingText text={detail.text} marks={marks} scrollTo={scrollTo} />
             ) : (
               <p className="text-[13px] text-faint">{t("page.noText")}</p>
             )}
@@ -142,20 +171,21 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
         </section>
 
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-          {actionFailed && <p className="rounded-md bg-surface px-4 py-2.5 text-[13px] text-ink">{t("page.actionError")}</p>}
+          {actionError && (
+            <p role="alert" title={actionError.detail ?? undefined} className="rounded-md bg-surface px-4 py-2.5 text-[13px] text-ink">
+              {t(actionError.unavailable ? "page.modelUnavailable" : "page.actionError")}
+            </p>
+          )}
           <RelevanceCard relevance={detail.relevance} onShowScoring={onShowScoring} />
           {!hasSummary && (
             <section className="rounded-xl bg-surface px-5 py-5">
               <h2 className="text-[13px] font-medium text-ink">{t("page.summaries")}</h2>
               <p className="mt-1.5 text-[13px] leading-5 text-muted">{t("page.none")}</p>
               <div className="mt-4">
-                {busy === "all" ? (
-                  <span className="flex h-8 items-center gap-2 text-[13px] text-muted">
-                    <LoaderCircle size={14} strokeWidth={2} className="animate-spin" aria-hidden />
-                    {t("page.generating")}
-                  </span>
+                {busy?.scope === "all" ? (
+                  <Working writing />
                 ) : (
-                  <Button primary onClick={() => act("all", () => generateSummaries(rulingId))}>
+                  <Button primary disabled={!detail.text} onClick={() => act("all", () => generateSummaries(rulingId), true)}>
                     {t("page.generate")}
                   </Button>
                 )}
@@ -168,20 +198,28 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
                 key={language}
                 language={language}
                 summary={summaries[language]}
-                revisions={detail.revisions}
-                busy={busy === language || busy === "all"}
+                text={detail.text}
+                revisions={detail.revisions ?? []}
+                busy={busyFor(language)}
+                active={focus?.language === language ? focus.index : null}
+                selected={selected?.language === language ? selected.index : null}
+                onHover={(index) => setHovered(index === null ? null : { language, index })}
+                onSelect={(index) => {
+                  setSelected(index === null ? null : { language, index });
+                  if (index !== null) setScrollTo((n) => n + 1);
+                }}
                 onConfirm={() => act(language, () => confirmSummary(rulingId, language))}
                 onUnconfirm={() => act(language, () => unconfirmSummary(rulingId, language))}
                 onSave={(body, confirm) => act(language, () => saveSummary(rulingId, language, body, confirm))}
-                onRevise={(reason, note) => act(language, () => reviseSummary(rulingId, language, reason, note))}
+                onRevise={(reason, note) => act(language, () => reviseSummary(rulingId, language, reason, note), true)}
               />
             ))}
-          {LANGUAGES.some((l) => detail.reference[l]) && (
+          {LANGUAGES.some((l) => detail.reference?.[l]) && (
             <section className="rounded-xl bg-surface">
               <header className="flex h-12 items-center border-b border-line px-5">
                 <h2 className="text-[13px] font-medium text-ink">{t("page.reference")}</h2>
               </header>
-              {LANGUAGES.filter((l) => detail.reference[l]).map((language) => (
+              {LANGUAGES.filter((l) => detail.reference?.[l]).map((language) => (
                 <div key={language} className="border-b border-line px-5 py-4 last:border-b-0">
                   <div className="pb-1.5 text-[12px] text-faint">{tx("language", language)}</div>
                   <p className="whitespace-pre-wrap font-serif text-[14px] leading-[23px] text-ink">{detail.reference[language]}</p>
@@ -193,6 +231,28 @@ export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props
       </div>
     </div>
   );
+}
+
+/** The full text of the ruling, with the source passages of the chosen summary sentence marked. */
+function RulingText({ text, marks, scrollTo }: { text: string; marks: Range[]; scrollTo: number }) {
+  const first = useRef<HTMLElement>(null);
+  // A new selection brings its first passage into view; hovering only marks.
+  useEffect(() => {
+    if (scrollTo > 0) first.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [scrollTo]);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  marks.forEach(([start, end], i) => {
+    if (start > cursor) parts.push(text.slice(cursor, start));
+    parts.push(
+      <mark key={start} ref={i === 0 ? first : undefined} className="rounded-[2px] bg-accent-wash box-decoration-clone text-ink">
+        {text.slice(start, end)}
+      </mark>,
+    );
+    cursor = end;
+  });
+  parts.push(text.slice(cursor));
+  return <div className="mx-auto max-w-[68ch] whitespace-pre-wrap font-serif text-[14px] leading-[23px] text-ink">{parts}</div>;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

@@ -35,6 +35,10 @@ SORTS = {
     "docket": "docket",
     "area": "area",
     "score": "score",
+    # Tier of the status: with order=desc the expert-confirmed come first, then the AI-assessed, the
+    # potentially relevant, the not yet assessed and last the ones an expert ruled out.
+    "status": """CASE status WHEN 'expert_confirmed' THEN 4 WHEN 'ai_relevant' THEN 3
+                 WHEN 'potentially_relevant' THEN 2 WHEN 'not_assessed' THEN 1 ELSE 0 END""",
 }
 MAX_PAGE_SIZE = 200
 
@@ -159,7 +163,8 @@ def list_rulings(
     offset = max(0, int(offset))
     where, params = _where(filters or RulingFilters())
     # Missing values go last in both directions; the tie-break keeps pages stable.
-    order_by = f"{SORTS[sort]} {order.upper()} NULLS LAST, decision_date DESC, docket ASC, id ASC"
+    tie = "score DESC NULLS LAST, " if sort == "status" else ""  # within a tier: the highest score first
+    order_by = f"{SORTS[sort]} {order.upper()} NULLS LAST, {tie}decision_date DESC, docket ASC, id ASC"
     with conn.cursor(row_factory=dict_row) as cur:
         total = cur.execute(_BASE + "SELECT count(*) AS n FROM list" + where, params).fetchone()["n"]
         items = cur.execute(
@@ -303,3 +308,57 @@ def learning(conn) -> dict:
         "transitions": [{"before": b, "after": a, "n": n} for b, a, n in transitions],
         "revision_reasons": [{"reason": r, "n": n} for r, n in reasons],
     }
+
+
+# --- training data: what the experts did, as rows ------------------------------------------------------------
+
+
+def _page(conn, select: str, source: str, clauses: list[str], params: list, limit: int, offset: int) -> dict:
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    limit, offset = max(1, min(int(limit), MAX_EXPORT_SIZE)), max(0, int(offset))
+    with conn.cursor(row_factory=dict_row) as cur:
+        total = cur.execute(f"SELECT count(*) AS n {source}{where}", params).fetchone()["n"]
+        items = cur.execute(
+            f"{select} {source}{where} ORDER BY e.id DESC LIMIT %s OFFSET %s", [*params, limit, offset]
+        ).fetchall()
+    return {"total": total, "items": items}
+
+
+MAX_EXPORT_SIZE = 5000
+
+
+def relevance_events(conn, ruling_id: int | None = None, limit: int = 500, offset: int = 0) -> dict:
+    """Every expert decision on relevance, newest first: the status it started from and ended in, and the
+    prediction it confirmed or overrode (`score_shown` 0..1 as stored, `predicted_relevant` of that prediction)."""
+    clauses, params = (["e.ruling_id = %s"], [ruling_id]) if ruling_id is not None else ([], [])
+    return _page(
+        conn,
+        """SELECT e.id, e.ruling_id, r.docket, e.action, e.status_before, e.status_after, e.prediction_id,
+                  e.score_shown, p.relevant AS predicted_relevant, e.reason, e.comment, e.actor, e.created_at""",
+        """FROM relevance_events e JOIN rulings r ON r.id = e.ruling_id
+           LEFT JOIN predictions p ON p.id = e.prediction_id""",
+        clauses, params, limit, offset,
+    )  # fmt: skip
+
+
+def summary_events(
+    conn, ruling_id: int | None = None, language: str | None = None, action: str | None = None,
+    limit: int = 500, offset: int = 0,
+) -> dict:  # fmt: skip
+    """Every action on a summary, newest first, with the text before and after it (`kind` = the action:
+    generate, revise, edit, confirm, unconfirm). An expert's edit is the pair (before_text, after_text)."""
+    clauses, params = [], []
+    for column, value in (("e.ruling_id", ruling_id), ("e.language", language), ("e.action", action)):
+        if value is not None:
+            clauses.append(f"{column} = %s")
+            params.append(value)
+    return _page(
+        conn,
+        """SELECT e.id, e.ruling_id, r.docket, e.language, e.action AS kind, e.reason, e.note, e.unchanged,
+                  e.before_id, b.version AS before_version, b.origin AS before_origin, b.body AS before_text,
+                  e.after_id, a.version AS after_version, a.origin AS after_origin, a.body AS after_text,
+                  e.actor, e.created_at""",
+        """FROM summary_events e JOIN rulings r ON r.id = e.ruling_id
+           LEFT JOIN summaries b ON b.id = e.before_id LEFT JOIN summaries a ON a.id = e.after_id""",
+        clauses, params, limit, offset,
+    )  # fmt: skip

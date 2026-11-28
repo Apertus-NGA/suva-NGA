@@ -52,9 +52,32 @@ export type Facets = {
   statuses: FacetValue[];
 };
 
+/** A failed call: the HTTP status and, when the server gave one, its `{detail}` text. */
+export class ApiError extends Error {
+  status: number;
+  detail: string | null;
+  constructor(status: number, detail: string | null) {
+    super(detail ?? String(status));
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function failure(response: Response): Promise<ApiError> {
+  let detail: string | null = null;
+  try {
+    const body: unknown = await response.json();
+    const value = body && typeof body === "object" ? (body as { detail?: unknown }).detail : null;
+    if (typeof value === "string") detail = value;
+  } catch {
+    // no JSON body: the status alone is reported
+  }
+  return new ApiError(response.status, detail);
+}
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, { signal, headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  if (!response.ok) throw await failure(response);
   return response.json() as Promise<T>;
 }
 
@@ -144,14 +167,35 @@ export type Summary = {
   body: string;
   confirmed: boolean; // confirmed by an expert as final: a gold summary
   category: string | null; // the matter whose prompt wrote it
-  problems: string[]; // what the code-side checker found
-  checks: RefineCheck[]; // what the refine loop checked, step by step (empty when refine did not run)
+  problems?: string[]; // what the code-side checker found
+  checks?: RefineCheck[]; // what the refine loop checked, step by step (empty when refine did not run)
+  // Provenance (newer summaries). Any of these may be missing: read them through lib/provenance.ts.
+  sentences?: SummarySentence[] | null; // [] for older or expert-edited summaries: then only the body is shown
+  confidence?: number | null; // 0..100: how far the checks verified it; null without a trace
+  confidence_level?: string | null; // "high" | "medium" | "low"
+  confidence_reasons?: string[] | null;
+  needs_review?: boolean | null;
+  validated?: boolean | null; // same meaning as `confirmed`
+  writer?: string | null;
+  mode?: string | null; // "LIVE" | "REPLAY"
+};
+
+export type SummarySource = { quote?: string | null; start?: number | null; end?: number | null };
+
+/** One sentence of a summary with where the ruling says it. Offsets count characters of the page's `text`. */
+export type SummarySentence = {
+  text: string;
+  status?: "written" | "repaired" | "removed" | null;
+  accepted?: boolean | null;
+  considerations?: string[] | null; // e.g. "E.4.2"
+  sources?: SummarySource[] | null;
+  why_not?: string[] | null;
 };
 
 export type RefineCheck = {
   step: string; // form, facts, context, holding, economy, terms, language, length, form_final
   status: "passed" | "corrected" | "needs_review" | "skipped";
-  findings: { reason: string; accepted?: boolean; evidence?: string; quote?: string; why_not?: string }[];
+  findings: { reason: string; accepted?: boolean; evidence?: string; quote?: string; why_not?: string; text?: string }[];
   note?: string | null;
 };
 
@@ -212,7 +256,7 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  if (!response.ok) throw await failure(response);
   return response.json() as Promise<T>;
 }
 

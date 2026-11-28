@@ -1,6 +1,6 @@
 # Our single entry point (`make run` is our convention, D-042). Targets: AGENTS.md §6.
 # A fresh clone with .env filled needs only `make run`: database up, migrated, ingested if empty, triage,
-# summaries, then the API and UI on 127.0.0.1:8000. Every line is labelled LIVE or REPLAY (src/cli.py).
+# summaries (v3, German and French, every ruling that passed layer 1), then the API and UI on 127.0.0.1:8000. Every line is labelled LIVE or REPLAY (src/cli.py).
 # crawl, refit, eval, eval-private and claims are still stubs that print STUB.
 
 PY ?= $(if $(shell command -v uv 2>/dev/null),uv run --frozen python,python3)
@@ -12,16 +12,19 @@ RUN_FLAGS = $(if $(SUMMARY_LIMIT),--summary-limit $(SUMMARY_LIMIT),) $(if $(filt
 
 WRITE ?= 0
 
-.PHONY: help run run-live replay-cache serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up
+.PHONY: help run run-live summaries replay-cache serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
-run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, triage, top SUMMARY_LIMIT (default 5) summaries, serve; SERVE=0 stops before serving
+run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, triage, v3 summaries of every ruling that passed layer 1 (SUMMARY_LIMIT=N caps, 0 skips), serve; SERVE=0 stops before serving
 	$(PY) -m src.cli run --mode $(MODE) $(RUN_FLAGS) $(ARGS)
 
 run-live: ## the same, LIVE (needs LLM_*); ARGS="--limit N": smoke, triage of the first N rulings not written, N summaries; ARGS="--all": full triage written
 	$(PY) -m src.cli run --mode live $(RUN_FLAGS) $(ARGS)
+
+summaries: ## batch v3 summaries (DE + FR) of every ruling with a prediction that lacks them, relevant first; resumable (MODE=replay|live; ARGS="--workers 8 --limit N --dry-run")
+	$(PY) -m src.summarize.batch --mode $(MODE) $(ARGS)
 
 replay-cache: ## fill replay/llm (committed) with the cached Apertus answers one full run reads; no gateway call
 	$(PY) -m src.cli replay-cache

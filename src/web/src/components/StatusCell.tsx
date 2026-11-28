@@ -17,7 +17,7 @@ const STYLE: Record<Status, string> = {
 
 /**
  * A ruling's status, and on hover the expert's actions: confirm (gold label), not relevant, or undo.
- * An expert-confirmed ruling cannot be marked not relevant; a confirmation made here can only be undone.
+ * Any ruling can be decided either way; a decision made here is taken back with undo.
  */
 export function StatusCell({ ruling, onDecide }: Props) {
   const { t, tx } = useI18n();
@@ -27,7 +27,7 @@ export function StatusCell({ ruling, onDecide }: Props) {
   return (
     // Clicks on the decision buttons must not open the ruling page of the row.
     <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-      <span className={cn("truncate text-[12px]", pill && "inline-flex h-[22px] items-center gap-1 rounded-full px-2 font-medium", STYLE[status])}>
+      <span title={tx("statusHint", status)} className={cn("truncate text-[12px]", pill && "inline-flex h-[22px] shrink-0 whitespace-nowrap items-center gap-1 rounded-full px-2 font-medium", STYLE[status])}>
         {status === "expert_confirmed" && <Check size={12} strokeWidth={2.5} aria-hidden />}
         {tx("status", status)}
       </span>
@@ -43,7 +43,7 @@ export function StatusCell({ ruling, onDecide }: Props) {
                 <Check size={14} strokeWidth={2} aria-hidden />
               </Action>
             )}
-            {status !== "not_relevant" && status !== "expert_confirmed" && (
+            {status !== "not_relevant" && (
               <Action label={t("action.reject")} onClick={() => onDecide("mark_not_relevant")}>
                 <X size={14} strokeWidth={2} aria-hidden />
               </Action>

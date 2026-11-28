@@ -12,6 +12,8 @@ from datetime import date
 
 from suva_data import db, ingest
 
+SUMMARY_WORKERS = 4  # rulings summarised at once after an update (a full batch may be running beside it)
+
 
 class UpdateRunning(RuntimeError):
     """An update is already running in this process."""
@@ -30,6 +32,9 @@ def default_assess() -> dict:
     Live when the gateway is configured: a new ruling has no cached Apertus answer, the known ones are read
     from the cache. Replay otherwise: it then fails on the first new ruling the model must read, nothing is
     written, and the new rulings stay "not assessed" until a live run.
+
+    Then the rulings this update added that passed layer 1 get their German and French fiche (v3,
+    src/summarize/batch.py), in the same mode. A failure there is reported and leaves the assessment standing.
     """
     import sys
 
@@ -50,11 +55,20 @@ def default_assess() -> dict:
             summary = tp.run_and_store(conn, client, mode=mode, write_db=True)
     finally:
         client.close()
-    return {
+    out = {
         "mode": mode.upper(),
         "assessed": summary["kept_by_layer1"],
         "suspected_relevant": sum(q["suspected_relevant"] for q in summary["by_quarter"].values()),
     }
+    try:
+        from src.summarize import batch
+
+        done = batch.run(mode, new_only=True, workers=SUMMARY_WORKERS)
+        out["summarised"] = len(done["done"]) + len(done["fallback"])
+        out["summaries_missing"] = len(done["failed"]) + len(done["uncached"])
+    except (Exception, SystemExit) as e:  # noqa: BLE001  the tiers stand; the fiches are missing
+        out["summaries_error"] = f"{type(e).__name__}: {e}"
+    return out
 
 
 class Updates:

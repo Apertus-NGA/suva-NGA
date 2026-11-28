@@ -293,6 +293,8 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
             "finish_notes": {lang: p["finish_notes"] for lang, p in result["languages"].items()},
             "writer": {lang: p.get("writer", "v2") for lang, p in result["languages"].items()},
         }
+        if result.get("requested_writer"):  # what the run asked for; `writer` says who wrote each language
+            params["requested_writer"] = result["requested_writer"]
         if result.get("extract_errors"):
             params["extract_errors"] = result["extract_errors"]
         if refined := _refine_params(result):
@@ -391,6 +393,7 @@ def summarise_ruling(
     result = write(ruling, shots, ask or functools.partial(_chat, mode=mode), refine_model, lexicons, make_model,
                    writer)  # fmt: skip
     result["mode"] = "injected" if ask is not None else mode
+    result["requested_writer"] = writer
     result["stored"] = store(conn, ruling_id, result, model or os.environ.get("LLM_NAME") or "unknown")
     return result
 

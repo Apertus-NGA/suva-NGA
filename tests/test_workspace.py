@@ -253,3 +253,112 @@ def test_a_ruling_with_summary_work_cannot_be_removed_by_a_rebuild(db_conn, draf
     with pytest.raises((RuntimeError, errors.ForeignKeyViolation)):
         rec.reconcile(db_conn, config.Window("2020-01-01", "2020-12-31"))
     assert len(_versions(db_conn, drafted)) == 1 and FICHE["de"][:20] in _versions(db_conn, drafted)[0][4]
+
+
+# --- the page: what each summary says about itself (writer, validation, sentence trace) -------------------------
+
+V3_TEXT = "Urteil vom 3. März 2026\n\n   3.1 Der Unfallbegriff setzt  einen ungewöhnlichen\näusseren Faktor voraus.\n\n4. Die Beschwerde wird abgewiesen. 😀 Ende."  # noqa: E501
+V3_STEPS = [
+    {"step": "record", "status": "passed", "findings": [], "note": None},
+    {"step": "verify", "status": "needs_review", "note": None, "findings": [
+        {"text": "Der Unfall setzt einen ungewöhnlichen äusseren Faktor voraus.", "status": "written",
+         "accepted": True, "reason": "P1 rule (court)", "evidence": "E.3.1, E.4", "entailment": 0.97,
+         "quote": "Der Unfallbegriff setzt einen ungewöhnlichen äusseren Faktor voraus. … Ende."},
+        {"text": "Die Suva haftet immer.", "status": "removed", "accepted": False, "reason": "no proposition",
+         "evidence": "", "quote": "Das steht nirgends.", "why_not": "not entailed; names Suva"},
+        {"reason": "P4 not stated", "accepted": False, "evidence": "E.5", "quote": "x"},
+    ]},
+]  # fmt: skip
+
+
+def _v3_summary(conn, rid, mode="replay"):
+    from psycopg.types.json import Jsonb
+
+    params = {"mode": mode, "writer": {"de": "v3"},
+              "refine": {"de": {"steps": V3_STEPS, "confidence": {"score": 72, "level": "medium", "reasons": ["r"]}}}}  # fmt: skip  # noqa: E501
+    run = conn.execute(
+        "INSERT INTO model_runs (kind, models, params) VALUES ('summary', %s, %s) RETURNING id",
+        (Jsonb([{"name": "m", "role": "r"}]), Jsonb(params)),
+    ).fetchone()[0]
+    conn.execute(
+        """INSERT INTO summaries (ruling_id, language, body, origin, run_id, version, created_by)
+           VALUES (%s, 'de', 'Der Unfall setzt einen ungewöhnlichen äusseren Faktor voraus.', 'model', %s, 1, 'pipeline')""",  # noqa: E501
+        (rid, run),
+    )
+
+
+def test_a_v3_summary_gives_its_sentences_with_the_ruling_sentences_located_in_the_text_shown(db_conn):
+    rid = _ruling(db_conn, text=V3_TEXT)
+    _v3_summary(db_conn, rid)
+    page = workspace.ruling_page(db_conn, rid)
+    de, text = page["summaries"]["de"], page["text"]
+    assert (de["writer"], de["mode"], de["confidence"], de["confidence_level"]) == ("v3", "REPLAY", 72, "medium")
+    assert (de["origin"], de["version"], de["validated"], de["needs_review"]) == ("model", 1, False, True)
+    first, removed = de["sentences"]  # the "P4 not stated" finding is not a sentence
+    assert set(first) == {"text", "status", "accepted", "considerations", "sources", "why_not"}
+    assert (first["status"], first["accepted"], first["considerations"], first["why_not"]) == (
+        "written", True, ["E.3.1", "E.4"], [])  # fmt: skip
+    rule, end = first["sources"]
+    # the stored text has a double space and a line break inside the sentence: found all the same
+    assert text[rule["start"] : rule["end"]] == "Der Unfallbegriff setzt  einen ungewöhnlichen\näusseren Faktor voraus."
+    # offsets count as the browser does (UTF-16): the emoji before "Ende." takes two units
+    assert end["quote"] == "Ende." and end["end"] - end["start"] == 5
+    assert text.encode("utf-16-le")[2 * end["start"] : 2 * end["end"]].decode("utf-16-le") == "Ende."
+    assert removed == {
+        "text": "Die Suva haftet immer.", "status": "removed", "accepted": False, "considerations": [],
+        "sources": [{"quote": "Das steht nirgends.", "start": None, "end": None}],
+        "why_not": ["not entailed", "names Suva"],
+    }  # fmt: skip
+    # validated by the expert: no longer flagged; edited by the expert: no sentence trace
+    assert workspace.confirm(db_conn, rid, "de")["summaries"]["de"]["needs_review"] is False
+    edited = workspace.save_edit(db_conn, rid, "de", "Mein eigener Text.")["summaries"]["de"]
+    assert (edited["origin"], edited["writer"], edited["sentences"], edited["confidence"], edited["version"]) == (
+        "expert", None, [], None, 2)  # fmt: skip
+
+
+def test_a_prompt_written_summary_has_no_sentence_trace(db_conn, drafted):
+    de = workspace.ruling_page(db_conn, drafted)["summaries"]["de"]
+    assert (de["writer"], de["sentences"], de["confidence"], de["mode"]) == ("v2", [], None, None)
+    assert de["validated"] is False
+
+
+def test_the_button_writes_with_v3_live_when_configured_and_replayed_otherwise(db_conn, monkeypatch):
+    """MOCK DECLARED (G9): pipeline.summarise_ruling is replaced; it records how it was called and stores the
+    FakeModel's fiches through the real pipeline."""
+    real, calls = workspace.pipeline.summarise_ruling, []
+
+    def fake(conn, ruling_id, ask=None, model=None, mode="live", writer=None):
+        calls.append((ask, mode, writer))
+        return real(conn, ruling_id, FakeModel(), "m")
+
+    monkeypatch.setattr(workspace.pipeline, "summarise_ruling", fake)
+    monkeypatch.setattr(workspace.summarize, "ROOT", config.REPO / "tmp" / "no-env-here")
+    rid = _ruling(db_conn)
+    for key, value in (
+        ("LLM_NAME", "swiss-ai/Apertus-70B-Instruct-2509"),
+        ("LLM_BASE_URL", "http://x.invalid"),
+        ("LLM_API_KEY", "k"),
+    ):  # noqa: E501
+        monkeypatch.setenv(key, value)
+    page = workspace.generate(db_conn, rid)
+    monkeypatch.delenv("LLM_API_KEY")
+    workspace.generate(db_conn, rid)
+    assert calls == [(None, "live", "v3"), (None, "replay", "v3")]
+    assert page["summaries"]["de"]["body"] and [e[1] for e in _events(db_conn)] == ["generate"] * 4
+
+
+# --- export of the summary events ---------------------------------------------------------------------------------
+
+
+def test_summary_events_export_gives_the_text_before_and_after_each_action(db_conn, drafted):
+    workspace.save_edit(db_conn, drafted, "de", "Mein eigener Text mit Regel.", confirm=True)
+    out = queries.summary_events(db_conn, drafted, language="de")
+    assert out["total"] == 3
+    confirm, edit, generate = out["items"]  # newest first
+    assert (edit["kind"], edit["before_origin"], edit["after_origin"], edit["after_text"], edit["docket"]) == (
+        "edit", "model", "expert", "Mein eigener Text mit Regel.", "8C_900/2025")  # fmt: skip
+    assert FICHE["de"][:20] in edit["before_text"] and (edit["before_version"], edit["after_version"]) == (1, 2)
+    assert (generate["kind"], generate["before_text"]) == ("generate", None)
+    assert (confirm["kind"], confirm["unchanged"]) == ("confirm", False)
+    assert queries.summary_events(db_conn, action="edit")["total"] == 1
+    assert queries.summary_events(db_conn, drafted, limit=1, offset=1)["items"][0]["id"] < out["items"][0]["id"]

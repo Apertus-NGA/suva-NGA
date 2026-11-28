@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Suva Rechtsprechung", lifespan=lifespan)
+app = FastAPI(title="Suva Scout", lifespan=lifespan)
 updates = Updates(assess=default_assess)  # after each ingest the new rulings get their tier
 
 
@@ -80,6 +80,7 @@ def get_rulings(
     ingested: bool | None = None,
     inbox: bool | None = None,
     summarised: bool | None = None,
+    has_summary: bool | None = None,  # the same filter under the name the list's field has
     score_min: Annotated[int | None, Query(ge=0, le=100)] = None,
     score_max: Annotated[int | None, Query(ge=0, le=100)] = None,
     q: str | None = None,
@@ -106,7 +107,7 @@ def get_rulings(
         predicted_relevant=predicted_relevant,
         ingested=ingested,
         inbox=inbox,
-        summarised=summarised,
+        summarised=summarised if summarised is not None else has_summary,
         score_min=score_min,
         score_max=score_max,
         q=q,
@@ -174,7 +175,8 @@ def get_workspace(ruling_id: int, conn=Depends(get_conn)) -> dict:
 
 @app.post("/api/rulings/{ruling_id}/summaries")
 def generate_summaries(ruling_id: int, conn=Depends(get_conn)) -> dict:
-    """Write the German and French summary with Apertus (pipeline version 1). Takes up to a minute."""
+    """Write the German and French summary with Apertus (summariser v3: live when LLM_* is set, else replayed
+    from the stored answers; 503 when neither is possible). Takes up to a minute."""
     return _workspace(lambda: workspace.generate(conn, ruling_id))
 
 
@@ -215,6 +217,30 @@ def get_scoring(conn=Depends(get_conn)) -> dict:
 @app.get("/api/learning")
 def get_learning(conn=Depends(get_conn)) -> dict:
     return queries.learning(conn)
+
+
+@app.get("/api/relevance-events")
+def get_relevance_events(
+    conn=Depends(get_conn),
+    ruling_id: int | None = None,
+    limit: Annotated[int, Query(ge=1, le=queries.MAX_EXPORT_SIZE)] = 500,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict:
+    """Training data: every expert decision on relevance with the status before and after (append-only)."""
+    return queries.relevance_events(conn, ruling_id, limit, offset)
+
+
+@app.get("/api/summary-events")
+def get_summary_events(
+    conn=Depends(get_conn),
+    ruling_id: int | None = None,
+    language: str | None = None,
+    kind: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=queries.MAX_EXPORT_SIZE)] = 500,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict:
+    """Training data: every action on a summary with the text before and after it (append-only)."""
+    return queries.summary_events(conn, ruling_id, language, kind, limit, offset)
 
 
 class UpdateRequest(BaseModel):

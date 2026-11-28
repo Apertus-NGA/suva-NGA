@@ -172,3 +172,39 @@ def test_a_ruling_with_an_expert_decision_cannot_be_removed_by_a_rebuild(db_conn
     with pytest.raises(RuntimeError, match="8C_500/2025"):
         rec.reconcile(db_conn, config.Window("2025-10-01", "2025-12-31"))
     assert ruling(db_conn, "8C_500/2025", "2026-01-20")["id"] == jan and len(_events(db_conn)) == 2
+
+
+def test_relevance_events_export_lists_every_transition_with_the_prediction_it_overrode(db_conn):
+    scored, bare = _ruling(db_conn, "8C_1/2026"), _ruling(db_conn, "8C_2/2026")
+    prediction = _predict(db_conn, scored, 0.8)
+    feedback.decide_relevance(db_conn, scored, "mark_not_relevant", comment="kein Bezug")
+    feedback.decide_relevance(db_conn, scored, "confirm_relevant")  # the expert changes their mind
+    feedback.decide_relevance(db_conn, bare, "mark_not_relevant")  # never assessed: still decidable
+    out = queries.relevance_events(db_conn)
+    assert out["total"] == 3
+    rows = [(e["docket"], e["action"], e["status_before"], e["status_after"], e["prediction_id"],
+             e["predicted_relevant"], e["score_shown"]) for e in out["items"]]  # fmt: skip
+    assert rows == [  # newest first
+        ("8C_2/2026", "mark_not_relevant", "not_assessed", "not_relevant", None, None, None),
+        ("8C_1/2026", "confirm_relevant", "not_relevant", "expert_confirmed", prediction, True, 0.8),
+        ("8C_1/2026", "mark_not_relevant", "ai_relevant", "not_relevant", prediction, True, 0.8),
+    ]
+    assert all(e["created_at"] and e["actor"] == "expert" for e in out["items"])
+    assert out["items"][2]["comment"] == "kein Bezug"
+    assert queries.relevance_events(db_conn, ruling_id=bare)["total"] == 1
+
+
+def test_sort_by_status_puts_expert_confirmed_first_then_ai_then_potential_then_the_rest(db_conn):
+    ids = {
+        name: _ruling(db_conn, f"8C_{n}/2026")
+        for n, name in enumerate(("gold", "ai", "ai_low", "maybe", "none", "out"), 1)
+    }  # noqa: E501
+    for name, score in (("gold", 0.2), ("ai", 0.9), ("ai_low", 0.6), ("maybe", 0.3), ("out", 0.95)):
+        _predict(db_conn, ids[name], score)
+    feedback.decide_relevance(db_conn, ids["gold"], "confirm_relevant")
+    feedback.decide_relevance(db_conn, ids["out"], "mark_not_relevant")
+    by_id = {v: k for k, v in ids.items()}
+    best_first = [by_id[r["id"]] for r in queries.list_rulings(db_conn, sort="status", order="desc")["items"]]
+    assert best_first == ["gold", "ai", "ai_low", "maybe", "none", "out"]
+    worst_first = [by_id[r["id"]] for r in queries.list_rulings(db_conn, sort="status", order="asc")["items"]]
+    assert worst_first == ["out", "none", "maybe", "ai", "ai_low", "gold"]
