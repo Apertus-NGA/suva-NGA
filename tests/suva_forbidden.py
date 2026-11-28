@@ -11,6 +11,7 @@ Job titles and single names are not matched: they are ordinary words in rulings.
 
 from __future__ import annotations
 
+import gzip
 import html
 import re
 import zipfile
@@ -111,17 +112,36 @@ def _compile(f: Forbidden) -> list[tuple[str, re.Pattern[str]]]:
     return checks
 
 
+def _texts(path: Path) -> list[tuple[str, str]]:
+    """(member suffix, text) pairs to scan. A .zip or .gz is read inside, member by member: its compressed bytes
+    would hide a real value and match one by chance. Any other file is read as UTF-8, invalid bytes ignored."""
+    raw = path.read_bytes()
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".zip" and zipfile.is_zipfile(path):
+            with zipfile.ZipFile(path) as z:
+                return [
+                    (f"!{n}", z.read(n).decode("utf-8", errors="ignore")) for n in z.namelist() if not n.endswith("/")
+                ]
+        if suffix == ".gz":
+            return [("", gzip.decompress(raw).decode("utf-8", errors="ignore"))]
+    except (zipfile.BadZipFile, gzip.BadGzipFile, EOFError, OSError):
+        pass  # not a readable archive after all: scan its bytes as they are
+    return [("", raw.decode("utf-8", errors="ignore"))]
+
+
 def scan(files: list[Path], forbidden: Forbidden, root: Path) -> list[str]:
-    """Return 'path:line: kind' for every match. Never the value."""
+    """Return 'path[!member]:line: kind' for every match. Never the value."""
     checks = _compile(forbidden)
     hits: list[str] = []
     for path in files:
         try:
-            text = path.read_bytes().decode("utf-8", errors="ignore")
+            parts = _texts(path)
         except OSError:
             continue
-        for lineno, line in enumerate(text.splitlines(), 1):
-            for kind, pattern in checks:
-                if pattern.search(line):
-                    hits.append(f"{path.relative_to(root)}:{lineno}: {kind}")
+        for member, text in parts:
+            for lineno, line in enumerate(text.splitlines(), 1):
+                for kind, pattern in checks:
+                    if pattern.search(line):
+                        hits.append(f"{path.relative_to(root)}{member}:{lineno}: {kind}")
     return hits

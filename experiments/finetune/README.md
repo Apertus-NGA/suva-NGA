@@ -8,7 +8,7 @@ Reference: `docs/FINETUNE.md`. Role brief: `docs/agents/finetune.md`.
 | `manifests/suva-ft-v3/*.sha256` | hashes of the data archive and of the ambiguous-negatives list | yes |
 | `scripts/04_build_dataset_v2.py`, `05_build_dataset_v3.py` | deterministic builders (v3 imports v2 and `../filtre_couche1/filtre_e.py`) | yes |
 | `scripts/verify_dataset.py` | checks a data folder against a manifest (stdlib only) | yes |
-| `scripts/03_keera_baseline.py`, `metrics_only.py` | historical: produced `runs_v3`; calls the gateway directly, outside `src/llm/` (G2 gap, `docs/FINETUNE.md` FT-Q5). Do not use for new runs | yes |
+| `scripts/metrics_only.py` | metrics used by `02_train_eval.py` (fixed thresholds, superseded by `metrics.py` for reports). `03_keera_baseline.py`, which scored `runs_v3` with a direct gateway call, was removed on 28 Nov (G2; in git history at `6b254ae`) | yes |
 | `metrics.py` | **the** layer-2 metrics module (`docs/FINETUNE.md` §5), frozen before the benchmark; reproduces the audit's numbers | yes |
 | `tests/` | tests of `metrics.py` (synthetic + reproduction of the audit) and of the runner (3 real rulings, declared mock gateway): `uv run --frozen pytest experiments/finetune/tests` | yes |
 | `scripts/06_benchmark_repeat.py` | repeated, resumable zero-shot benchmark through `src/llm/`; stores logprobs; stops on the first failure; `--dry-run`, `--limit N` or `--all` | yes |

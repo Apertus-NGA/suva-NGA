@@ -1,4 +1,4 @@
-"""Metrics shared by 02_train_eval.py and 03_keera_baseline.py (no torch)."""
+"""Metrics used by 02_train_eval.py (no torch); 03_keera_baseline.py used them too (removed 28 Nov, G2)."""
 
 
 def auc(pos, neg):

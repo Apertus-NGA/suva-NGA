@@ -4,7 +4,7 @@ Every call goes through src/llm/ (AGENTS.md G2): concurrency cap, timeout, one e
 served-model check, the `llm_calls` log and the cache, in a store dedicated to this benchmark
 (`<out>/../llm_store/` by default, under data/derived/, git-ignored).
 
-Prompt, parameters and score are those of 03_keera_baseline.py, unchanged: the dataset's messages, T=0,
+Prompt, parameters and score are those of 03_keera_baseline.py (which scored runs_v3; removed 28 Nov, G2), unchanged: the dataset's messages, T=0,
 max_tokens=1, logprobs with top_logprobs=20; score = P(Ja) / (P(Ja) + P(Nein)) on the first output token, where
 P(Ja) sums the top-20 tokens 'ja'/'j' and P(Nein) the tokens 'nein'/'nei'/'ne' (case and spaces ignored).
 New: logprob(Ja), logprob(Nein), the logit, the raw top-20, the served model and the token usage per ruling.
@@ -13,7 +13,7 @@ A failed call fails the run (no silent drop): the repetition file is not written
 repetitions are skipped and calls already answered come back from the store's cache (marked REPLAY).
 Repetition i is sent with `repetition = rep_offset + i` (part of the cache key), so each one is a fresh call.
 
-Usage (needs LLM_NAME, LLM_NAME_SMALL, LLM_BASE_URL, LLM_API_KEY in the environment; LLM_CONCURRENCY <= 5):
+Usage (needs the gateway variables of .env.example in the environment, plus LLM_NAME_SMALL; LLM_CONCURRENCY <= 5):
   uv run --frozen python -I experiments/finetune/scripts/06_benchmark_repeat.py \
       --data-root data/derived/finetune/suva-ft-v3 \
       --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json \
@@ -51,7 +51,7 @@ class ScoreError(RuntimeError):
 
 
 def read_first_token(logprobs: dict | None) -> dict:
-    """Score and log-probabilities from the first token's top_logprobs, as 03_keera_baseline.py computes them."""
+    """Score and log-probabilities from the first token's top_logprobs, as 03_keera_baseline.py did."""
     try:
         top = logprobs["content"][0]["top_logprobs"]
     except (TypeError, KeyError, IndexError) as exc:
