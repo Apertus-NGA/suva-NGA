@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest  # linux/amd64
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # full history (about 2.5 MB): tests/test_layer1_reference.py proves the vendored parity reference equals
+          # `git show 4c246a8:src/courts.py`, and skips that check on a shallow clone
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v10.4.0
       - name: Install
         run: uv sync --frozen

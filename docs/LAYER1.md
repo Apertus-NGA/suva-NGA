@@ -84,7 +84,7 @@ The filter decisions are `PROPOSED` in `docs/DECISIONS.md` (D-072, D-073, D-083)
 
 ### 6.1 What changed from `src/courts.py`
 
-`src/courts.py` stays the reference. `src/layer1/` takes its rules, writes every decision (kept and dropped) to the data layer (D-061 to D-071), and checks itself against `courts.py` on every ruling of every run.
+`src/courts.py` at `4c246a8` stays the reference. `src/layer1/` takes its rules, writes every decision (kept and dropped) to the data layer (D-061 to D-071), and measures parity on every ruling of every run against the frozen copy `src/layer1/reference_courts_4c246a8.py`, never against the live `src/courts.py` (L2-F21, D-082 point 7). That copy is `git show 4c246a8:src/courts.py` byte for byte: `tests/test_layer1_reference.py` pins its SHA-256 (`41cc56b7…`) and, when the git history is present, its equality with the commit. The live `src/courts.py` belongs to its owner and keeps changing (PR #42 rewrites it); `parity_same` and `parity_different` do not follow it. A new reference is a new file, never an edit of this one.
 
 | Concern | `src/courts.py` | `src/layer1/` |
 |---|---|---|
@@ -121,14 +121,14 @@ Exactly one subject rule fires per ruling (a `KEEP_RUBRIC*` or a `DROP_*`), plus
 ### 6.3 What a run writes
 
 1. `data/runs/<run_id>/decisions.jsonl`: one record per ruling. It holds **every rule evaluation** of the version (outcome, evidence, detail), the rubric and its source, the scope, the reason code, the German explanation and the fingerprint of the inputs. The database is loaded from the same records in memory, not from this file; `verify` proves the two are equal (§7.4). The fields `subject` and `text` keep the meaning of the two checks of `courts.py` (`kept_subject`, `subject_missing`, `wrong_court`, `wrong_letter`, `subject_out`; `kept_text`, `kept_contract`, `text_clear`, `text_absent`) in every version. A `V1.2.0` keep that `courts.py` does not know shows in `reason_code`, the rule hits and the ledger only: a ruling kept by its title has `subject = subject_out` and `reason_code = L1_KEEP_TITLE_RUBRIC`.
-2. `data/runs/<run_id>/layer1_log.json`: the owner's log (`docs/layer1_log.schema.json`, `layer1-log-1`), built by `courts.build_layer1_log`. It carries real UTC start and end times, `input.sha256` (SHA-256 of the sorted input fingerprints), `input.bytes` (UTF-8 bytes of the texts read), and `ruling_id` and `decision_date` on each asset, because a docket is not unique (F-15). The log's closure checks need every kept ruling to pass its subject action or its text action, so a `V1.2.0` keep is logged under the action it belongs to: the title keep as a subject pass (`kept_title_rubric`, criterion = the cut title head), the no-text keep as a text pass (`kept_text_unavailable`, criterion `empty_text`). `V1.0.0` and `V1.1.0` have neither rule, so their log rows are built as before.
-3. `data/runs/<run_id>/manifest.json`: the SHA-256 of both files, the version, the profile, the counts, the ledger's outcome counts and the golden status (§7.4).
+2. `data/runs/<run_id>/layer1_log.json`: the owner's log (`docs/layer1_log.schema.json`, `layer1-log-1`), built by `build_layer1_log` of the frozen reference `src/layer1/reference_courts_4c246a8.py` (§6.1). It carries real UTC start and end times, `input.sha256` (SHA-256 of the sorted input fingerprints), `input.bytes` (UTF-8 bytes of the texts read), and `ruling_id` and `decision_date` on each asset, because a docket is not unique (F-15). The log's closure checks need every kept ruling to pass its subject action or its text action, so a `V1.2.0` keep is logged under the action it belongs to: the title keep as a subject pass (`kept_title_rubric`, criterion = the cut title head), the no-text keep as a text pass (`kept_text_unavailable`, criterion `empty_text`). `V1.0.0` and `V1.1.0` have neither rule, so their log rows are built as before.
+3. `data/runs/<run_id>/manifest.json`: the SHA-256 of both files, the version, the profile, the counts, the ledger's outcome counts, the parity counts against the frozen reference (`parity_with_courts`: `same`, `different`), the `parity_reference` block (`path` `src/layer1/reference_courts_4c246a8.py`, `source` `src/courts.py@4c246a8`, `sha256` of the copy) and the golden status (§7.4).
 4. The golden check, before anything is loaded: a run over the whole corpus of the pinned snapshot compares its decisions with `expected/layer1/<version>.json`. A mismatch fails the run and loads nothing (§7.4).
 5. One transaction in PostgreSQL:
    - one `ops.span` per ruling under the run's root span;
    - one `triage.assessment` per ruling, with its German explanation;
    - one `triage.assessment_reason` row per rule of the version: the rule ledger (§7.1), certified row by row and, at commit, per assessment;
-   - one event `layer1.decision.made` per ruling, and the run events `layer1.run.decided`, `layer1.parity.checked`, `layer1.files.written`, then `layer1.golden.matched` (info) or `layer1.golden.not_comparable` (warning, with the reason);
+   - one event `layer1.decision.made` per ruling, and the run events `layer1.run.decided`, `layer1.parity.checked` (against the frozen reference, which its attributes name: `reference` = the `parity_reference` block), `layer1.files.written`, then `layer1.golden.matched` (info) or `layer1.golden.not_comparable` (warning, with the reason). Events are idempotent per (`run_id`, `seq`) (L2-F20): `src.db.runs.events` inserts an event only when its run has no row with that `seq`, under a per-run transaction advisory lock, so emitting a run's events again adds nothing (`tests/test_db_events.py`). The run and its root span close last, at the real clock time, so the run's own events lie within its `started_at` and `finished_at`;
    - the run metrics (`ops.run_metric`), including `ledger_rows` and one `outcome_<outcome>` count per outcome.
 
    Nothing is written if one row fails.
@@ -141,7 +141,7 @@ The explanation is composed from the ledger:
   - a contract term blocked by a closed rubric: `Hinweis: <flag label>: «<term>» im Urteilstext gefunden, Rechtsgebiet «<rubric>».`;
 - then, in both cases, the title signal when the rubric was read from the title.
 
-In `V1.2.0`, `L1_KEEP_TEXT_UNAVAILABLE` searches no term list (its `detail` has `text_chars` and no `pattern`), so it never appears in the `ohne Treffer` list of a dropped ruling. `L1_KEEP_TITLE_RUBRIC` also fires, by design, on rulings that another keep already decides, such as a rubric and a title that both name the same matter; their explanation then names it after `Ebenso:` (`Rechtsgebiet laut Gegenstand in der Liste der Abteilung`).
+In `V1.2.0`, `L1_KEEP_TEXT_UNAVAILABLE` searches no term list (its `detail` has `text_chars` and no `pattern`), so it never appears in the `ohne Treffer` list of a dropped ruling. A dropped ruling's explanation does not name `L1_KEEP_TITLE_RUBRIC` either: when it is `not_fired`, the cut title head it compared is in the ledger only (`examined_value`). Adding it to the explanation is left to a later version. `L1_KEEP_TITLE_RUBRIC` also fires, by design, on rulings that another keep already decides, such as a rubric and a title that both name the same matter; their explanation then names it after `Ebenso:` (`Rechtsgebiet laut Gegenstand in der Liste der Abteilung`).
 
 A drop label states only its own condition (`Abteilung nicht in der Liste der Vorauswahl`); the explanation adds the text outcome (F-03).
 
@@ -173,14 +173,14 @@ The traceability and governance commands (`layer1-golden`, `layer1-verify`, `lay
 |---|---|---|
 | Kept (`potentially`), `expected/layer1/` | 931 | 935 |
 | Dropped (`out_of_scope`), `expected/layer1/` | 5,124 | 5,120 |
-| Same subject and text decision as `courts.py` | 6,055 / 6,055 | 6,038 / 6,055 |
+| Same subject and text decision as the frozen reference (`courts.py` at `4c246a8`, §6.1) | 6,055 / 6,055 | 6,038 / 6,055 |
 | Suva list, Federal Court rulings (kept/total) | 59/59 | 59/59 |
 | Q3/2025 summaries not in the list (kept/total) | 23/23 | 23/23 |
 | All summary exports (kept/total) | 55/55 | 55/55 |
 | Kept in the Q2/2026 union (2,677, `expected/ingest/V1.0.0.json`) | 380 | 383 |
 | Run time on a laptop, files and database (first measurement, before the rule ledger) | about 20 s | about 23 s |
 
-`V1.1.0` keeps 4 more rulings and drops none that `V1.0.0` kept. The 4 are `2C_462/2024`, `2C_533/2025` and `7B_400/2024` (other courts, `assurance-accidents` in the plural) and `8C_170/2026` (an unemployment ruling that names an accident insurer). The 13 other rulings that differ from `courts.py` are kept by both versions and gain an accident-term reason. 931 here against 993 in §3: §3 ran on the local cache `data/cache/rulings.parquet`, which no repo code builds and which was not available for this measure. `courts.py` and `V1.0.0` agree on all 6,055 rulings of the HF file, so the gap of 62 comes from the input, not the code; which columns differ is not measured.
+`V1.1.0` keeps 4 more rulings and drops none that `V1.0.0` kept. The 4 are `2C_462/2024`, `2C_533/2025` and `7B_400/2024` (other courts, `assurance-accidents` in the plural) and `8C_170/2026` (an unemployment ruling that names an accident insurer). The 13 other rulings that differ from the reference are kept by both versions and gain an accident-term reason. 931 here against 993 in §3: §3 ran on the local cache `data/cache/rulings.parquet`, which no repo code builds and which was not available for this measure. The reference (`courts.py` at `4c246a8`) and `V1.0.0` agree on all 6,055 rulings of the HF file, so the gap of 62 comes from the input, not the code; which columns differ is not measured.
 
 The rubric read from the title is a matter, not a Neuheiten rubric: `4A_127/2025` reads `contratto di assicurazione`, which no court-4 rubric matches, and is kept by its contract term. Fetching the Neuheiten rubric (`corpus.subject_observation`, source `neuheiten`) would replace that reading; the crawl does not write it yet.
 
@@ -213,13 +213,14 @@ What each rule records:
 | `L1_KEEP_ACCIDENT_TERM` (`text_accident_term`) | there is no text (`text_absent`) | the full text, with the term list in `detail.pattern` |
 | `L1_KEEP_CONTRACT_TERM` (`text_contract_term`) | there is no text | the full text; `blocked` when a contract term matched on a closed rubric |
 | `L1_FLAG_CLOSED_RUBRIC` (`text_contract_term_blocked`) | there is no text | fires when a contract term matched on a closed rubric (evidence: the closed rubric) |
-| `L1_KEEP_TEXT_UNAVAILABLE` (`text_unavailable`, `V1.2.0`) | never | fires when there is no text (`full_text`, no offsets and no match, which the database accepts only on an assessment without text); otherwise `not_fired` with `detail.text_chars` and no `pattern` |
+| `L1_KEEP_TEXT_UNAVAILABLE` (`text_unavailable`, `V1.2.0`) | never | fires when there is no text (`full_text`, no offsets and no match, which the database accepts only on an assessment without text and only for this check); otherwise `not_fired` with `detail.text_chars` and no `pattern` |
 | `L1_KEEP_TITLE_RUBRIC` (`title_rubric_kept`, `V1.2.0`) | the court or the letter is not listed, or there is no title (`gegenstand_absent`) | the title head cut at the first of `(`, `;`, `,` or `:` and stripped (`gegenstand`; `examined_value` = the cut head), compared with the court's keep list; `detail` names `pattern` (`courts.<digit>.rubrics`), `rubric_key` and `cut_at` |
 
 The database certifies the ledger (`src/db/sql/80_triggers.sql`):
 - **Each row, on insert** (`t30_check` on `triage.assessment_reason`):
   - the rule is an enabled rule of the assessment's version, at its ordinal, with its reason code and its kind as effect;
   - a full-text match is the exact slice `[char_start, char_end)` of the stored text, at least one character long; offsets exist only on `full_text` evidence;
+  - on an assessment without text, a `full_text` row is `not_applicable` (`text_absent`), or `fired` without offsets or match, and the latter only for a rule whose check is `text_unavailable`: no other keep is certified without evidence;
   - `not_applicable` names one of the five `why` values, and `text_absent` only when the assessment has no text;
   - only a keep is `blocked`, by another enabled flag of the version, and the row names the closed rubric;
   - the assessment was inserted by the same transaction: a committed ledger is sealed.
@@ -281,7 +282,7 @@ Every row of the source file is accounted for. A row is either a source referenc
 | `ING_DOCKET_MALFORMED` | it is in a window, but its docket is not in the Federal Court format | |
 | `ING_SOURCE_ID_MISSING`, `ING_SOURCE_ID_DUPLICATE` | it has no usable id of its own: it is recorded as `row:<index>` | |
 
-The loader (`src/ingest/hf_base.py`) classifies every row with one function shared with the loading path. It writes the exclusions in the same transaction as the rulings. Before commit, it checks the closure `row_count` = refs + exclusions: a lost row fails the load and writes nothing. Loading the same file again changes nothing. Writes for one snapshot are serialised by one advisory lock (`corpus.lock_source_rows`), so two loads cannot both load and exclude a row.
+The loader (`src/ingest/hf_base.py`) classifies every row with one function shared with the loading path. A row gets one reason: the first condition it fails, in this order: no usable id (`ING_SOURCE_ID_*`), a same-date twin (`ING_TWIN_SAME_DATE`, decided with its base), no decision date, no window (`OUT_OF_WINDOW`), a malformed docket. So a malformed docket outside every window is `OUT_OF_WINDOW`. `detail` holds the dates the windows read, not the result of each window comparison, and not that the Suva-reference check was negative: a reader recomputes them from those dates and the windows of the ingest version the row names (`component_version_id`, its `ops.component_version.config`). Recording each comparison would need a new ingest version. It writes the exclusions in the same transaction as the rulings. Before commit, it checks the closure `row_count` = refs + exclusions: a lost row fails the load and writes nothing. Loading the same file again changes nothing. Writes for one snapshot are serialised by one advisory lock (`corpus.lock_source_rows`), so two loads cannot both load and exclude a row.
 
 The closure, per snapshot:
 
@@ -315,11 +316,11 @@ Exclusivity holds per snapshot, not per ingest version (D-084 point 8).
   - the candidate drops a labelled ruling;
   - a run fails, a golden mismatch included.
 
-  The baseline's recall is reported, not required: a candidate may fix it. The report holds aggregates only (D-031), plus a `validation` block. The candidate run gets the event `layer1.validation.passed` or `layer1.validation.failed`.
-- **Code identity** (F-09). Every run records `params.code_paths` and `params.code_sha256`. A layer-1 run hashes `src/layer1/engine.py`, `models.py`, `run.py`, `golden.py` and `recall.py`. Compare a run's hash only with another run's over the same paths, never with its version's `code_sha256`, which hashes the code that created the version.
-- **Decision and validation references** (F-12). Every registry version names its decision (`decision`, a `D-NNN` row of `docs/DECISIONS.md`). A step version also names its certified file (`validation`). Both are stored (`ops.component_version.decision_ref`, `validation_ref`; `ops.pipeline_profile_version.decision_ref`) and compared strictly. `tests/test_registry_refs.py` checks that every `D-NNN` exists and that every validation file certifies that step and version.
+  The baseline's recall is reported, not required: a candidate may fix it. The report holds aggregates only (D-031), plus a `validation` block. A candidate run that succeeded gets the event `layer1.validation.passed` or `layer1.validation.failed`, appended after the run closed (so its `ts` is after the run's `finished_at`). A candidate run that failed itself (a golden mismatch, for example) writes no validation event anywhere: its failure is in the report (`validation.failures`; `validation.candidate.run_id` is null), the exit code 1 and the failed `ops.pipeline_run` row with its error span.
+- **Code identity** (F-09). Every run records `params.code_paths` and `params.code_sha256`. A layer-1 run hashes six files: `src/layer1/engine.py`, `models.py`, `run.py`, `golden.py`, `recall.py` and the frozen parity reference `reference_courts_4c246a8.py` (`src.layer1.run.CODE_PATHS`). Its manifest also names that reference in its `parity_reference` block (path, source `src/courts.py@4c246a8`, SHA-256), so parity is always read against a known file (§6.1). Compare a run's hash only with another run's over the same paths, never with its version's `code_sha256`, which hashes the code that created the version.
+- **Decision and validation references** (F-12, its traceability half). Every registry version names its decision (`decision`, a `D-NNN` row of `docs/DECISIONS.md`). A step version also names its certified file (`validation`). Both are stored (`ops.component_version.decision_ref`, `validation_ref`; `ops.pipeline_profile_version.decision_ref`) and compared strictly. `tests/test_registry_refs.py` checks that every `D-NNN` exists and that every validation file certifies that step and version. The review half of F-12 stays open: the owner's ratification of D-072 and D-073 (still `PROPOSED`) and what happens to PR #36 are D-084 point 11.
 - **Sealed rule sets.** A version's rules cannot change once it is used or pinned (§7.1). The loader also refuses a registry file that drops, reorders or re-versions a rule of an existing version.
-- **Pipeline role** (F-11). Every pipeline session runs `SET ROLE suva_g_pipeline` (`DB_PIPELINE_ROLE`; an exported empty value keeps the login's rights, with a warning). A missing or ungranted role fails the connection and names the fix. The audit log records the role (`audit.change_log.db_role`). Under a superuser login this is advisory, not a security boundary (`.env.example`, D-084 point 9).
+- **Pipeline role** (F-11). Every pipeline session runs `SET ROLE suva_g_pipeline` (`DB_PIPELINE_ROLE`; an exported empty value keeps the login's rights, with a warning). A missing or ungranted role fails the connection and names the fix. The audit log records the role (`audit.change_log.db_role`). Under a superuser login this is advisory, not a security boundary (`.env.example`, D-084 point 9). The compose cluster logs in as the dedicated `suva_pipeline` login instead (D-090); the advisory `SET ROLE` remains for the local and CI trust logins.
 - **Recall** (F-14). `python -m src.layer1 recall` exits 1 when a labelled ruling is dropped, and a DB test proves it. `make run` says `SKIPPED run S2 recall` when `gold.label` is empty (§6.4).
 
 ### 7.5 Commands
@@ -327,19 +328,19 @@ Exclusivity holds per snapshot, not per ingest version (D-084 point 8).
 ```
 make layer1-golden PARQUET=path/to/bger.parquet          # certified decisions, in memory, no DB; WRITE=1 writes a missing file
 make layer1-verify RUN=<run_id>                          # the run's files equal its DB rows (read-only)
-make layer1-validate BASE=default PROFILE=layer1_candidate   # two runs, recall, compare; fails on a removal
+make layer1-validate BASE=default PROFILE=layer1_candidate   # two runs, recall, compare; fails on a removal; OUT=path
 make layer1 PROFILE=layer1_candidate                     # one run of V1.2.0
 uv run python -m src.ingest closure [--out PATH]          # every row of the source file accounted for, per snapshot
 ```
 
-`make layer1-validate` defaults to `BASE=layer1_reference PROFILE=default`. `validate` writes `results/layer1_validation.json` unless `--out` names another file, and the make target passes no `--out`. The committed results files are written as follows: `results/layer1_validation.json` holds `default` → `layer1_candidate` (`V1.1.0` → `V1.2.0`), `results/layer1_validation_reference.json` holds `layer1_reference` → `default` (`V1.0.0` → `V1.1.0`):
+`make layer1-validate` defaults to `BASE=layer1_reference PROFILE=default` and writes its report to `tmp/layer1_validation_<BASE>_<PROFILE>.json` (git-ignored) unless `OUT=path` names another file, so a plain `make layer1-validate` never overwrites a committed results file. The Python command `validate` itself still defaults to `results/layer1_validation.json` when `--out` is absent. The committed results files are written as follows, from a clean checkout of the commit they are committed with (so each run's `git_dirty` is false): `results/layer1_validation.json` holds `default` → `layer1_candidate` (`V1.1.0` → `V1.2.0`), `results/layer1_validation_reference.json` holds `layer1_reference` → `default` (`V1.0.0` → `V1.1.0`):
 
 ```
 uv run python -m src.layer1 validate --baseline-profile layer1_reference --profile default --out results/layer1_validation_reference.json
 uv run python -m src.layer1 validate --baseline-profile default --profile layer1_candidate --out results/layer1_validation.json
 ```
 
-So `make layer1-validate` with its defaults overwrites `results/layer1_validation.json` with the reference comparison: pass `BASE=default PROFILE=layer1_candidate` to rewrite that file.
+The same with make: `make layer1-validate OUT=results/layer1_validation_reference.json`, then `make layer1-validate BASE=default PROFILE=layer1_candidate OUT=results/layer1_validation.json`.
 
 `closure` has no make target yet; it reads `corpus.v_ingest_closure` and writes `results/ingest_closure.json`, counts only. It exits 1 when no snapshot is loaded or one does not close.
 

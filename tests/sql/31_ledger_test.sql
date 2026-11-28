@@ -280,11 +280,12 @@ SELECT pg_temp.expect_error(pg_temp.row_sql('00000000-0000-4000-8000-000000000c0
   'rule L1_KEEP_ACCIDENT_TERM: the assessment has no input text');
 SELECT pg_temp.expect_error(pg_temp.row_sql('00000000-0000-4000-8000-000000000c02', 'kept', 'L1_KEEP_CONTRACT_TERM'),
   'rule L1_KEEP_CONTRACT_TERM: the assessment has no input text');
--- shape only: a rule that fires on the absence of text (V1.2.0's text_unavailable) names full_text, without offsets or match
-DO $$ BEGIN
-  EXECUTE pg_temp.row_sql('00000000-0000-4000-8000-000000000c02', 'kept', 'L1_KEEP_ACCIDENT_TERM',
-                          '{"char_start": null, "char_end": null, "matched_text": null}');
-END $$;
+-- only a rule whose check fires on the absence of text (V1.2.0's text_unavailable) fires on full_text without a text,
+-- without offsets or match: a term keep fired there would certify a keep with no evidence (review fix). The accepted
+-- shape, a fired L1_KEEP_TEXT_UNAVAILABLE on the real registry, is covered by tests/test_layer1_v120_db.py.
+SELECT pg_temp.expect_error(pg_temp.row_sql('00000000-0000-4000-8000-000000000c02', 'kept', 'L1_KEEP_ACCIDENT_TERM',
+                                            '{"char_start": null, "char_end": null, "matched_text": null}'),
+  'rule L1_KEEP_ACCIDENT_TERM: the assessment has no input text, so only a rule whose check is text_unavailable can fire on full_text \(check text_accident_term\)');
 -- CHECKs: evidence of a fired keep or drop; offsets and match only when fired or blocked; no copied text
 SELECT pg_temp.expect_error(pg_temp.row_sql('00000000-0000-4000-8000-000000000c01', 'kept', 'L1_KEEP_RUBRIC', '{"evidence_field": null}'),
   'assessment_reason_evidence_chk');
