@@ -1,0 +1,199 @@
+# ruff: noqa: E501  (test data: whole sentences of rulings, kept on one line to stay readable)
+"""Tests of the extractive writer (src/summarize/extract). The model is the declared fake transport of
+tests/test_refine.py: no gateway call (G9)."""
+
+from __future__ import annotations
+
+import pytest
+
+from src.summarize.extract import candidates as cand
+from src.summarize.extract import choose, write
+from src.summarize.refine.model import Model, ModelFailed
+from tests.test_refine import RULING, Fake
+
+FR_RULING = """Arrêt du 3 juin 2025
+Composition
+Mmes et MM. les Juges fédéraux Viscione, Présidente, Maillard et Métral.
+Greffière : Barman Ionta.
+
+Faits :
+A. L'assurée a chuté le 7 mai 2023. La CNA a refusé ses prestations par décision sur opposition du 12 octobre 2023.
+B. L'assurée interjette un recours en matière de droit public contre cet arrêt, en concluant principalement à sa réforme.
+L'Office fédéral de la santé publique a renoncé à se déterminer.
+
+Considérant en droit :
+1. Le recours est recevable (art. 82 LTF).
+
+2. La recourante soutient que la cour cantonale aurait violé le droit fédéral en niant son droit aux prestations.
+
+3. Selon la jurisprudence, le droit à des prestations de l'assurance-accidents suppose un lien de causalité naturelle entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA). Ce lien serait rompu, selon la recourante, par la durée du traitement.
+Le statu quo sine a été atteint le 30 juin 2023, de sorte que la CNA pouvait mettre fin à ses prestations.
+
+Par ces motifs, le Tribunal fédéral prononce :
+1. Le recours est rejeté.
+2. Les frais judiciaires, arrêtés à 800 fr., sont mis à la charge de la recourante.
+"""
+
+
+def model_for(fake: Fake, budget: int = 40) -> Model:
+    return Model(fake, budget=budget, labeler=fake.label)
+
+
+# --- candidates ---------------------------------------------------------------------------------------------------
+
+
+def test_the_filter_leaves_out_what_a_fiche_never_restates_and_says_why():
+    found = cand.candidates(FR_RULING)
+    reasons = {sentence[:40]: why for _, why, sentence in found.dropped}
+    assert reasons["Le recours est recevable (art. 82 LTF)."[:40]] == "admissibility"
+    assert any(why == "operative" for why in reasons.values())
+    assert reasons["L'assurée interjette un recours en matière"[:40]] == "proceedings"
+    assert reasons["L'Office fédéral de la santé publique a ren"[:40]] == "proceedings"
+    assert reasons["La recourante soutient que la cour cantona"[:40]] == "party_argument"
+    assert reasons["Ce lien serait rompu, selon la recourante, "[:40]] == "reported"
+    kept = [c.text for c in found.kept]
+    assert kept[0].startswith("L'assurée a chuté le 7 mai 2023")  # the heading "A." is taken off
+    assert any(t.startswith("Selon la jurisprudence, le droit à des prestations") for t in kept)
+    assert [c.id for c in found.kept] == [f"S{n}" for n in range(1, len(kept) + 1)]
+
+
+def test_tags_say_what_a_sentence_holds():
+    rule = "Selon la jurisprudence, le droit à des prestations suppose un lien de causalité naturelle (art. 6 al. 1 LAA; ATF 129 V 177)."
+    assert cand.tags(rule) == ["article", "case law", "rule formula"]
+    assert cand.tags("La cour cantonale a retenu que la recourante travaillait à plein temps.") == ["names a party"]
+
+
+# --- choose -------------------------------------------------------------------------------------------------------
+
+
+def test_choose_ranks_considerations_offers_only_their_sentences_and_restores_the_courts_order():
+    found = cand.candidates(RULING)
+    by_label = {c.label: c.id for c in found.kept}
+    v = choose.VERSION
+    fake = Fake(**{
+        f"{v}/passages": [{"a_point": "Ende der Leistungspflicht", "b_passages": ["E.3"]}],
+        f"{v}/rank/E.2.1": [0.9], f"{v}/rank/E.3": [0.8], f"{v}/rank/E.2": [0.1],
+        f"{v}/sentences": [{"a_chosen": [
+            {"a_id": by_label["E.3"], "b_role": "holding"},
+            {"a_id": by_label["E.2.1"], "b_role": "rule"},
+            {"a_id": by_label["E.2.1"], "b_role": "condition"},  # a repeat is dropped
+            {"a_id": by_label["facts"], "b_role": "fact"},
+        ]}],
+    })  # fmt: skip
+    choice = choose.choose(RULING, model_for(fake))
+    assert [c.label for c, _ in choice.chosen] == ["facts", "E.2.1", "E.3"]  # the court's order, not the answer's
+    assert choice.scores == {"E.2": 0.1, "E.2.1": 0.9, "E.3": 0.8}
+    sentences_prompt = next(m for v_, m in fake.sent if v_.startswith(f"{v}/sentences"))[-1]["content"]
+    assert "[E.2.1]" in sentences_prompt and "[facts]" in sentences_prompt
+    assert "Die Beschwerde ist zulässig" not in sentences_prompt  # admissibility never reaches the model
+    assert "[article]" in sentences_prompt  # code's hints are shown
+
+
+def test_top_takes_the_best_considerations_by_reading():
+    assert choose.top({"E.2": 0.2, "E.3": 0.9, "E.4": 0.95, "E.5": 0.1, "E.6": 0.5, "E.7": 0.3}) == ["E.4", "E.3", "E.6", "E.7", "E.2"]
+
+
+def test_a_ruling_with_too_few_candidates_goes_to_a_person():
+    with pytest.raises(ModelFailed):
+        choose.choose("Urteil.\n\nErwägungen:\n1. Kurz.\n", model_for(Fake()))
+
+
+# --- write --------------------------------------------------------------------------------------------------------
+
+RULE = cand.Candidate("S9", "E.3", "Selon la jurisprudence, le droit à des prestations de l'assurance-accidents suppose un lien de causalité naturelle entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA; ATF 129 V 177 consid. 3.1).")
+FR = {"text": FR_RULING, "language": "fr", "category": "uv", "starred": False}
+
+
+def test_a_written_sentence_is_kept_when_code_and_the_entailment_reading_agree():
+    adapted = "Selon la jurisprudence, le droit à des prestations de l'assurance-accidents suppose un lien de causalité naturelle entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA)."
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": adapted}]})
+    written = write.write_sentence(RULE, "rule", "fr", FR, model_for(fake))
+    assert written.status == "written" and written.text == adapted and written.entailment == 0.97
+    prompt = fake.sent[0][1][-1]["content"]
+    assert "ATF 129 V 177" in prompt and "Adapt this sentence" in prompt
+
+
+def test_a_sentence_the_source_does_not_entail_gets_one_retry_then_codes_own_clean_copy():
+    stronger = "Le droit à des prestations suppose toujours un lien de causalité naturelle et adéquate entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA)."
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": stronger}], f"{write.VERSION}/1": [{"a_sentence": stronger}],
+                   "entail@1/write": [0.2, 0.3]})  # fmt: skip
+    written = write.write_sentence(RULE, "rule", "fr", FR, model_for(fake))
+    assert written.status == "cleaned"
+    assert written.text.endswith("l'atteinte à la santé (art. 6 al. 1 LAA).")  # the reference parenthesis is out, the article stays
+    assert "ATF" not in written.text
+    retry = next(m for v, m in fake.sent if v == f"{write.VERSION}/1")
+    assert "entailment 0.20 below 0.9" in retry[-1]["content"]
+
+
+def test_a_translation_must_use_the_glossary_term_and_a_failed_one_is_left_out():
+    terms = write.required_terms(RULE.text, "fr", "de", "uv")
+    assert terms, "the glossary has a term of this sentence"
+    src, dst = terms[0]
+    bad = "Nach der Rechtsprechung setzt der Anspruch auf Leistungen der Unfallversicherung einen Zusammenhang voraus (Art. 6 Abs. 1 UVG)."
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": bad}], f"{write.VERSION}/1": [{"a_sentence": bad}]})
+    written = write.write_sentence(RULE, "rule", "de", {**FR, "language": "fr"}, model_for(fake))
+    if write.uses_term(bad, dst):
+        pytest.skip(f"the glossary's first term ({dst}) happens to be in the test sentence")
+    assert written.status == "dropped" and any("glossary term missing" in p for p in written.problems)
+    assert f"Translate '{src}' as '{dst}'" in fake.sent[0][1][-1]["content"]
+
+
+def test_uses_term_allows_inflection_but_not_a_missing_word():
+    assert write.uses_term("mit überwiegender Wahrscheinlichkeit erstellt", "überwiegende Wahrscheinlichkeit")
+    assert not write.uses_term("mit Wahrscheinlichkeit erstellt", "überwiegende Wahrscheinlichkeit")
+
+
+def test_flow_keeps_a_connective_and_refuses_a_change_that_brings_a_number():
+    texts = ["Der Anspruch setzt einen natürlichen Kausalzusammenhang voraus.", "Der Status quo sine war am 30. Juni 2023 erreicht."]
+    fake = Fake(**{write.FLOW_VERSION: [{"a_sentences": [
+        {"a_id": "s1", "b_text": "Der Anspruch setzt einen natürlichen Kausalzusammenhang voraus, mindestens zu 50 %."},
+        {"a_id": "s2", "b_text": "Hier war der Status quo sine am 30. Juni 2023 erreicht."},
+    ]}]})  # fmt: skip
+    out, log = write.flow(texts, "de", {"text": RULING, "category": "uv"}, model_for(fake))
+    assert out == [texts[0], "Hier war der Status quo sine am 30. Juni 2023 erreicht."]
+    assert [entry["accepted"] for entry in log] == [False, True]
+
+
+def test_the_fiche_ends_with_codes_outcome_sentence():
+    found = cand.candidates(RULING)
+    chosen = tuple((c, "rule") for c in found.kept if c.label in ("E.2.1", "E.3"))
+    choice = choose.Choice("Ende der Leistungspflicht", chosen, len(found.kept), found.reasons())
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": c.text} for c, _ in chosen],
+                   write.FLOW_VERSION: [{"a_sentences": [{"a_id": f"s{n}", "b_text": c.text} for n, (c, _) in enumerate(chosen, 1)]}]})  # fmt: skip
+    fiche = write.write_fiche(choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False}, model_for(fake))
+    assert fiche.text.startswith("Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus")
+    assert fiche.text.endswith("Die Beschwerde wird abgewiesen.")
+    assert [w.status for w in fiche.sentences] == ["written"] * len(chosen)
+
+
+# --- real rulings -------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    from suva_data import db
+
+    try:
+        conn = db.connect()
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"project database not reachable: {exc}")
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("docket", ["8C_676/2024", "8C_178/2025", "8C_135/2025"])  # DE, FR, IT
+def test_real_rulings_keep_considerations_and_facts_and_drop_the_operative_part(corpus, docket):
+    from src.summarize import pipeline
+
+    row = corpus.execute("SELECT id FROM rulings WHERE docket = %s", (docket,)).fetchone()
+    if row is None:
+        pytest.skip(f"{docket} is not in the database")
+    found = cand.candidates(pipeline.load_ruling(corpus, row[0])["text"])
+    labels = {c.label for c in found.kept}
+    assert "operative" not in labels and "facts" in labels
+    assert sum(label.startswith("E.") for label in labels) >= 3
+    assert len(found.kept) >= 30
+    reasons = found.reasons()
+    assert reasons.get("operative", 0) > 0 and reasons.get("admissibility", 0) > 0
+    assert set(reasons) <= {"operative", "admissibility", "costs", "procedural_law", "citation", "party_argument",
+                            "proceedings", "reported", "fragment"}  # fmt: skip

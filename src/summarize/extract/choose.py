@@ -18,7 +18,8 @@ from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 
 VERSION = "choose@6"
-MIN, MAX = 5, 12
+MIN, MAX = 5, 12  # what the prompt asks for
+MIN_VALID = 3  # what code accepts ("fewer for a simple ruling")
 MAX_PASSAGES = 4
 ROLES = ["rule", "condition", "application", "holding", "fact"]
 
@@ -173,6 +174,6 @@ def choose(text: str, model: Model, passages: str = "rank") -> Choice:
         answer = model.ask([system, {"role": "user", "content": prompt}], "choose", shape,
                            f"{VERSION}/sentences/{attempt}", max_tokens=500)  # fmt: skip
         chosen = _order(found, answer["a_chosen"], allowed)
-        if len(chosen) >= min(MIN, len(allowed)):
+        if len(chosen) >= min(MIN_VALID, len(allowed)):
             return Choice(point, tuple(chosen), len(found.kept), found.reasons(), scores)
-    raise ModelFailed(f"fewer than {MIN} valid sentence ids, twice")
+    raise ModelFailed(f"fewer than {MIN_VALID} valid sentence ids, twice")

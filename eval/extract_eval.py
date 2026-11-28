@@ -172,6 +172,76 @@ def choose_all(name_set: str, name: str, passages: str = "rank") -> None:
     print(f"{len(rows)} rulings -> {OUT / f'chosen_{name_set}_{name}.jsonl'}")
 
 
+def write_all(name_set: str, name: str, choice_name: str) -> None:
+    """Write both fiches of each ruling from a stored choice; rows in refine_eval's format, so its `judge` and
+    `report` compare them with the current pipeline's drafts (`--name` there is this run's name)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from eval.refine_eval import OUT as REFINE_OUT
+    from src.llm.client import client_from_env
+    from src.summarize import pipeline
+    from src.summarize.extract import candidates as cand
+    from src.summarize.extract import choose, write
+    from src.summarize.refine import Model, checks, gateway
+    from src.summarize.refine.model import gateway_labeler
+    from suva_data import db
+
+    drafts = {(r["docket"], r["language"]): r for r in _jsonl(REFINE_OUT / f"drafts_{name_set}.jsonl")}
+    stored = {r["docket"]: r for r in _jsonl(OUT / f"chosen_{name_set}_{choice_name}.jsonl")}
+    client = client_from_env("live")
+    transport, labeler = gateway(client=client), gateway_labeler(client=client)
+    with db.connect() as conn:
+        rulings = []
+        for docket in sets()[name_set]:
+            rid, area, language = conn.execute(
+                "SELECT id, area, language FROM rulings WHERE docket = %s", (docket,)).fetchone()  # fmt: skip
+            ruling = pipeline.load_ruling(conn, rid)
+            ruling["language"], ruling["category"] = language, pipeline.route(area)
+            rulings.append(ruling)
+
+    def one(ruling: dict) -> list[dict]:
+        row = stored.get(ruling["docket"])
+        if not row or "error" in row:
+            print(f"{ruling['docket']}: no choice", flush=True)
+            return []
+        found = cand.candidates(ruling["text"])
+        chosen = tuple((found.get(item["id"]), item["role"]) for item in row["chosen"])
+        picked = choose.Choice(row["point"], chosen, row["offered"], row["dropped"], row.get("scores"))
+        out = []
+        for lang in ("de", "fr"):
+            model = Model(transport, budget=60, labeler=labeler)
+            try:
+                fiche = write.write_fiche(picked, lang, ruling, model)
+            except Exception as exc:  # noqa: BLE001 -- one fiche's failure is reported, the others go on
+                print(f"{ruling['docket']} {lang}: FAILED {type(exc).__name__}: {exc}", flush=True)
+                continue
+            draft = drafts.get((ruling["docket"], lang), {}).get("text", "")
+            statuses = [w.status for w in fiche.sentences]
+            trace = [
+                {"step": "choose", "status": "passed", "calls": row.get("calls", 0), "findings": []},
+                {"step": "write", "status": "needs_review" if "dropped" in statuses else "corrected",
+                 "calls": fiche.calls, "findings": [{**w.as_dict(), "reason": f"{w.label} {w.role}",
+                                                     "accepted": w.status == "written"} for w in fiche.sentences]},
+                {"step": "flow", "status": "passed", "calls": 0,
+                 "findings": [{**f, "reason": f["id"]} for f in fiche.flow]},
+            ]  # fmt: skip
+            out.append({
+                "docket": ruling["docket"], "language": lang, "text": fiche.text, "draft": draft,
+                "calls": fiche.calls + row.get("calls", 0) // 2, "trace": trace, "finish_notes": fiche.notes,
+                "checks_before": checks.failing(checks.run(draft, lang, ruling["text"])) if draft else {},
+                "checks_after": checks.failing(checks.run(fiche.text, lang, ruling["text"])),
+                "model_log": model.log,
+            })  # fmt: skip
+            print(f"{ruling['docket']} {lang}: {fiche.calls} calls, sentences {statuses}, "
+                  f"flow kept {sum(f.get('accepted', False) for f in fiche.flow)}/{len(fiche.flow)}", flush=True)
+        return out
+
+    with ThreadPoolExecutor(4) as pool:
+        rows = [r for batch in pool.map(one, rulings) for r in batch]
+    _write(REFINE_OUT / f"refined_{name_set}_{name}.jsonl", rows)
+    print(f"{len(rows)} fiches -> {REFINE_OUT / f'refined_{name_set}_{name}.jsonl'}")
+
+
 def report(name_set: str, name: str) -> dict:
     golds = {r["docket"]: r for r in _jsonl(OUT / f"gold_{name_set}.jsonl")}
     chosen = {r["docket"]: r for r in _jsonl(OUT / f"chosen_{name_set}_{name}.jsonl")}
@@ -222,10 +292,11 @@ def report(name_set: str, name: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("filter", "choose", "report"))
+    parser.add_argument("command", choices=("filter", "choose", "write", "report"))
     parser.add_argument("--set", default="iterate", choices=("iterate", "holdout"))
     parser.add_argument("--name", default="c1")
     parser.add_argument("--passages", default="rank", choices=("rank", "list"))
+    parser.add_argument("--choice", default="c6", help="the stored choice a `write` run starts from")
     args = parser.parse_args(argv)
     from src.summarize import summarize
 
@@ -236,6 +307,9 @@ def main(argv: list[str] | None = None) -> int:
         (results / f"extract_filter_{args.set}.json").write_text(json.dumps(summary, indent=2) + "\n")
     elif args.command == "choose":
         choose_all(args.set, args.name, args.passages)
+        return 0
+    elif args.command == "write":
+        write_all(args.set, args.name, args.choice)
         return 0
     else:
         summary = report(args.set, args.name)

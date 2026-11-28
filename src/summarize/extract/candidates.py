@@ -29,7 +29,7 @@ from src.summarize import finish
 from src.summarize.refine import evidence
 from src.summarize.refine.draft import split_sentences
 
-VERSION = "candidates@2"
+VERSION = "candidates@3"
 MIN_WORDS = 6
 
 # A court sentence quoting a party: "Der Beschwerdeführer rügt …", "La recourante soutient que …". The verbs are
@@ -59,7 +59,9 @@ _PROCEEDINGS = re.compile(
 
 # Reported speech: the court restating a position it then answers. Measured on the iterate set (28 Nov): in 16 %
 # of the other candidates, in 3 % of the sentences Suva's fiches restate.
-_REPORTED = re.compile(r"\b(?:sei|seien|habe|hätte|hätten|wäre|wären|serait|seraient|aurait|auraient|sarebbe|avrebbe)\b")
+_REPORTED = re.compile(
+    r"\b(?:sei|seien|habe|hätte|hätten|wäre|wären|serait|seraient|aurait|auraient|sarebbe|avrebbe)\b"
+)
 
 # What a sentence holds, read by code and shown to Apertus as a hint (choose.py), never as a decision.
 _CASE_LAW = re.compile(r"\b(?:BGE|ATF|DTF)\s+\d+|\b\d[A-Z]_\d+/\d{4}")
@@ -157,7 +159,7 @@ def reason(label: str, sentence: str, excluded: dict[str, str]) -> str | None:
         return "procedural_law"
     if len(sentence.split()) < MIN_WORDS:
         return "fragment"
-    if _own_words(sentence) < MIN_WORDS:
+    if _CITATION.search(sentence) and _own_words(sentence) < MIN_WORDS:  # a short fact without a reference stays
         return "citation"
     if _PARTY_ARGUMENT.search(sentence):
         return "party_argument"
