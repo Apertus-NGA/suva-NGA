@@ -279,3 +279,19 @@ def test_a_limit_smoke_run_reads_the_rulings_without_fitting_the_scorer(monkeypa
     assert summary["rulings"] == 1 and summary["core_rulings_read_by_apertus"] == 1
     assert summary["apertus_readings_failed"] == 1
     assert "not fitted" in summary["scorer"]
+
+
+def test_serve_fails_loudly_when_the_port_is_taken(monkeypatch):
+    import socket
+
+    taken = socket.socket()
+    taken.bind(("127.0.0.1", 0))
+    taken.listen()
+    try:
+        monkeypatch.setenv("SUVA_HOST", "127.0.0.1")
+        monkeypatch.setenv("SUVA_PORT", str(taken.getsockname()[1]))
+        monkeypatch.setattr(cli, "build_ui", lambda: "UI: (not built in this test)")
+        with pytest.raises(cli.StageError, match="already in use"):
+            cli.serve()
+    finally:
+        taken.close()

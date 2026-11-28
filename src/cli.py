@@ -227,6 +227,13 @@ def serve() -> int:
 
     host = os.environ.get("SUVA_HOST") or "127.0.0.1"
     port = int(os.environ.get("SUVA_PORT") or 8000)
+    import socket
+
+    with socket.socket() as probe:  # fail with the reason before the app starts, not after its startup
+        try:
+            probe.bind((host, port))
+        except OSError as exc:
+            raise StageError(f"{host}:{port} is already in use ({exc.strerror}); stop it or set SUVA_PORT") from exc
     print(f"serve: {build_ui()}", flush=True)
     print(f"serve: API and UI on http://{host}:{port} (Ctrl-C to stop)", flush=True)
     uvicorn.run("suva_app.main:app", host=host, port=port)
