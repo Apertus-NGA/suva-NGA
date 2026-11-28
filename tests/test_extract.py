@@ -237,7 +237,7 @@ def test_real_rulings_keep_considerations_and_facts_and_drop_the_operative_part(
     reasons = found.reasons()
     assert reasons.get("operative", 0) > 0 and reasons.get("admissibility", 0) > 0
     assert set(reasons) <= {"operative", "admissibility", "costs", "procedural_law", "citation", "party_argument",
-                            "proceedings", "reported", "fragment"}  # fmt: skip
+                            "proceedings", "reported", "recital", "review", "fragment"}  # fmt: skip
 
 
 # --- profiles -----------------------------------------------------------------------------------------------------
@@ -525,6 +525,16 @@ def test_code_shortens_a_repeated_lead_in_and_a_long_name_after_its_first_mentio
 # --- the pipeline -------------------------------------------------------------------------------------------------
 
 
+FRENCH = [
+    "Le droit aux prestations suppose une relation de cause à effet entre l'événement et l'atteinte",
+    "Lorsque cette relation disparaît, l'obligation de l'assureur prend fin",
+    "Les rapports médicaux établissent que l'état antérieur était retrouvé",
+    "Partant, la juridiction cantonale pouvait confirmer la suppression des prestations",
+    "La chute depuis une échelle constitue l'événement assuré",
+    "La question litigieuse concerne la fin du versement des prestations",
+]
+
+
 class Echo:
     """A declared fake of the gateway for the whole extractive writer: it ranks every consideration yes, chooses
     the first candidates offered, gives every sentence back as written (a translation: one fixed French sentence),
@@ -533,6 +543,7 @@ class Echo:
     def __init__(self, fail_choice: bool = False) -> None:
         self.sent: list[str] = []
         self.fail_choice = fail_choice
+        self.n = 0
 
     def label(self, messages, prompt_version):
         self.sent.append(prompt_version)
@@ -552,9 +563,11 @@ class Echo:
             ids = re.findall(r"(?m)^(S\d+)\b", content)[:4]
             return json.dumps({"a_chosen": [{"a_id": i, "b_role": "rule"} for i in ids]})
         if prompt_version.startswith("write@"):
-            if content.startswith("Translate"):  # a French fiche of a German ruling: one fixed French sentence
-                return json.dumps({"a_sentence": "Le droit aux prestations de l'assurance-accidents suppose un lien de "
-                                                 "causalité naturelle entre l'accident et l'atteinte à la santé."})  # fmt: skip
+            if content.startswith("Translate"):  # a French fiche of a German ruling: distinct French sentences
+                terms = re.findall(r"Translate '[^']+' as '([^']+)'", content)
+                self.n += 1
+                lead = FRENCH[self.n % len(FRENCH)]
+                return json.dumps({"a_sentence": f"{lead} ({', '.join(terms)})." if terms else f"{lead}."})
             return json.dumps({"a_sentence": re.findall(r"<sentence>\n(.*?)\n</sentence>", content, re.S)[-1]})
         if prompt_version.startswith("flow@"):
             pairs = re.findall(r"(?m)^(s\d+): (.*)$", content)
@@ -592,10 +605,79 @@ def test_a_ruling_the_extractive_writer_cannot_read_still_gets_the_prompt_writte
     from src.summarize import pipeline
     from tests.test_summary_pipeline import FakeModel, _ruling
 
-    rid = _ruling(db_conn)
-    pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=Echo(fail_choice=True),
+    rid = _ruling(db_conn, text=RULING)  # long enough to reach the choice call, which the gateway fails
+    echo = Echo(fail_choice=True)
+    pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=echo,
                               writer="extract")  # fmt: skip
     params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
     assert params["writer"] == {"de": "v2", "fr": "v2"}
     assert "choice failed" in params["extract_errors"]["_error"]
     assert db_conn.execute("SELECT count(*) FROM summaries WHERE ruling_id = %s", (rid,)).fetchone()[0] == 2
+    assert any(v.startswith(f"{choose.VERSION}/passages") for v in echo.sent)  # the failure came from the gateway
+
+
+# --- review fixes (28 Nov) -----------------------------------------------------------------------------------------
+
+
+def test_must_is_matched_as_whole_words_only():
+    assert not write.strength("Die Rente ist zulässig und kann gekürzt werden.", "Die Rente kann gekürzt werden.")
+    assert write.strength("Die Rente ist zu kürzen.", "Die Rente kann gekürzt werden.")
+    assert not write.strength("Das ist zutreffend, die Rente kann gekürzt werden.", "Die Rente kann gekürzt werden.")
+
+
+def test_a_citation_is_not_a_remand():
+    from src.summarize.extract import profiles
+
+    assert not profiles._says(
+        profiles.REMAND, "Le droit à la rente suppose un lien de causalité (ATF 129 V 177 et les renvois)."
+    )
+    assert profiles._says(
+        profiles.REMAND,
+        "Le recours doit être admis en ce sens que l'arrêt est annulé et la cause renvoyée à l'intimée.",
+    )
+    assert not profiles._says(
+        profiles.REMAND, "L'arrêt entrepris expose correctement les règles; il suffit d'y renvoyer."
+    )
+
+
+def test_a_ruling_without_a_language_in_the_database_is_read_for_it():
+    assert write.ruling_language(RULING) == "de"
+    assert write.ruling_language(FR_RULING) == "fr"
+
+
+def test_codes_copy_in_another_language_is_never_kept():
+    sentence = cand.Candidate(
+        "S1",
+        "E.3",
+        "Le statu quo sine a été atteint le 30 juin 2023, de sorte que la CNA pouvait mettre fin à ses prestations.",
+    )
+    fake = Fake(
+        **{f"{write.VERSION}/0": [{"a_sentence": sentence.text}], f"{write.VERSION}/1": [{"a_sentence": sentence.text}]}
+    )
+    written = write.write_sentence(
+        sentence, "holding", "de", {"text": FR_RULING, "language": None, "category": "uv"}, model_for(fake)
+    )
+    assert written.status == "dropped"  # read as a French ruling: a translation, and the French copy is no German fiche
+
+
+def test_the_lead_in_is_shortened_only_where_gender_and_verb_allow():
+    de = ["Das kantonale Gericht hielt fest, dass die Rente zu kürzen sei und die Kürzung dem Gesetz entspreche.",
+          "Das kantonale Gericht hielt fest, dass die Versicherte keine Einwände erhoben habe."]  # fmt: skip
+    assert write.edit(de, "de")[0] == de  # "Sie hielt fest zudem" would be wrong German
+    de2 = ["Die Vorinstanz erwog, dass die Rente zu kürzen sei und die Kürzung dem Gesetz entspreche.",
+           "Die Vorinstanz erwog, dass die Versicherte keine Einwände erhoben habe."]  # fmt: skip
+    assert write.edit(de2, "de")[0][1].startswith("Sie erwog zudem, dass")
+
+
+def test_a_quoted_word_copied_from_the_source_language_is_refused_in_a_translation():
+    problems = write._problems("Le droit à la rente est examiné de manière globale («allseitig») selon la jurisprudence.",
+                               "Der Rentenanspruch ist umfassend („allseitig“) zu prüfen, wie die Rechtsprechung festhält.",
+                               "fr", RULING, [], translation=True)  # fmt: skip
+    assert any("allseitig" in p for p in problems)
+
+
+def test_every_failed_ranking_is_a_failure_not_an_order_by_label():
+    fake = Fake(**{f"{choose.VERSION}/passages": [{"a_point": "p", "b_passages": []}]})
+    fake.label = lambda messages, version: None  # no Ja or Nein among the alternatives: every reading fails
+    with pytest.raises(ModelFailed, match="no consideration could be read"):
+        choose.choose(RULING, model_for(fake))

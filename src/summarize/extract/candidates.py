@@ -14,6 +14,8 @@ restates, by legal category, never by a word list learnt from Suva's texts:
 | party_argument   | a sentence that reports what a party argues, not what the court holds                  |
 | proceedings      | a sentence of the facts about the filings before the Federal Supreme Court             |
 | reported         | reported speech (sei, habe, serait, aurait): a party's or the lower court's position   |
+| recital          | the court's formula referring to the lower court's statement of the law                |
+| review           | the standard of review: it cites BGG/LTF Art. 95, 97, 105 or 106                       |
 | fragment         | under MIN_WORDS words                                                                  |
 
 Every candidate gets an id `S1…Sn` (in reading order) and keeps the label of its passage, so a model can only
@@ -32,7 +34,7 @@ from src.summarize import finish
 from src.summarize.refine import evidence
 from src.summarize.refine.draft import split_sentences
 
-VERSION = "candidates@4"
+VERSION = "candidates@5"
 MIN_WORDS = 6
 
 # A court sentence quoting a party: "Der Beschwerdeführer rügt …", "La recourante soutient que …". The verbs are
@@ -127,6 +129,17 @@ _COURT_OWN = re.compile(
 )
 
 
+# The articles of the Federal Supreme Court Act on the standard of review (what the court may examine).
+_REVIEW = re.compile(r"(?:Art|art)\.\s*(?:95|96|97|105|106)\b.*\b(?:BGG|LTF)$")
+# … and its wording, when the article stands in another sentence (run x16: 8C_311/2025)
+_REVIEW_WORDS = re.compile(
+    r"n'est pas lié par (?:les faits|l'état de fait|la constatation)|nicht an die [^.]{0,60}(?:Feststellung|Tatsachen)"
+    r"[^.]{0,40}gebunden|non è vincolat\w* (?:dai fatti|dall'accertamento)"
+    r"|prüft (?:frei|nur)[^.]{0,40}(?:Rechtsverletzung|Sachverhalt)|examine (?:librement|d'office)",
+    re.IGNORECASE,
+)
+
+
 # References to other rulings and literature: removed before counting what the sentence says itself.
 _CITATION = re.compile(
     r"\b(?:BGE|ATF|DTF)\s+\d+\s+[IV]+\s+\d+(?:\s+(?:E\.|consid\.)\s*[\d.]+)?"
@@ -203,6 +216,12 @@ def reason(label: str, sentence: str, excluded: dict[str, str]) -> str | None:
         return "proceedings"
     if _REPORTED.search(sentence):
         return "reported"
+    if evidence._RECITAL.search(sentence):  # "darauf kann verwiesen werden", "il suffit d'y renvoyer"
+        return "recital"
+    if any(_REVIEW.search(a) for a in cited) or _REVIEW_WORDS.search(
+        sentence
+    ):  # run x16: "nicht an die … Tatsachen gebunden (Art. 97 Abs. 2 BGG)"
+        return "review"
     return None
 
 

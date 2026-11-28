@@ -49,8 +49,21 @@ from src.summarize.prompts import category_of  # noqa: E402
 PIPELINE_VERSION = "1"
 REFINE_BUDGET = 80  # Apertus calls of refine per ruling: the shared record and both languages
 WRITERS = ("extract", "v2")  # extract: the fiche from the ruling's own sentences (src/summarize/extract); v2: prompt
-EXTRACT_CHOICE_BUDGET = 60  # Apertus calls to read the ruling once (ranking and choice), shared by DE and FR
-EXTRACT_FICHE_BUDGET = 70  # Apertus calls per fiche: one per sentence, its checks, the flow and the polish
+EXTRACT_MIN_SENTENCES = 3  # fewer of the chosen sentences kept: the v2 fiche instead (review, 28 Nov)
+
+
+def _choice_budget(text: str) -> int:
+    """One reading per consideration, the point and two readings of the choice with a retry each."""
+    from src.summarize.extract import candidates
+
+    return len({c.label for c in candidates.candidates(text).kept}) + 10
+
+
+def _fiche_budget(choice) -> int:
+    """Up to six calls per sentence (two writes, two readings, the antecedent), the question, flow and polish."""
+    return 6 * (len(choice.chosen) + 2) + 20
+
+
 LANGUAGES = ("de", "fr")
 MODES = ("live", "replay")
 CATEGORIES = ("uv", "iv", "kv", "bv", "vvg", "other")
@@ -111,6 +124,15 @@ def lexicon(conn, language: str, target_docket: str) -> str:
     return "\n".join(body for (body,) in rows)
 
 
+def _replay_miss(exc: BaseException) -> None:
+    """A replay miss stays one: the caller stores nothing (the model wraps every transport error, review)."""
+    cause = exc
+    while cause is not None:
+        if isinstance(cause, ReplayMiss):
+            raise cause
+        cause = cause.__cause__
+
+
 def _extract(ruling: dict, category: str, make_model, lexicons: dict[str, str] | None) -> dict:
     """The extractive fiches {language: fiche}; a language whose fiche failed is missing (the caller falls back to
     the prompt-written fiche for it, so every ruling gets one)."""
@@ -119,21 +141,24 @@ def _extract(ruling: dict, category: str, make_model, lexicons: dict[str, str] |
 
     out: dict = {}
     try:
-        choice = extract.choose.choose(ruling["text"], make_model(EXTRACT_CHOICE_BUDGET))
+        choice = extract.choose.choose(ruling["text"], make_model(_choice_budget(ruling["text"])))
     except ModelFailed as exc:
+        _replay_miss(exc)
         return {"_error": f"choice failed: {exc}"}
     source = {"text": ruling["text"], "language": ruling.get("language"), "category": category,
               "starred": ruling.get("starred")}  # fmt: skip
     for language in LANGUAGES:
-        model = make_model(EXTRACT_FICHE_BUDGET)
+        model = make_model(_fiche_budget(choice))
         try:
             known = {**source, "lexicon": (lexicons or {}).get(language, "")}
             fiche = extract.write.write_fiche(choice, language, known, model, frame="question")
         except ModelFailed as exc:
+            _replay_miss(exc)
             out[f"_error_{language}"] = str(exc)
             continue
-        if not fiche.text.strip() or all(w.status not in ("written", "cleaned") for w in fiche.sentences):
-            out[f"_error_{language}"] = "no sentence was kept"
+        kept = [w for w in fiche.sentences if w.status in ("written", "cleaned") and not w.source_id.startswith("Q")]
+        if len(kept) < min(EXTRACT_MIN_SENTENCES, len(choice.chosen)):
+            out[f"_error_{language}"] = f"only {len(kept)} of the chosen sentences kept"
             continue
         out[language] = {"text": fiche.text, "raw": "", "finish_notes": fiche.notes, "writer": "extract",
                          "extract": {"version": extract.VERSION, "draft": "", "calls": fiche.calls,

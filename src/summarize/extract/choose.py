@@ -58,7 +58,7 @@ conditions, and the one where it gives its own decisive reasoning on that point.
 them: admissibility and standard of review, the parties' and the lower court's positions, secondary complaints,
 facts, costs.
 Question: is consideration [{label}] one of the one to three a digest restates? Answer with one word: yes or no."""
-TOP, SURE, MAX_RANKED = 5, 1.1, 5  # the 5 best-read considerations (choose@5)
+TOP = 5  # the 5 best-read considerations (choose@5)
 SENTENCES = """The legal point in dispute: {point}
 
 Sentences of the considerations that state and decide it, and of the facts:
@@ -146,8 +146,7 @@ def rank(found: cand.Candidates, offered: list[str], model: Model) -> dict[str, 
 
 
 def top(scores: dict[str, float]) -> list[str]:
-    ordered = sorted(scores, key=lambda label: -scores[label])
-    return [label for n, label in enumerate(ordered[:MAX_RANKED]) if n < TOP or scores[label] >= SURE]
+    return sorted(scores, key=lambda label: -scores[label])[:TOP]
 
 
 # A sentence that opens by pointing back ("Dieser Betrag", "Cette condition", "Ceux-ci") needs the sentence before
@@ -208,6 +207,8 @@ def choose(text: str, model: Model, passages: str = "rank", use_profiles: bool =
     scores: dict[str, float] = {}
     if passages == "rank":
         scores = rank(found, offered, model)
+        if scores and not any(scores.values()):  # every reading failed: an order by label is no ranking (review)
+            raise ModelFailed("no consideration could be read")
         named = top(scores)
     else:
         named = first["b_passages"]

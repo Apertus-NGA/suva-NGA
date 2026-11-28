@@ -25,9 +25,12 @@ _MALE = re.compile(
 )
 # An insurer's name: the brand, then only words that belong to a name (capitalised, or a legal form), and an IV
 # office with its canton. Never the words that follow it in the sentence (run x4 read "IV-Stelle die Kosten").
-_NAME_TAIL = r"(?:\s+(?:[A-ZÄÖÜÉ][\w-]+|SA|AG|SpA|Assurances?|Versicherungen?|Accidents|Unfall))*"
+# only words of a company's name ("AXA Leistungen" read a German noun as part of the name: review, 28 Nov)
+_NAME_TAIL = (
+    r"(?:\s+(?:SA|AG|SpA|SE|Suisse|Schweiz|Assurances?|Versicherungen?|Accidents|Unfall|Global|Mutuel|Générales))*"
+)
 _INSURER = re.compile(
-    r"\b(?:Suva|SUVA|CNA|Allianz|AXA|Helsana|Zurich|Generali|Bâloise|Baloise|Mobiliar|Visana|CSS|Sanitas|SWICA|Vaudoise"
+    r"\b(?:Suva|SUVA|CNA|Allianz|AXA|Helsana|Zurich(?=\s+(?:Versicherung|Assurance|Compagnie|Insurance))|Generali|Bâloise|Baloise|Mobiliar|Visana|CSS|Sanitas|SWICA|Vaudoise"
     r"|Groupe Mutuel|Concordia|Assura)\b"
     + _NAME_TAIL
     + r"|\b(?:IV-Stelle|office AI|Office de l'assurance-invalidité|Ufficio AI)"

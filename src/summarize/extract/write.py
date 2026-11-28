@@ -111,7 +111,12 @@ FLOW_RATIO = (0.7, 1.5)
 
 _PLACEHOLDER = re.compile(checks.PLACEHOLDER)
 # A parenthesis that holds a reference (BGE 145 V 57 E. 4; RS 830.1; Urteil 8C_1/2024): code takes it out.
-_REFERENCE = re.compile(r"\b(?:BGE|ATF|DTF)\b|\d[A-Z]_\d+/\d{4}|\b(?:E\.|consid\.)\s*\d|\b(?:RS|SR)\s*\d")
+# A reference: to a ruling, a consideration, the official compilation, or literature (an author in capitals, or a
+# page, margin or note number: "HANS KIND, …, RSAS 1993, p. 291", run x16 on 8C_517/2024).
+_REFERENCE = re.compile(
+    r"\b(?:BGE|ATF|DTF)\b|\d[A-Z]_\d+/\d{4}|\b(?:E\.|consid\.)\s*\d|\b(?:RS|SR)\s*\d"
+    r"|\b[A-ZÄÖÜÉ]{3,}\b[^()]*\b(?:p|S|N|Rz|n°|no)\.?\s*\d|\b(?:p|S|N|Rz)\.\s*\d+\s*(?:ff?\.|ss?\.)?\s*$"
+)
 _REF_PARENTHESIS = re.compile(r"\s*\((?=[^()]*(?:" + _REFERENCE.pattern + r"))[^()]*\)")
 
 
@@ -182,8 +187,12 @@ def uses_term(text: str, term: str) -> bool:
 
 # How strongly a sentence states its rule. Run x4: "peut être confirmée" became "doit être confirmée" and the
 # entailment reading let it through (8C_311/2025). Code compares the two classes in source and new sentence.
-_MUST = re.compile(r"\b(?:muss|müssen|musste|hat zu|ist zu|sind zu|darf nicht|doit|doivent|devait|il faut|il y a lieu"
-                   r"|deve|devono|occorre|è tenut)\w*", re.IGNORECASE)  # fmt: skip
+# Whole words only: "ist zu prüfen" is a "must", "ist zutreffend" and "ist zulässig" are not (review, 28 Nov).
+_MUST = re.compile(
+    r"\b(?:muss|müssen|musste|mussten|darf nicht|dürfen nicht|doit|doivent|devait|devaient|il faut|il y a lieu"
+    r"|deve|devono|occorre|è tenut[oai])\b|\b(?:hat|haben|ist|sind|war|waren)\s+zu\s+[a-zäöü]+en\b",
+    re.IGNORECASE,
+)
 _MAY = re.compile(r"\b(?:kann|können|konnte|darf|dürfen|peut|peuvent|pouvait|il est possible|può|possono)\b",
                   re.IGNORECASE)  # fmt: skip
 # A word in quotation marks inside the sentence: in a translation it is the source language's (run x4: «allseitig»
@@ -202,7 +211,8 @@ def strength(new: str, sentence: str) -> list[str]:
     return []
 
 
-def _problems(new: str, sentence: str, language: str, source: str, terms: list[tuple[str, str]]) -> list[str]:
+def _problems(new: str, sentence: str, language: str, source: str, terms: list[tuple[str, str]],
+              translation: bool = False) -> list[str]:  # fmt: skip
     problems = []
     if not new.strip():
         return ["empty"]
@@ -220,16 +230,11 @@ def _problems(new: str, sentence: str, language: str, source: str, terms: list[t
     if not MIN_RATIO <= ratio <= MAX_RATIO:
         problems.append(f"length changed by a factor {ratio:.2f}")
     problems += strength(new, sentence)
-    if (
-        terms is not None
-        and _QUOTED.search(new)
-        and checks.language_of(_QUOTED.search(new).group(0))
-        not in (
-            None,
-            language,
-        )
-    ):
-        problems.append(f"a quoted word of another language: {_QUOTED.search(new).group(0).strip()}")
+    # A quoted word copied from a source in another language ("«allseitig»" in a French fiche of a German ruling):
+    # a one-word quotation is too short for language_of, so code compares it with the source sentence.
+    for quoted in re.findall(r"(?:«|„|“|\")\s*([^»“”\"]{2,40}?)\s*(?:»|“|”|\")", new):
+        if quoted.lower() in sentence.lower() and translation:
+            problems.append(f"a quoted word of the ruling's language left in: {quoted}")
     missing = [dst for _, dst in terms if not uses_term(new, dst)]
     if missing:
         problems.append("glossary term missing: " + ", ".join(missing))
@@ -237,18 +242,31 @@ def _problems(new: str, sentence: str, language: str, source: str, terms: list[t
     return problems
 
 
+def ruling_language(text: str) -> str | None:
+    """The ruling's language read from its considerations, for a ruling whose language the database lacks."""
+    from collections import Counter
+
+    seen = Counter(
+        checks.language_of(s) for label, s in cand.sentences(evidence.passages(text)) if label.startswith("E.")
+    )
+    seen.pop(None, None)
+    return seen.most_common(1)[0][0] if seen else None
+
+
 def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: dict, model: Model,
                    before: str = "", who: str = "") -> Written:  # fmt: skip
-    source_language = ruling.get("language") or language
+    source_language = ruling.get("language") or ruling_language(ruling["text"]) or language
     same = source_language == language
     lang = NAME[language]
     terms = [] if same else required_terms(candidate.text, source_language, language, ruling["category"])
+    before = before if needs_context(candidate.text) else ""  # only for a sentence that points back (run x6)
     context = (
-        f"The sentence before it in the ruling:\n<sentence>\n{evidence.as_data(before)}\n</sentence>\n"
+        f"For reference only, the sentence before it in the ruling (do not write it):\n<before>\n"
+        f"{evidence.as_data(before)}\n</before>\n"
         if before
         else ""
     )
-    voice = VOICE[language] if candidate.voice == "lower_court" else ""
+    voice = VOICE[language] if candidate.voice == "lower_court" else HOLDING[language] if role == "holding" else ""
     if same:
         prompt = ADAPT.format(voice=voice, lang=lang, sentence=evidence.as_data(candidate.text), roles=ROLES[language],
                               context=context, parties=who)  # fmt: skip
@@ -269,9 +287,10 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
             written.problems.append(str(exc))
             break
         new = polish(answer["a_sentence"], SimpleNamespace(language=language, source=ruling["text"]))
+        new = _REF_PARENTHESIS.sub(_without_references, new)  # references the model left in: code takes them out
         if not same:  # "(«allseitig»)" after its translation: the source language's word comes out
             new = re.sub(r"\s*\((?:«|„|\"|“)[^»“”\"]{1,40}(?:»|“|”|\")\)", "", new)
-        problems = _problems(new, candidate.text, language, ruling["text"], terms)
+        problems = _problems(new, candidate.text, language, ruling["text"], terms, translation=not same)
         if not problems:
             try:  # the sentence before may say what a pronoun refers to, so it is part of the premise
                 premise = f"{before}\n{candidate.text}" if before else candidate.text
@@ -289,7 +308,7 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
                      "nothing more."}]  # fmt: skip
     if same:
         copy = cleaned(candidate.text, language, ruling["text"])
-        if not _PLACEHOLDER.search(copy):
+        if not _PLACEHOLDER.search(copy) and checks.language_of(copy) in (None, language):
             written.text, written.status = copy, "cleaned"
     return written
 
@@ -458,7 +477,7 @@ def question(text: str) -> list[cand.Candidate]:
             out = [cand.Candidate("Q", label, sentence)]
             if _PROCEDURAL_QUESTION.search(sentence) and n + 1 < len(every):
                 nxt_label, nxt = every[n + 1]
-                if nxt_label == label and len(nxt.split()) >= cand.MIN_WORDS and not cand._REPORTED.search(nxt):
+                if nxt_label == label and cand.reason(nxt_label, nxt, {}) is None:  # the filters hold for it too
                     out.append(cand.Candidate("Q2", label, nxt))
             return out
     return []
@@ -523,11 +542,14 @@ def _states_court(text: str) -> bool:
 
 # The second of two consecutive sentences that open on the lower court: a pronoun and "also" (run x13: "La cour
 # cantonale a retenu" twice in a row). Code changes only the opening words; the rest of the sentence stays.
+# Only where the pronoun's gender and the verb allow it: "Die Vorinstanz" (feminine) with a verb that has no
+# separable particle; "Das kantonale Gericht hielt fest" is left as it is (review: "Sie hielt fest zudem").
 _LEAD_IN = {
-    "de": (re.compile(r"^(?:Die Vorinstanz|Das kantonale Gericht) (erwog|hielt fest|stellte fest|verneinte|bejahte)\b"),
-           r"Sie \1 zudem"),
-    "fr": (re.compile(r"^(?:La cour cantonale|La juridiction cantonale|Le tribunal cantonal) a (retenu|considéré|jugé|"
-                      r"estimé|constaté|admis|nié)\b"), r"Elle a en outre \1"),
+    "de": [(re.compile(r"^Die Vorinstanz (erwog|verneinte|bejahte|bestätigte|verwarf)\b"), r"Sie \1 zudem")],
+    "fr": [(re.compile(r"^(?:La cour cantonale|La juridiction cantonale|L'autorité précédente) a (retenu|considéré|"
+                       r"jugé|estimé|constaté|admis|nié)\b"), r"Elle a en outre \1"),
+           (re.compile(r"^Le tribunal cantonal a (retenu|considéré|jugé|estimé|constaté|admis|nié)\b"),
+            r"Il a en outre \1")],
 }  # fmt: skip
 # The short form of a party's long name after its first mention (Suva's fiches: "die IV-Stelle", "l'office AI").
 _SHORT_NAMES = [
@@ -541,12 +563,16 @@ _SHORT_NAMES = [
 def edit(texts: list[str], language: str) -> tuple[list[str], list[str]]:
     """Code's editing of the assembled sentences: the repeated lead-in, the short name after the first mention."""
     out, notes = list(texts), []
-    pattern, replacement = _LEAD_IN.get(language, (None, None))
-    if pattern is not None:
-        for n in range(1, len(out)):
-            if pattern.search(out[n - 1]) and pattern.search(out[n]):
+    rules = _LEAD_IN.get(language, [])
+    lead = re.compile("|".join(p.pattern for p, _ in rules)) if rules else None
+    for n in range(1, len(out)):
+        if lead is None or not lead.search(out[n - 1]):
+            continue
+        for pattern, replacement in rules:
+            if pattern.search(out[n]):
                 out[n] = pattern.sub(replacement, out[n], count=1)
                 notes.append(f"sentence {n + 1}: lead-in shortened")
+                break
     for name, short in _SHORT_NAMES:
         seen = False
         for n, text in enumerate(out):
@@ -568,9 +594,10 @@ def polish_steps():
     (refine/steps; each patch verified there). Run x11: one flow call fixed 9 sentences in 24 fiches."""
     from src.summarize.refine.steps.form import Form
     from src.summarize.refine.steps.language import Language
-    from src.summarize.refine.steps.terms import Terms
 
-    return [Form("form"), Terms(), Language(POLISH_MAX_FIX), Form("form_final")]
+    # Not refine's terms step: its replacements are only checked as attested, not entailed (review, 28 Nov), and
+    # the writer already requires the glossary's terms in every translated sentence.
+    return [Form("form"), Language(POLISH_MAX_FIX), Form("form_final")]
 
 
 def write_fiche(choice: Choice, language: str, ruling: dict, model: Model, frame: str = "none",

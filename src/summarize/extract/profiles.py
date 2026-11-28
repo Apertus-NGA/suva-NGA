@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from src.summarize.extract import candidates as cand
 from src.summarize.refine import evidence
 
-VERSION = "profiles@2"
+VERSION = "profiles@3"
 MAX_ADDED = 3  # two for the profile, and the court's answer
 
 
@@ -54,7 +54,7 @@ PROFILES = (
             Item(
                 "wage_table",
                 "which statistical wage table and line the income rests on",
-                _p(r"\bLSE\b|\bTA1\b|\bRSS\b|Tabellenl(?:o|ö)hn|salaires? statistiques?|tabella"),
+                _p(r"\bLSE\b|\bESS\b|\bTA1\b|\bRSS\b|Tabellenl(?:o|ö)hn|salaires? statistiques?|tabella"),
             ),
             Item(
                 "skill_level",
@@ -102,7 +102,10 @@ PROFILES = (
 REMAND = Item(
     "remand",
     "what the court sends back, to whom, and what must be clarified",
-    _p(r"zur(?:ü|u)ckgewiesen|R(?:ü|u)ckweisung|renvo(?:i|y\w*)|rinvi\w*"),
+    # the case sent back, not "renvoyer à" (to refer to: run x16 took "il suffit d'y renvoyer" for the remand)
+    _p(r"zur(?:ü|u)ckgewiesen|R(?:ü|u)ckweisung|(?:cause|affaire|dossier)\s+(?:(?:est|soit|doit être|sera)\s+)?renvoy"
+       r"|renvo(?:ie|yer|yant)\s+la\s+cause|renvoi\s+de\s+la\s+cause|(?:causa|incarto)\s+(?:è|viene|va)\s+rinviat"
+       r"|rinvi\w*\s+la\s+causa"),
 )  # fmt: skip
 
 
@@ -111,7 +114,7 @@ REMAND = Item(
 ANSWER = Item(
     "answer",
     "the court's own conclusion on the point in dispute",
-    _p(r"^(?:Zusammenfassend|Insgesamt|Nach dem Gesagten|Im Ergebnis|Demnach|Somit|Folglich|Damit|Es ergibt sich"
+    _p(r"^(?:Zusammenfassend|Insgesamt|Nach dem Gesagten|Im Ergebnis|Demnach|Somit|Folglich|Es ergibt sich"
        r"|Il s'ensuit|En définitive|En conclusion|En résumé|Partant|Vu ce qui précède|Au vu de ce qui précède|Dès lors"
        r"|Ne consegue|In conclusione|Pertanto|Ne discende)\b"),
 )  # fmt: skip
@@ -160,11 +163,19 @@ def hint(profile: Profile | None, remand: bool) -> str:
     return ("\n" + "\n".join(lines)) if lines else ""
 
 
+def _says(item: Item, text: str) -> bool:
+    """The item's pattern on the sentence without its references ("et les renvois" is a citation, not a remand)."""
+    return bool(item.pattern.search(cand._CITATION.sub(" ", text)))
+
+
 def _best(found: cand.Candidates, item: Item, scores: dict[str, float], taken: set[str]) -> cand.Candidate | None:
-    pool = [c for c in _considerations(found) if c.id not in taken and item.pattern.search(c.text)
+    pool = [c for c in _considerations(found) if c.id not in taken and _says(item, c.text)
             and not (item is ANSWER and c.voice == "lower_court")]  # the court's answer is its own  # fmt: skip
     if not pool:
         return None
+    if item is REMAND:  # the court's own last word on what goes back, in its own voice
+        own = [c for c in pool if c.voice == "court"]
+        return (own or pool)[-1]
     if item is ANSWER:  # the court's last conclusion in its best-read consideration
         best = max(scores.get(c.label, 0.0) for c in pool)
         return [c for c in pool if scores.get(c.label, 0.0) == best][-1]
@@ -182,9 +193,9 @@ def check(found: cand.Candidates, chosen: list, text: str, scores: dict[str, flo
     taken = {c.id for c, _ in chosen}
     out, notes, added = list(chosen), [], 0
     for item in items:
-        if any(item.pattern.search(c.text) for c, _ in out):
+        if any(_says(item, c.text) for c, _ in out):
             continue
-        if not any(item.pattern.search(c.text) for c in _considerations(found)):
+        if not any(_says(item, c.text) for c in _considerations(found)):
             continue  # the court does not discuss it: nothing to state
         if added >= MAX_ADDED:
             notes.append(f"{item.id}: not stated, and the limit of {MAX_ADDED} additions is reached")
