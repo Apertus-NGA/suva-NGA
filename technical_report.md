@@ -6,7 +6,7 @@ numbers say.
 - **Challenge partner:** Suva
 - **Challenge:** Identification of relevant Federal Court judgements and preparation of a legal summary
 - **Event:** On-site Zurich
-- **Team:** `<to fill: team name — members>`
+- **Team:** NGA - Need GPUs for Apertus — TheDiRocco, RabahSend, bananagoo
 - **Demo:** `<to fill: link to video>`
 
 ## 1. Summary
