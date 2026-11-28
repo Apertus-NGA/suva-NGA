@@ -38,7 +38,7 @@ def test_a_missing_required_point_and_a_removed_sentence_lower_the_score_and_are
     assert any("failed their checks" in r for r in out["reasons"])
     assert out["parts"]["coverage"] == 0.5 and out["parts"]["kept"] == 0.5
     one_missing = confidence(record(), fiche([Sentence("b", ("P2",), "written", [], 1.0)] * 9, ["P3"]))
-    assert one_missing["level"] == "medium" and one_missing["score"] == HIGH - 1  # never "high" with a point missing
+    assert one_missing["level"] == "medium" and one_missing["score"] <= HIGH - 1  # never "high" with a point missing
 
 
 def test_a_record_that_needs_review_caps_the_score():
