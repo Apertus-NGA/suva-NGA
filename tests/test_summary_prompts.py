@@ -53,3 +53,20 @@ def test_system_prompt_names_its_matter():
     assert "Art. 17 ATSG" in system_prompt("de", "uv")
     assert "Art. 17" not in system_prompt("de", "vvg")
     assert "LPP" in system_prompt("fr", "bv")
+
+
+def test_category_reads_the_matter_like_the_gate():
+    # Real subject lines of 8C_44/2025, 8C_539/2025 and 9C_636/2025 (German, French, Italian).
+    assert category_of("Invalidenversicherung, Invalidenrente") == "iv"
+    assert category_of("Assurance-accident (assistance judiciaire gratuite; condition de recevabilité)s") == "uv"
+    assert category_of("Assicurazione contro le malattie") == "kv"
+    assert category_of("Militärversicherung") == "other"  # no glossary of its own
+    assert category_of(None) == "other"
+
+
+def test_every_glossary_subject_is_read_as_its_own_matter():
+    from src.summarize.v2.prompts import GLOSSARY
+
+    for key, block in GLOSSARY.items():
+        for subject in block.get("subjects", []):
+            assert category_of(subject) == key, (key, subject)

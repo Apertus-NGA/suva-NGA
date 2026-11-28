@@ -60,7 +60,7 @@
     "subjects": [
       "krankenversicherung",
       "assurance-maladie",
-      "assicurazione malattie"
+      "assicurazione malattie", "assicurazione contro le malattie"
     ],
     "laws": [
       {"de": "KVG", "fr": "LAMal"}
