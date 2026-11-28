@@ -58,7 +58,7 @@ BEGIN
     ('ops.llm_call_example', ''), ('ops.artifact', ''), ('ops.component_version_model', ''),
     ('ops.component_version_prompt', ''), ('ops.component_version_rule', ''), ('ops.pipeline_profile_step', ''),
     ('ops.log_event', ''), ('audit.change_log', ''),
-    ('corpus.ruling', ''), ('corpus.ruling_source_ref', ''), ('corpus.publication_observation', ''),
+    ('corpus.ruling', ''), ('corpus.ruling_source_ref', ''), ('corpus.publication_observation', ''), ('corpus.subject_observation', ''),
     ('corpus.consideration', ''), ('corpus.ruling_parse', ''), ('corpus.ingest_issue', ''),
     ('corpus.population_member', ''),
     ('triage.assessment', ''), ('triage.assessment_reason', ''), ('triage.llm_judgement', ''),

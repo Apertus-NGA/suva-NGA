@@ -21,7 +21,7 @@ from src.llm.served_model import REPO_ROOT
 STAGES = [
     ("S0 ingest", "read the committed snapshot (data/public/) and judgements/ (D-051 fields dropped)"),
     ("S1 signals", "compute the example rules and their neighbours, each with its evidence span"),
-    ("S2 net", "drop only the clearly out-of-domain, each with a reason code (optional, D-021)"),
+    ("S2 layer 1", "keep or drop every ruling with its rules, reasons and evidence; recall on Suva's labels (D-073)"),
     ("S3 judgement", "ask Apertus for a judgement per candidate (live slice or replay, D-032)"),
     ("S4 score", "compute the 0-100 score, the F2 threshold, the rank and the top-30 cut (D-021, D-046)"),
     ("S5 explain", "write a German explanation for every ruling, selected or not (G5)"),
@@ -53,6 +53,43 @@ def stub(target: str, would: str) -> int:
     return 0
 
 
+def run_layer1_stage() -> int:
+    """S2: layer 1 on the default profile, then the blocking recall check when Suva's labels are loaded.
+
+    Needs DATABASE_URL and a loaded base dataset (python -m src.ingest registry|base|gold); without them the
+    stage is skipped with its reason, never faked.
+    """
+    if not os.environ.get("DATABASE_URL"):
+        print("SKIPPED run S2 layer 1: no DATABASE_URL (make db-up, then python -m src.ingest registry|base|gold)")
+        return 0
+    from src.db.pg import connect
+    from src.layer1.recall import record_recall
+    from src.layer1.run import run_layer1
+
+    with connect(actor="make-run") as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM corpus.ruling")
+            if cur.fetchone()[0] == 0:
+                print("SKIPPED run S2 layer 1: corpus.ruling is empty (python -m src.ingest base --parquet PATH)")
+                return 0
+            cur.execute("SELECT count(*) FROM gold.label")
+            has_labels = cur.fetchone()[0] > 0
+        out = run_layer1(conn, actor="make-run")
+        print(
+            f"run S2 layer 1: {out['kept']} of {out['rulings']} kept ({out['profile']}, layer1_filter "
+            f"{out['version']}), "
+            f"files in {out['files']}"
+        )
+        if has_labels:
+            result = record_recall(conn, out["run_id"])
+            missed = {c: v for c, v in result.items() if v["kept"] != v["total"]}
+            print("run S2 recall: " + ", ".join(f"{c} {v['kept']}/{v['total']}" for c, v in sorted(result.items())))
+            if missed:
+                print("run S2 recall FAILED: a labelled ruling is dropped", file=sys.stderr)
+                return 1
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     mode = args.mode
     if mode == "live":
@@ -70,9 +107,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     for name, what in STAGES:
         if args.dry_run:
             print(f"  [dry-run] {name}: {what}")
+        elif name == "S2 layer 1":
+            status = run_layer1_stage()
+            if status:
+                return status
         else:
             stub(f"run {name}", what)
-    print("run: skeleton only, no stage implemented yet (docs/STATE.md lists the stubs)")
+    print("run: S2 implemented; the other stages are stubs (docs/STATE.md lists them)")
     return 0
 
 

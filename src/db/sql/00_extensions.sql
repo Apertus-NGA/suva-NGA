@@ -78,6 +78,7 @@ BEGIN
     ('segmentation_status',    ARRAY['ok','partial','failed']),
     ('outcome_kind',           ARRAY['upheld','partly_upheld','dismissed','inadmissible','remanded','other']),
     ('ruling_origin',          ARRAY['base_dataset','user_added']),
+    ('subject_source',         ARRAY['neuheiten','hf_legal_area']),
     ('population_definition',  ARRAY['decision_date','publication_date','union','reference']),
     ('population_role',        ARRAY['target','labelled','reference']),
     ('member_basis',           ARRAY['decision_date','publication_exact','publication_approx','reference']),

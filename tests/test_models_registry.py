@@ -17,7 +17,7 @@ MODEL_ID = re.compile(
     r"|pplx-embed[A-Za-z0-9._-]*"
     r"|bge-m3[A-Za-z0-9._-]*"
     r"|(?:gpt|claude|gemini|llama|mistral|qwen)-[A-Za-z0-9._-]+"
-    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
+    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge-|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
     r")",
     re.I,
 )
@@ -54,3 +54,10 @@ def test_check_goes_red_on_an_unlisted_model(tmp_path):
     f = tmp_path / "x.py"
     f.write_text('JUDGE = "apertus-v1-5-70b"\nEMB = "intfloat/multilingual-e5-large"\nX = "gpt-4o"\n')
     assert unregistered([f], registered_ids()) == ["x.py: intfloat/multilingual-e5-large", "x.py: gpt-4o"]
+
+
+def test_a_data_file_named_bger_is_not_a_model(tmp_path):
+    """`bge-` names a BAAI embedding model; the Hugging Face file `data/bger.parquet` (the BGer rulings) is data."""
+    f = tmp_path / "x.py"
+    f.write_text('BASE = "data/bger.parquet"\nEMB = "BAAI/bge-m3"\n')
+    assert unregistered([f], set()) == ["x.py: BAAI/bge-m3"]

@@ -64,6 +64,19 @@ CREATE TABLE IF NOT EXISTS corpus.publication_observation (
 COMMENT ON TABLE corpus.publication_observation IS
   'What a source says about the publication date. Exact only from a Neuheiten page (ours, or HF''s poller from 19 May 2026); a first-seen date is an approximation, never a publication date (D-050). Append-only.';
 
+CREATE TABLE IF NOT EXISTS corpus.subject_observation (
+  observation_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ruling_id        uuid NOT NULL REFERENCES corpus.ruling(ruling_id) ON DELETE RESTRICT,
+  source           ops.subject_source NOT NULL,
+  rubric           text NOT NULL CHECK (length(btrim(rubric)) > 0),
+  star             boolean,
+  snapshot_id      uuid NOT NULL REFERENCES ops.source_snapshot(snapshot_id) ON DELETE RESTRICT,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT subject_observation_uq UNIQUE (ruling_id, source)
+);
+COMMENT ON TABLE corpus.subject_observation IS
+  'The matter rubric (Sachgebiet) a source states: the Neuheiten page (authoritative, with the publication star) or HF legal_area (empty for most Q2/2026 rulings). Layer 1 reads neuheiten > hf_legal_area > the head of gegenstand, and records which one it used (D-072). Append-only.';
+
 CREATE TABLE IF NOT EXISTS corpus.ruling_text (
   text_id          uuid PRIMARY KEY,
   ruling_id        uuid NOT NULL REFERENCES corpus.ruling(ruling_id) ON DELETE RESTRICT,

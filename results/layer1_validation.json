@@ -1,0 +1,127 @@
+{
+  "runs": [
+    {
+      "run_id": "a9ef8375-d9d4-4046-8d31-51d35a8659e9",
+      "layer1_filter": "V1.0.0",
+      "profile": "layer1_reference V0.1.0",
+      "started_at": "2026-11-28 01:24:44.363247+00",
+      "git_commit": "9cefebfc54278a43b302ede5081a394d963067e0",
+      "git_dirty": false,
+      "totals": {
+        "rulings_in": 6055,
+        "kept": 931,
+        "dropped": 5124,
+        "parity_same": 6055,
+        "parity_different": 0,
+        "rubric_from_title": 1680
+      },
+      "by_reason": {
+        "L1_DROP_WRONG_COURT": 4061,
+        "L1_KEEP_ACCIDENT_TERM": 42,
+        "L1_KEEP_CONTRACT_TERM": 11,
+        "L1_DROP_RUBRIC_OUT": 1063,
+        "L1_KEEP_RUBRIC": 859,
+        "L1_KEEP_RUBRIC_MISSING": 19
+      },
+      "recall": {
+        "all_labelled_total": 82,
+        "all_labelled_kept": 82,
+        "q3_2025_summaries_total": 23,
+        "q3_2025_summaries_kept": 23,
+        "summary_exports_total": 55,
+        "summary_exports_kept": 55,
+        "suva_list_total": 59,
+        "suva_list_kept": 59
+      },
+      "by_population": {
+        "2025Q4_decision": {
+          "rulings": 1931,
+          "kept": 295
+        },
+        "2026Q1_decision": {
+          "rulings": 2005,
+          "kept": 338
+        },
+        "2026Q2_decision": {
+          "rulings": 2096,
+          "kept": 275
+        },
+        "2026Q2_publication": {
+          "rulings": 2060,
+          "kept": 312
+        },
+        "2026Q2_union": {
+          "rulings": 2677,
+          "kept": 380
+        },
+        "suva_reference": {
+          "rulings": 23,
+          "kept": 23
+        }
+      }
+    },
+    {
+      "run_id": "c0b72b37-5471-46bb-8e73-39a23fc883f0",
+      "layer1_filter": "V1.1.0",
+      "profile": "default V0.2.0",
+      "started_at": "2026-11-28 01:25:04.858991+00",
+      "git_commit": "9cefebfc54278a43b302ede5081a394d963067e0",
+      "git_dirty": false,
+      "totals": {
+        "rulings_in": 6055,
+        "kept": 935,
+        "dropped": 5120,
+        "parity_same": 6038,
+        "parity_different": 17,
+        "rubric_from_title": 1680
+      },
+      "by_reason": {
+        "L1_DROP_WRONG_COURT": 4058,
+        "L1_KEEP_ACCIDENT_TERM": 47,
+        "L1_KEEP_CONTRACT_TERM": 10,
+        "L1_DROP_RUBRIC_OUT": 1062,
+        "L1_KEEP_RUBRIC": 859,
+        "L1_KEEP_RUBRIC_MISSING": 19
+      },
+      "recall": {
+        "all_labelled_total": 82,
+        "all_labelled_kept": 82,
+        "q3_2025_summaries_total": 23,
+        "q3_2025_summaries_kept": 23,
+        "summary_exports_total": 55,
+        "summary_exports_kept": 55,
+        "suva_list_total": 59,
+        "suva_list_kept": 59
+      },
+      "by_population": {
+        "2025Q4_decision": {
+          "rulings": 1931,
+          "kept": 295
+        },
+        "2026Q1_decision": {
+          "rulings": 2005,
+          "kept": 339
+        },
+        "2026Q2_decision": {
+          "rulings": 2096,
+          "kept": 278
+        },
+        "2026Q2_publication": {
+          "rulings": 2060,
+          "kept": 312
+        },
+        "2026Q2_union": {
+          "rulings": 2677,
+          "kept": 383
+        },
+        "suva_reference": {
+          "rulings": 23,
+          "kept": 23
+        }
+      }
+    }
+  ],
+  "scope_changes": {
+    "out_of_scope->potentially": 4
+  }
+}
