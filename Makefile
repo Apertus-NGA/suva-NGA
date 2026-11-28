@@ -6,9 +6,9 @@
 PY ?= $(if $(shell command -v uv 2>/dev/null),uv run --frozen python,python3)
 MODE ?= replay
 SERVE ?= 1
-SUMMARY_LIMIT ?= 5
+SUMMARY_LIMIT ?=
 ARGS ?=
-RUN_FLAGS = --summary-limit $(SUMMARY_LIMIT) $(if $(filter 0,$(SERVE)),--no-serve,)
+RUN_FLAGS = $(if $(SUMMARY_LIMIT),--summary-limit $(SUMMARY_LIMIT),) $(if $(filter 0,$(SERVE)),--no-serve,)
 
 WRITE ?= 0
 
@@ -17,7 +17,7 @@ WRITE ?= 0
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
-run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, triage, top SUMMARY_LIMIT (5) summaries, serve; SERVE=0 stops before serving
+run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, triage, top SUMMARY_LIMIT (default 5) summaries, serve; SERVE=0 stops before serving
 	$(PY) -m src.cli run --mode $(MODE) $(RUN_FLAGS) $(ARGS)
 
 run-live: ## the same, LIVE (needs LLM_*); ARGS="--limit N": smoke, triage of the first N rulings not written, N summaries; ARGS="--all": full triage written
