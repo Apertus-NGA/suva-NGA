@@ -1,0 +1,15 @@
+{
+  "set": "iterate",
+  "rulings": 12,
+  "rulings_with_matched_fiche": 11,
+  "sentences_median": 142.5,
+  "candidates_median": 76.0,
+  "suva_sentences_matched": 77,
+  "suva_sentences_kept_by_filter": 74,
+  "filter_keeps": 0.961,
+  "lost_by_reason": {
+    "operative": 1,
+    "reported": 2
+  },
+  "match_rate": 0.733
+}
