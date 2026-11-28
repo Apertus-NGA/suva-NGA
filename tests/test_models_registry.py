@@ -23,11 +23,15 @@ MODEL_ID = re.compile(
 )
 
 
+# Installed or built third-party files, not our code (src/web/node_modules, src/web/dist).
+SKIPPED_DIRS = {"__pycache__", "node_modules", "dist"}
+
+
 def scanned_files(root: Path = ROOT) -> list[Path]:
     files = [root / n for n in ("Makefile", "Dockerfile", "docker-compose.yml", ".env.example")]
     for d in ("src", "eval", "prompts"):
         if (root / d).is_dir():
-            files += [p for p in (root / d).rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+            files += [p for p in (root / d).rglob("*") if p.is_file() and not SKIPPED_DIRS & set(p.parts)]
     return [f for f in files if f.is_file()]
 
 
