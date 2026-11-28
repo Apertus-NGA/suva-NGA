@@ -1,0 +1,233 @@
+{
+  "step": "verify",
+  "doc": "docs/LAYER3.md. The engine checks every sentence it keeps (Sentence.checks); the writer stores one summ.verification_check per claim and check code, with the rule V3_<CODE>, and per removed sentence one text-level fail per failed code, or one V3_ENTAILMENT row (not_applicable when no check failed, fail when the engine named none). A version is immutable (D-064).",
+  "config_schema": {
+    "schema_code": "verify.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: the ten engine check codes, the rule prefix, the entailment threshold, one repair, how a removed sentence is recorded."
+  },
+  "rule_schema": {
+    "schema_code": "verify.rule",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: the engine check code a rule stores, its target, its source."
+  },
+  "rules": [
+    {
+      "rule_code": "V3_LANGUAGE",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "language",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence is written in its fiche's language.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_PLACEHOLDER",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "placeholder",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence holds no placeholder or template residue.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_NEW_IDENTIFIER",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "new_identifier",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence holds no article, docket, date or reference that is not in the ruling (G1).",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_MODAL_STRENGTH",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "modal_strength",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence keeps the ruling's modal strength (must, may, can).",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_GLOSSARY_TERM",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "glossary_term",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence uses the required glossary term of its language.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_SUVA_NAMED",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "suva_named",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "Suva is named only when the ruling names it.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_OUTCOME_RESTATED",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "outcome_restated",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence does not restate the outcome that code adds once.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_SPEAKER",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "speaker",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence attributes the statement to the right speaker (court, lower court, a party, an expert).",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_ENTAILMENT",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "entailment",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The ruling sentence it rests on entails it (P(Ja) at or above entailment_min), after at most one repair.",
+      "changelog": "Initial (D-094)."
+    },
+    {
+      "rule_code": "V3_DUPLICATE",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "check",
+      "definition": {
+        "check": "duplicate",
+        "target": "claim",
+        "source": "engine_sentence_checks"
+      },
+      "description": "The sentence is not a near-duplicate of another kept sentence.",
+      "changelog": "Initial (D-094)."
+    }
+  ],
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "v3 sentence checks",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "checks": [
+          "language",
+          "placeholder",
+          "new_identifier",
+          "modal_strength",
+          "glossary_term",
+          "suva_named",
+          "outcome_restated",
+          "speaker",
+          "entailment",
+          "duplicate"
+        ],
+        "rule_prefix": "V3_",
+        "entailment_min": 0.9,
+        "repair_attempts": 1,
+        "removed_sentence": "text_check_per_failed_code",
+        "fallback_rule_for_removed": "V3_ENTAILMENT"
+      },
+      "rules": [
+        "V3_LANGUAGE",
+        "V3_PLACEHOLDER",
+        "V3_NEW_IDENTIFIER",
+        "V3_MODAL_STRENGTH",
+        "V3_GLOSSARY_TERM",
+        "V3_SUVA_NAMED",
+        "V3_OUTCOME_RESTATED",
+        "V3_SPEAKER",
+        "V3_ENTAILMENT",
+        "V3_DUPLICATE"
+      ],
+      "models": {
+        "judge": "apertus-v1-5-70b"
+      },
+      "decision": "D-094",
+      "validation": null,
+      "changelog": "Initial (D-094): one rule per engine check code. A kept sentence is a claim, verified when no check failed; a removed sentence is a text-level fail per failed code (V3_ENTAILMENT not_applicable when the engine read its checks and none failed, fail when it named no check)."
+    }
+  ]
+}

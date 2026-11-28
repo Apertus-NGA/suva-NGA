@@ -1,29 +1,28 @@
-"""Write a Suva fiche in German and in French, each on its own.
+"""Write a Suva fiche in German and in French, each on its own: prompts, the checker and the model call.
 
-Reads the local cache data/cache. Writes nothing to Hugging Face.
+Ported from the summary owner's branch `summarize/v3` @ a4a1504 (its runner, pipeline.py, is not ported: the
+engine is src/summarize/engine.py, the writer into summ.* is src/layer3/). Two changes from the branch: `load_env`
+reads `.env.local` / `.env` with src/cli.py's reader (the branch used a package main does not have), and the
+cache readers of main's trial script (`load_tables`, `row_for`, `gold_body`) stay for src/summarize/tally.py.
 The key stays in .env and is never printed.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 import re
 import sys
 from pathlib import Path
 
 if __package__:
-    from .prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from .prompts import VERSION, glossary_block, sigil_hint, sigils, system_prompt
 else:
-    from prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from prompts import VERSION, glossary_block, sigil_hint, sigils, system_prompt
 
 ROOT = Path(__file__).resolve().parents[2]
-CACHE = ROOT / "data" / "cache"
+CACHE = ROOT / "data" / "cache"  # main's legacy parquet cache, read by tally.py only
 # Tone only: one short fiche (remand) and one dismissal.
 # The text of those rulings is not put in the prompt: it leaked into the outcome.
 FEW_SHOT = ("8C_177/2025", "8C_224/2025")
-EXCLUDED = frozenset({"8C_21/2025", "8C_44/2025", "8C_455/2025"})
 ORDER_MARKERS = (
     "Demnach erkennt das Bundesgericht",
     "Par ces motifs, le Tribunal fédéral prononce",
@@ -31,25 +30,13 @@ ORDER_MARKERS = (
 )
 
 
-def _gate(docket: str, area: object, text: str, title: object = None):
-    """The script is launched from src/summarize: courts.py lives in src/."""
-    src = str(ROOT / "src")
-    if src not in sys.path:
-        sys.path.insert(0, src)
-    from courts import area_for_gate, decide
-
-    filled = area_for_gate(area, title)
-    return decide(docket, filled, text), filled
-
-
 def load_env() -> None:
-    env_path = ROOT / ".env"
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    """Put the settings of `.env.local` / `.env` (when present) into the environment; never override it."""
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from src.cli import load_dotenv
+
+    load_dotenv()
 
 
 def clean(text: str) -> str:
@@ -322,12 +309,16 @@ def repair_prompt(
     )
 
 
-def chat(messages: list[dict]) -> str:
+def chat(messages: list[dict], mode: str = "live", store_dir: Path | None = None) -> str:
+    """One call through the shared client. `mode="replay"` answers from its replay cache (D-032) and raises
+    `ReplayMiss` for a request never answered live; it never reaches the gateway. `store_dir` is the client's
+    store (default: data/derived/llm)."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
+    from src.llm import client as llm
     from src.llm.client import LLMError, client_from_env
 
-    client = client_from_env("live")
+    client = client_from_env(mode, store_dir or llm.DEFAULT_STORE)
     try:
         return client.chat(messages, max_tokens=1200, prompt_version=VERSION).content
     except LLMError as exc:
@@ -337,6 +328,7 @@ def chat(messages: list[dict]) -> str:
 
 
 def load_tables():
+    """main's legacy parquet cache (data/cache), for tally.py; the engine never reads it."""
     import pandas as pd
 
     rulings_path = CACHE / "rulings.parquet"
@@ -427,10 +419,6 @@ def outcome_of(order: str) -> str:
     if "gutgeheissen" in low or "admis" in low or "accolto" in low:
         return "admitted"
     return ""
-
-
-def _tail(text: str) -> str:
-    return text.strip()[-280:].lower()
 
 
 def _article_in_source(number: str, law: str, source: str) -> bool:
@@ -676,91 +664,29 @@ def _critical(language: str, text: str, source: str, docket: str) -> list[str]:
     return [item for item in blocking(language, text, source) if item.startswith("critique")]
 
 
-def summarize(docket: str) -> dict:
-    rulings, gold = load_tables()
-    target = row_for(rulings, docket)
-    if docket in FEW_SHOT or docket in EXCLUDED:
-        raise SystemExit(f"{docket} is a few-shot example or is excluded from it")
-    decision, filled = _gate(target["docket"], target["area"], target["text"], target["title"])
-    if not decision.kept:
-        raise SystemExit(
-            f"{docket} does not pass the filter ({target['division']}, {filled}, {decision.subject}, {decision.text})"
-        )
-    category = category_of(filled if isinstance(filled, str) else None)
-    out = {
-        "docket": docket,
-        "model": os.environ["LLM_NAME"],
-        "filter": {"kept": decision.kept, "subject": decision.subject, "text": decision.text},
-        "prompt": VERSION,
-        "category": category,
-        "languages": {},
-    }
-    for language in ("de", "fr"):
-        examples = [{"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT]
-        text = chat(
+def write_fiche(language: str, target: dict, examples: list[dict], category: str, ask=None) -> tuple[str, list[str]]:
+    """One fiche in one language: generate, let the checker ask for up to two repairs, return (text, problems).
+
+    `target` is {"docket", "decision_date", "division", "area", "text"}; `examples` are [{"docket", "body"}].
+    `ask` sends the messages to the model and returns its text (default: `chat`, the gateway client).
+    The prompt is the one of the ruling's matter (`category`), in the fiche's language.
+    """
+    ask = ask or chat
+    system = system_prompt(language, category)
+    user = user_prompt(language, examples, target, category)
+    text = ask([{"role": "system", "content": system}, {"role": "user", "content": user}])
+    forms = required_forms(language, target["text"])
+    sense = directions(language, target["text"])
+    for _ in range(2):
+        issue = _critical(language, text, target["text"], target["docket"])
+        if not issue:
+            break
+        revised = ask(
             [
-                {"role": "system", "content": system_prompt(language, category)},
-                {"role": "user", "content": user_prompt(language, examples, target, category)},
+                {"role": "system", "content": system},
+                {"role": "user", "content": repair_prompt(language, text, forms, issue, sense, category)},
             ]
         )
-        forms = required_forms(language, target["text"])
-        sense = directions(language, target["text"])
-        for _ in range(2):
-            issue = _critical(language, text, target["text"], docket)
-            if not issue:
-                break
-            revised = chat(
-                [
-                    {"role": "system", "content": system_prompt(language, category)},
-                    {
-                        "role": "user",
-                        "content": repair_prompt(language, text, forms, issue, sense, category),
-                    },
-                ]
-            )
-            revised_issue = _critical(language, revised, target["text"], docket)
-            if len(revised_issue) < len(issue):
-                text = revised
-        issue = review(language, text, target["text"], docket)
-        out["languages"][language] = {
-            "generated": text,
-            "gold": gold_body(gold, docket, language),
-            "problems": issue,
-        }
-        print(f"{language} {len(text)} characters {issue or 'ok'}", flush=True)
-    return out
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("dockets", nargs="*")
-    args = parser.parse_args()
-    load_env()
-    dockets = args.dockets or ["8C_78/2025"]
-    failed: list[str] = []
-    dest = ROOT / "data" / "trial"
-    dest.mkdir(parents=True, exist_ok=True)
-    for index, docket in enumerate(dockets, start=1):
-        path = dest / (docket.replace("/", "_") + ".json")
-        if path.exists():
-            print(f"{index}/{len(dockets)} {docket} already written", flush=True)
-            continue
-        print(f"{index}/{len(dockets)} {docket}", flush=True)
-        try:
-            result = summarize(docket)
-        except (SystemExit, TimeoutError) as exc:
-            failed.append(f"{docket}: {exc}")
-            print(f"failed {docket}: {exc}", flush=True)
-            continue
-        path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(path, flush=True)
-        for language, payload in result["languages"].items():
-            critical = [item for item in payload["problems"] if str(item).startswith("critique")]
-            if critical:
-                failed.append(f"{docket} {language}: {', '.join(critical)}")
-    if failed:
-        raise SystemExit(" ; ".join(failed))
-
-
-if __name__ == "__main__":
-    main()
+        if len(_critical(language, revised, target["text"], target["docket"])) < len(issue):
+            text = revised
+    return text, review(language, text, target["text"], target["docket"])

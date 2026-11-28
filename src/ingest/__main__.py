@@ -1,6 +1,7 @@
 """Ingest commands (docs/DB_DDL_PLANNING.md §8). Needs DATABASE_URL; runs as DB_PIPELINE_ROLE (src.db.pg).
 
-python -m src.ingest registry               load step versions, rules and profiles (src/*/registry, src/db/seed)
+python -m src.ingest registry               load step versions, rules, preset versions and profiles
+                                            (src/*/registry, src/layer3/registry/presets, src/db/seed)
 python -m src.ingest base --parquet PATH    the HF base dataset (pinned voilaj/swiss-caselaw data/bger.parquet);
                                             every row of the file loaded or excluded with its reason (F-04)
 python -m src.ingest gold                   Suva's labels from judgements/ (columns A-B, export links; D-051)
@@ -25,6 +26,8 @@ from src.ingest.hf_base import load_base
 from src.ingest.models import IngestConfig
 from src.layer1.models import Layer1Config, RuleDefinition
 from src.layer2.models import Layer2Config
+from src.layer3.models import SegmentConfig, SummariseConfig, VerifyConfig, VerifyRuleDefinition, engine_code_paths
+from src.layer3.presets import load_presets
 
 REGISTRIES = (
     ("src/ingest/registry/ingest.json", IngestConfig, None, ("src/ingest/hf_base.py", "src/ingest/models.py")),
@@ -40,6 +43,20 @@ REGISTRIES = (
         None,
         ("src/layer2/engine.py", "src/layer2/models.py"),
     ),
+    ("src/layer3/registry/segment.json", SegmentConfig, None, ("src/layer3/models.py", "src/layer3/segment.py")),
+    (
+        "src/layer3/registry/summarise.json",
+        SummariseConfig,
+        None,
+        ("src/layer3/models.py", "src/layer3/render.py", "src/layer3/store.py", "src/summarize/engine_types.py")
+        + engine_code_paths(),  # the engine's import closure, where its prompts live (F-09)
+    ),
+    (
+        "src/layer3/registry/verify.json",
+        VerifyConfig,
+        VerifyRuleDefinition,
+        ("src/layer3/models.py", "src/layer3/render.py"),
+    ),
 )
 
 
@@ -50,6 +67,7 @@ def load_registries(conn) -> list[str]:
         versions = load_step_registry(conn, ROOT / path, config_model, rule_model, code)
         loaded += [f"{path}: " + ", ".join("V{}.{}.{}".format(*v) for v in versions)]
         bind_resources(conn, ROOT / path)  # models and prompts a version declares (layer2_judge), next to it
+    loaded += load_presets(conn)  # summ.preset_version of the seeded presets (suva_house), layer 3
     loaded += load_profiles(conn, ROOT / "src" / "db" / "seed" / "profiles.json")
     return loaded
 

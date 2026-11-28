@@ -1,0 +1,37 @@
+{
+  "step": "segment",
+  "doc": "docs/LAYER3.md; docs/DB_DDL_PLANNING.md §8.3. The own splitter V0: consideration headings found by code in the ruling text, the rules of the v3 engine's evidence passages. Never primary (D-070 criteria not measured). A version is immutable (D-064).",
+  "config_schema": {
+    "schema_code": "segment.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: method, where the heading rules come from, minimum citable depth, offsets, never primary."
+  },
+  "rules": [],
+  "versions": [
+    {
+      "version": [
+        0,
+        1,
+        0
+      ],
+      "name": "Own splitter V0: v3 evidence headings",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "method": "own_splitter",
+        "heading_rules": "summarize/v3@a4a1504 src/summarize/refine/evidence.py (_REASONS, _OPERATIVE, _NUMBER, _follows)",
+        "min_citable_depth": 1,
+        "locate_offsets": true,
+        "becomes_primary": false
+      },
+      "rules": [],
+      "decision": "D-094",
+      "validation": null,
+      "changelog": "Initial (D-094): numbered consideration headings after the reasoning heading and before the operative part, a number kept only when it continues the numbering (2.1 -> 2.2, 2.1.1 or 3). status ok when considerations are found, failed with none. Draft (V0.x): not measured against structure.parquet."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "preset": "suva_house",
+  "doc": "docs/LAYER3.md; docs/DB_DDL_PLANNING.md §13.2-§13.4. The mandatory preset (anchor 5, style by ruling language). Its versions live in summ.preset_version, config validated against the preset_config schema; a version is immutable (D-064).",
+  "config_schema": {
+    "schema_code": "preset.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: perspective, style, writer, the language pair, title line templates and the matter policy."
+  },
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "perspective": 5,
+        "style": "by_ruling_language",
+        "writer": "v3",
+        "languages": [
+          "de",
+          "fr"
+        ],
+        "title": {
+          "de": "BGer-Urteil {docket} vom {date}",
+          "fr": "Arrêt du TF {docket} du {date}"
+        },
+        "title_matter": "ruling_language_only"
+      },
+      "decision": "D-094",
+      "changelog": "Initial (D-094): anchor 5, style by the ruling's language (Q-30), written by the v3 engine; title line rendered by code from docket and decision date (DB plan §13.1), the matter appended only in the ruling's language."
+    }
+  ]
+}

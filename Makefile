@@ -80,6 +80,13 @@ layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 layer2: ## layer 2 on layer 1's candidates (MODE=replay|live; ARGS="--limit N|--all --population CODE --store DIR")
 	$(PY) -m src.layer2 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
 
+.PHONY: layer3 layer3-requests
+layer3: ## layer 3: summaries of the top 10 by layer-2 score + pending requests (MODE=replay|live; ARGS="--limit N --population CODE --dockets D ...")
+	$(PY) -m src.layer3 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
+layer3-requests: ## layer 3: the pending summary requests of the UI only (ops.user_request, MODE=replay|live)
+	$(PY) -m src.layer3 requests --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
 layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune)
 	$(PY) -m src.layer2 validate --data-root data/derived/finetune/suva-ft-v3 --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json --bench data/derived/finetune/bench_v3/8b_all $(ARGS)
 
