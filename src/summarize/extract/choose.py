@@ -11,13 +11,14 @@ holds no sentence of any ruling or of Suva's fiches, so nothing measured can lea
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from src.summarize.extract import candidates as cand
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 
-VERSION = "choose@6"
+VERSION = "choose@8"
 MIN, MAX = 5, 12  # what the prompt asks for
 MIN_VALID = 3  # what code accepts ("fewer for a simple ruling")
 MAX_PASSAGES = 4
@@ -78,6 +79,7 @@ class Choice:
     offered: int
     dropped: dict[str, int]
     scores: dict[str, float] | None = None
+    notes: list[str] | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -86,6 +88,7 @@ class Choice:
             "offered": self.offered,
             "dropped": self.dropped,
             "scores": {k: round(v, 3) for k, v in (self.scores or {}).items()},
+            "notes": self.notes or [],
             "chosen": [{"id": c.id, "label": c.label, "role": role, "text": c.text} for c, role in self.chosen],
         }
 
@@ -144,6 +147,48 @@ def top(scores: dict[str, float]) -> list[str]:
     return [label for n, label in enumerate(ordered[:MAX_RANKED]) if n < TOP or scores[label] >= SURE]
 
 
+# A sentence that opens by pointing back ("Dieser Betrag", "Cette condition", "Ceux-ci") needs the sentence before
+# it. Suva's fiches take runs of consecutive sentences of one consideration (iterate set, 28 Nov), so code adds the
+# ruling's previous sentence, or leaves the sentence out when that one is not a candidate.
+_POINTS_BACK = re.compile(
+    r"^(?:Dies(?:e[rsnm]?)?|Derartige|Solche[rsnm]?|Jene[rsnm]?|Ce|Cet|Cette|Ces|Celui-ci|Celle-ci|Ceux-ci|Celles-ci"
+    r"|Cela|Ceci|Tel(?:le)?s?|Questo|Questa|Questi|Queste|Tale|Tali|Ciò)\b"
+)
+
+
+def complete(found: cand.Candidates, chosen: list[tuple[cand.Candidate, str]]) -> tuple[list, list[str]]:
+    """The choice with every sentence that points back preceded by its antecedent; notes on what code did."""
+    position = {c.id: n for n, c in enumerate(found.kept)}
+    ids = {c.id for c, _ in chosen}
+    out, notes = [], []
+    for c, role in chosen:
+        if _POINTS_BACK.match(c.text):
+            n = position[c.id]
+            before = found.kept[n - 1] if n > 0 else None
+            if before is None or before.label != c.label:
+                notes.append(f"{c.id} left out: it points back and its antecedent is not a candidate")
+                continue
+            if before.id not in ids:
+                out.append((before, role))
+                ids.add(before.id)
+                notes.append(f"{before.id} added: {c.id} points back to it")
+        out.append((c, role))
+    out.sort(key=lambda item: position[item[0].id])
+    return out, notes
+
+
+def consensus(first: list, second: list, scores: dict[str, float]) -> list:
+    """Two readings of the same choice, as many sentences as the larger one: first what both picked, then the
+    others by the reading of their consideration (choose@7 kept only the agreement: a median of 4 sentences, and
+    consideration recall fell from 0.45 to 0.32 on the iterate set). The court's order is restored later."""
+    both = {c.id for c, _ in first} & {c.id for c, _ in second}
+    pool: dict[str, tuple] = {}
+    for c, role in [*first, *second]:
+        pool.setdefault(c.id, (c, role))
+    ranked = sorted(pool.values(), key=lambda item: (item[0].id not in both, -scores.get(item[0].label, 0.0)))
+    return ranked[: max(len(first), len(second))]
+
+
 def choose(text: str, model: Model, passages: str = "rank") -> Choice:
     found = cand.candidates(text)
     if len(found.kept) < MIN:
@@ -170,10 +215,24 @@ def choose(text: str, model: Model, passages: str = "rank") -> Choice:
     shape = obj({"a_chosen": array(obj({"a_id": enum(ids), "b_role": enum(ROLES)}), MAX + 4)})
     prompt = SENTENCES.format(point=evidence.as_data(point), ruling=lines(found, labels), digest=DIGEST, min=MIN,
                               max=MAX)  # fmt: skip
-    for attempt in range(2):
-        answer = model.ask([system, {"role": "user", "content": prompt}], "choose", shape,
-                           f"{VERSION}/sentences/{attempt}", max_tokens=500)  # fmt: skip
-        chosen = _order(found, answer["a_chosen"], allowed)
-        if len(chosen) >= min(MIN_VALID, len(allowed)):
-            return Choice(point, tuple(chosen), len(found.kept), found.reasons(), scores)
-    raise ModelFailed(f"fewer than {MIN_VALID} valid sentence ids, twice")
+    readings = []
+    # Two readings: the passages in the ruling's order, then best-ranked first (the same sentences, shown in
+    # another order: a choice that depends on the order it was shown in is not a stable one).
+    by_score = sorted(labels - {"facts"}, key=lambda label: -scores.get(label, 0.0)) + ["facts"]
+    for tag, order in (("court", None), ("ranked", by_score)):
+        text_ = lines(found, labels) if order is None else "\n".join(lines(found, {label}) for label in order)
+        prompt = SENTENCES.format(point=evidence.as_data(point), ruling=text_, digest=DIGEST, min=MIN, max=MAX)
+        for attempt in range(2):
+            answer = model.ask([system, {"role": "user", "content": prompt}], "choose", shape,
+                               f"{VERSION}/sentences/{tag}/{attempt}", max_tokens=500)  # fmt: skip
+            chosen = _order(found, answer["a_chosen"], allowed)
+            if len(chosen) >= min(MIN_VALID, len(allowed)):
+                readings.append(chosen)
+                break
+        if passages != "rank":
+            break  # the list mode has no ranking to vary
+    if not readings:
+        raise ModelFailed(f"fewer than {MIN_VALID} valid sentence ids, twice")
+    chosen = consensus(readings[0], readings[1], scores) if len(readings) == 2 else readings[0]
+    chosen, notes = complete(found, chosen[:MAX])
+    return Choice(point, tuple(chosen), len(found.kept), found.reasons(), scores, notes)

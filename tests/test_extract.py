@@ -78,6 +78,9 @@ def test_choose_ranks_considerations_offers_only_their_sentences_and_restores_th
             {"a_id": by_label["E.2.1"], "b_role": "rule"},
             {"a_id": by_label["E.2.1"], "b_role": "condition"},  # a repeat is dropped
             {"a_id": by_label["facts"], "b_role": "fact"},
+        ]}, {"a_chosen": [  # the second reading (passages best-ranked first) agrees
+            {"a_id": by_label["E.2.1"], "b_role": "rule"}, {"a_id": by_label["E.3"], "b_role": "holding"},
+            {"a_id": by_label["facts"], "b_role": "fact"},
         ]}],
     })  # fmt: skip
     choice = choose.choose(RULING, model_for(fake))
@@ -87,6 +90,25 @@ def test_choose_ranks_considerations_offers_only_their_sentences_and_restores_th
     assert "[E.2.1]" in sentences_prompt and "[facts]" in sentences_prompt
     assert "Die Beschwerde ist zulässig" not in sentences_prompt  # admissibility never reaches the model
     assert "[article]" in sentences_prompt  # code's hints are shown
+
+
+def test_the_two_readings_keep_what_both_chose_and_the_best_considerations_sentences():
+    a, b, c, d = (cand.Candidate(f"S{n}", label, f"Satz {n} mit genug Wörtern für einen Kandidaten.") for n, label in
+                  ((1, "E.2"), (2, "E.3"), (3, "E.3"), (4, "E.4")))  # fmt: skip
+    first, second = [(a, "rule"), (b, "rule"), (d, "holding")], [(a, "rule"), (c, "rule"), (d, "holding")]
+    kept = choose.consensus(first, second, {"E.2": 0.2, "E.3": 0.9, "E.4": 0.5})
+    assert [x.id for x, _ in kept] == ["S4", "S1", "S2"]  # both picked S4, S1 (by score), then the best consideration's
+
+
+def test_a_sentence_that_points_back_brings_its_antecedent_or_is_left_out():
+    rule = cand.Candidate("S1", "E.4", "Das Invalideneinkommen bemisst sich nach den Tabellenlöhnen der LSE.")
+    back = cand.Candidate("S2", "E.4", "Dieser Betrag ist als Invalideneinkommen anzurechnen.")
+    alone = cand.Candidate("S3", "E.5", "Diese Voraussetzung ist hier erfüllt, wie die Vorinstanz zutreffend festhält.")
+    found = cand.Candidates((rule, back, alone), ())
+    chosen, notes = choose.complete(found, [(back, "rule"), (alone, "application")])
+    assert [c.id for c, _ in chosen] == ["S1", "S2"]
+    assert notes == ["S1 added: S2 points back to it",
+                     "S3 left out: it points back and its antecedent is not a candidate"]  # fmt: skip
 
 
 def test_top_takes_the_best_considerations_by_reading():
