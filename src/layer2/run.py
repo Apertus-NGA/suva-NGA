@@ -41,7 +41,7 @@ from src.layer2.engine import (
     score_0_100,
 )
 from src.layer2.models import Layer2Config, Layer2JudgementRecord, Prompt, Reading
-from src.llm.client import DEFAULT_STORE, InputRejected, LLMClient, LLMError, ReplayMiss
+from src.llm.client import DEFAULT_STORE, SHIPPED_STORE, InputRejected, LLMClient, LLMError, ReplayMiss
 from src.llm.config import LLMConfig
 from src.llm.served_model import ServedModelError, canonical
 
@@ -198,11 +198,23 @@ def candidates(cur: psycopg.Cursor, layer1_run: str, populations: list[str] | No
     return [Candidate(*row) for row in cur.fetchall()]
 
 
+def _shipped(store: Path) -> Path | None:
+    """The read-only store shipped with the repo, looked up after the default store (as client_from_env does)."""
+    return SHIPPED_STORE if store == DEFAULT_STORE else None
+
+
+def _stores(store: Path) -> list[Path]:
+    shipped = _shipped(store)
+    return [store, *([shipped] if shipped else [])]
+
+
 def resolve_model(cfg: LLMConfig, judge: str, store: Path) -> Resolution:
     """Which client size carries the declared judge. `small` first: the D-074 benchmark sent the 8B as the small
     model, and the size is part of the cache key. No match: LLM_NAME is used and the override recorded (D-064)."""
     names: dict[str, str | None] = {"small": cfg.name_small, "large": cfg.name}
-    replay_models = store / "replay_models.json"
+    # the shipped store (replay/llm) carries the replay model names when the default store has none (D-106)
+    found = [p for p in _stores(store) if (p / "replay_models.json").is_file()]
+    replay_models = (found[0] if found else store) / "replay_models.json"
     if cfg.mode == "replay" and replay_models.is_file():
         known = json.loads(replay_models.read_text(encoding="utf-8"))
         names = {size: names[size] or known.get(size) for size in names}
@@ -743,7 +755,12 @@ def run_layer2(
         raise LookupError(f"layer-1 run {l1_run} has no candidate{where}")
     collector = _Attempts()
     if client is None:
-        client = LLMClient(LLMConfig.from_env(mode), store_dir=store, observer=collector)  # type: ignore[arg-type]
+        client = LLMClient(  # answers from the store, then the shipped store read-only; logs go to the store (D-106)
+            LLMConfig.from_env(mode),
+            store_dir=store,
+            shipped_dir=_shipped(store),
+            observer=collector,  # type: ignore[arg-type]
+        )
     else:
         client.observer = collector
     res = resolve_model(client.cfg, v.judge_model, client.store_dir)

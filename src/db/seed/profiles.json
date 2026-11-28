@@ -244,6 +244,43 @@
               0
             ]
           }
+        },
+        {
+          "version": [
+            0,
+            2,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            1,
+            0
+          ],
+          "decision": "D-105",
+          "changelog": "layer2_judge V2.1.0 (the scorer refit on the published dataset) replaces V2.0.0; ingest, layer1_filter and ranking unchanged (D-105).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              2,
+              1,
+              0
+            ],
+            "ranking": [
+              1,
+              0,
+              0
+            ]
+          }
         }
       ]
     },

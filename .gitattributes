@@ -10,3 +10,5 @@ judgements/** -text
 *.parquet binary
 *.png binary
 *.jpg binary
+# bger.ch Neuheiten pages kept byte for byte as published in the source dataset (D-106: their SHA-256 is provenance)
+replay/bger_neuheiten/*.html -text
