@@ -18,8 +18,10 @@ jobs:
         run: uv sync --frozen
       - name: make check (lint, unit, doctrine, models registry, template layout, D-051)
         run: make check
-      - name: make run, stages that need no Suva-derived artefact (no key in CI)
-        run: SERVE=0 MODE=replay make run
+      # `make run` now executes its stages; in replay, S2 triage needs the replay cache (data/derived/llm),
+      # which a fresh clone does not have, so it would fail loudly here. CI checks the plan only.
+      - name: make run, plan only (no key and no replay cache in CI)
+        run: SERVE=0 MODE=replay make run ARGS=--dry-run
       # Blocked by D-031 (hard due Fri 22:00): a fresh clone has no data/derived/ and no replay cache,
       # so the full replay of `make run` (T27) cannot run here until D-031 settles what may be committed.
       - name: make run replay with Suva-derived artefacts (blocked by D-031)
