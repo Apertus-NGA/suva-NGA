@@ -20,14 +20,30 @@ reference them here.
 
 ### Target architecture (mandatory)
 
-State which of the three architectures your project is deployable in, and how
-it meets that constraint:
+**Deployable in a), b) and c).** The project is a cluster of containers (`docker-compose.yml`, runbook
+`docs/DEPLOY.md`): PostgreSQL with pgvector, one app image for the loaders, the pipeline jobs and the app, and,
+optionally, Apertus served by vLLM inside the cluster. The same files serve the three targets; only `.env` changes.
 
-- **a) On-premise** — on the organisation's own infrastructure, under its own administration.
-- **b) Air-gapped** — with no external network connection at runtime.
-- **c) Sovereign Swiss cloud** — on a cloud platform operated in Switzerland, under Swiss jurisdiction, with Swiss data residency.
+- **a) On-premise** — `make cluster-env && make cluster-up` on any Docker host (`linux/amd64`, no GPU needed).
+  Apertus is reached through `LLM_BASE_URL`: the CSCS / Keera gateway or the organisation's own endpoint.
+- **b) Air-gapped** — the images (`docker save`), the pinned base dataset and the Apertus weights are carried in.
+  The `sovereign` profile serves Apertus on a local GPU with vLLM. The database and the model sit on an internal
+  network with no route out; the fetch step checks the carried file by SHA-256 and makes no network call.
+- **c) Sovereign Swiss cloud** — the same containers and a PostgreSQL service on a platform operated in
+  Switzerland, with Apertus served in Switzerland (CSCS).
+- **Transfer to Azure** (bonus) — configuration by environment variables only, one OCI image, standard
+  PostgreSQL; the service mapping is in `docs/DEPLOY.md` §8. Azure is not presented as c).
 
-List any external dependencies, and separate build time from runtime.
+External dependencies:
+
+| | Build time (once, on a connected machine) | Runtime |
+|---|---|---|
+| Images | `python:3.12-slim`, `pgvector/pgvector` (PostgreSQL 17), vLLM for b); all pinned by digest | none |
+| Packages | Debian (`make`, PostgreSQL client); Python packages pinned by `uv.lock` | none |
+| Data | Hugging Face `voilaj/swiss-caselaw`, `data/bger.parquet` at a pinned commit, SHA-256 checked | none |
+| Model | Apertus v1.5 weights, for b) only | the Apertus endpoint `LLM_BASE_URL` (inside the cluster in b) |
+
+No other external service at runtime: no CDN, no telemetry (vLLM usage statistics off), no closed model.
 
 ## 3. Use of Apertus
 
@@ -81,8 +97,16 @@ make check          # lint and tests
 make smoke-llm      # optional: probe the endpoint, writes results/gateway_probe.json
 ```
 
-With Docker instead of a local Python: `docker compose run --rm app make run` (Postgres with pgvector starts
-with it; both images are pinned by digest).
+With Docker instead of a local Python (the cluster, `docs/DEPLOY.md`):
+
+```
+make cluster-env
+make cluster-up
+```
+
+`make cluster-env` generates the database secrets into `.env` (it never overwrites or prints a value).
+`make cluster-up` builds the image, then runs the database, the schema, the base dataset, Suva's labels and
+`make run`. The first run downloads the pinned base dataset once. Images are pinned by digest.
 
 **Live or replayed:** how much of `make run` calls Apertus live is still open (D-032). The working default:
 a small live slice when the `LLM_*` variables are set, recorded answers for the rest, and every output

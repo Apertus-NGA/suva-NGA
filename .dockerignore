@@ -1,13 +1,18 @@
-# Never in the image: secrets, private or Suva-derived data (mounted at runtime instead), caches, git.
+# Never in the image: secrets, private or Suva-derived data (volumes at runtime instead), caches, git.
 .git
 .env
 .env.*
 !.env.example
-data/private
-data/derived
+data
 tmp
+backups
 .venv
 **/__pycache__
 .pytest_cache
 .ruff_cache
 ~$*
+# Not needed at runtime: documentation, experiments, the decks and reports (PDF), the UI sources until the
+# UI is built in the image (docs/DEPLOY.md §6).
+docs
+experiments
+*.pdf

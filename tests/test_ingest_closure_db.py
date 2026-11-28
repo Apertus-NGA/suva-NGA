@@ -199,6 +199,10 @@ def test_the_pipeline_role_can_be_changed_or_disabled_but_never_silently_missing
     with connect(db, actor="test") as conn:
         assert conn.execute("SELECT current_user = session_user").fetchone() == (True,)
     assert "DB_PIPELINE_ROLE is empty" in capsys.readouterr().err
+    monkeypatch.delenv("DB_PIPELINE_ROLE")
+    with connect(db, actor="test", pipeline=False) as conn:  # owner operations (src/db/logins.py): own rights
+        assert conn.execute("SELECT current_user = session_user").fetchone() == (True,)
+    assert "DB_PIPELINE_ROLE" not in capsys.readouterr().err
 
 
 def test_the_registry_keeps_a_version_whose_code_changed_but_never_a_changed_approval(ingested, tmp_path, capsys):

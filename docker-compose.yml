@@ -1,41 +1,309 @@
-# Postgres with pgvector, and the app (docs/agents/platform.md step 9). Images pinned by digest.
-# Usage: docker compose run --rm app make run   (or: docker compose up)
+# Suva case-law monitoring, as a cluster of containers (docs/DEPLOY.md). Images pinned by digest; every
+# setting comes from .env (template: .env.example); no secret and no endpoint in this file (G3, G13).
+#
+#   make cluster-env && make cluster-up                 secrets, then db -> migrate, fetch -> load -> pipeline
+#   docker compose --profile sovereign up -d llm        Apertus served inside the cluster (GPU host, air-gapped)
+#   docker compose --profile ops run --rm backup        pg_dump into the backups volume
+#   docker compose --profile ui up -d app               the API and the UI (after layer 3; `make serve` is a stub)
+#
+# Networks: `backend` is internal (no route out): the database and the local model live there only.
+# `egress` is for the jobs that call the Apertus endpoint (LLM_BASE_URL) or fetch the base dataset.
+name: suva-nga
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# One image for every job, built from the Dockerfile; read-only root file system, no capability, no new
+# privilege, non-root user (uid 10001). Writes go to the volumes only.
+x-app: &app
+  image: ${SUVA_IMAGE:-suva-nga/app:local}
+  build:
+    context: .
+    args:
+      GIT_COMMIT: ${GIT_COMMIT:-}
+      GIT_DIRTY: ${GIT_DIRTY:-1}
+  platform: linux/amd64
+  read_only: true
+  tmpfs:
+    - /tmp:size=512m
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  init: true
+  logging: *logging
+  restart: "no"
+
+# The pipeline login (suva_pipeline, group suva_g_pipeline): least privilege for every job but migrate.
+# libpq reads PGUSER and PGPASSWORD, so no password is ever written into a URL.
+x-pipeline-db: &pipeline-db
+  DATABASE_URL: postgresql://db:5432/suva
+  PGUSER: suva_pipeline
+  PGPASSWORD: ${SUVA_PIPELINE_PASSWORD:?set SUVA_PIPELINE_PASSWORD in .env (docs/DEPLOY.md §4)}
+
 services:
   db:
     image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
     platform: linux/amd64
+    restart: unless-stopped
     environment:
       POSTGRES_DB: suva
       POSTGRES_USER: suva
-      # Local, internal-only database: no port is published to the host, so no password is stored here.
-      # On a shared host, set POSTGRES_PASSWORD in .env and drop this line.
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (docs/DEPLOY.md §4)}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - max_connections=60
+      - -c
+      - log_min_duration_statement=5000
+      - -c
+      - log_connections=on
+    shm_size: 256mb
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U suva -d suva"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 30
+      start_period: 10s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
+    logging: *logging
 
-  app:
-    build: .
-    platform: linux/amd64
-    env_file:
-      - path: .env
-        required: false
+  # One-shot, as the owner: schema (idempotent), then the passwords of the three logins.
+  migrate:
+    <<: *app
+    command: ["make", "bootstrap"]
     environment:
-      DATABASE_URL: postgresql://suva@db:5432/suva
+      DATABASE_URL: postgresql://db:5432/suva
+      PGUSER: suva
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (docs/DEPLOY.md §4)}
+      SUVA_PIPELINE_PASSWORD: ${SUVA_PIPELINE_PASSWORD:?set SUVA_PIPELINE_PASSWORD in .env (docs/DEPLOY.md §4)}
+      SUVA_API_PASSWORD: ${SUVA_API_PASSWORD:-}
+      SUVA_REPORT_PASSWORD: ${SUVA_REPORT_PASSWORD:-}
+    networks:
+      - backend
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          pids: 512
+
+  # One-shot, as the pipeline login: versions, rules and profiles; the pinned base dataset; Suva's labels.
+  load:
+    <<: *app
+    command: ["make", "load", "PARQUET=/srv/hf/bger.parquet"]
+    environment:
+      <<: *pipeline-db
     volumes:
-      # Suva-derived artefacts stay outside the image and outside git while D-031 is open.
-      - ./data/derived:/app/data/derived
-      - ./results:/app/results
-    command: ["make", "run"]
+      - suva_data:/app/data
+      - suva_results:/app/results
+      - ${HF_BASE_SOURCE:-hf_base}:/srv/hf:ro
+    networks:
+      - backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      fetch:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+          pids: 512
+
+  # One-shot, as the pipeline login: `make run SERVE=0` (layer 1 and its recall today; the next stages as they
+  # land). MODE=replay needs no key; MODE=live needs the three LLM_* variables (G3, D-032).
+  pipeline:
+    <<: *app
+    command: ["make", "run", "SERVE=0"]
+    environment:
+      <<: *pipeline-db
+      MODE: ${MODE:-replay}
+      LLM_NAME: ${LLM_NAME:-}
+      LLM_NAME_SMALL: ${LLM_NAME_SMALL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_CONCURRENCY: ${LLM_CONCURRENCY:-}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-}
+      LLM_MAX_INPUT_TOKENS: ${LLM_MAX_INPUT_TOKENS:-}
+    volumes:
+      - suva_data:/app/data
+      - suva_results:/app/results
+    networks:
+      - backend
+      - egress
+    depends_on:
+      load:
+        condition: service_completed_successfully
+      llm:
+        condition: service_healthy
+        required: false
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          pids: 512
+
+  # One-shot provisioning: the pinned Hugging Face file, checked by SHA-256; skipped (no network) when the volume
+  # already holds it. Air-gapped hosts put the same file in HF_BASE_SOURCE beforehand (docs/DEPLOY.md §5).
+  fetch:
+    <<: *app
+    command: ["make", "fetch-base", "HF_BASE_DIR=/srv/hf"]
+    volumes:
+      - ${HF_BASE_SOURCE:-hf_base}:/srv/hf
+    networks:
+      - egress
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          pids: 512
+
+  # Sovereign inference (profile sovereign): Apertus on vLLM inside the cluster, weights from a local volume,
+  # no network (backend only). Point the jobs at it in .env: LLM_BASE_URL=http://llm:8000/v1 and
+  # LLM_NAME=apertus-v1-5-8b (docs/DEPLOY.md §6). Needs an NVIDIA GPU host; not run in CI.
+  llm:
+    image: vllm/vllm-openai:v0.33.0@sha256:d825baf9ce4b1b6bfc5ecc7b79880c7e6748c65a72d697ce3d47607aafa84c6e
+    profiles: ["sovereign"]
+    platform: linux/amd64
+    restart: unless-stopped
+    command:
+      - --model
+      - /models/${APERTUS_MODEL_DIR:-Apertus-v1.5-8B}
+      - --served-model-name
+      - ${APERTUS_SERVED_NAME:-apertus-v1-5-8b}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --tensor-parallel-size
+      - ${VLLM_TENSOR_PARALLEL:-1}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-65536}
+      - --max-logprobs
+      - "20"
+    environment:
+      # The key the jobs send (LLM_API_KEY); vLLM refuses any other. Set it: an empty key disables the check.
+      VLLM_API_KEY: ${LLM_API_KEY:-}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+    volumes:
+      - ${APERTUS_WEIGHTS_SOURCE:-apertus_weights}:/models:ro
+    ipc: host
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    logging: *logging
+
+  # The API and the UI (profile ui), as the API login. `make serve` is still a stub: the FastAPI app lands with
+  # the UI, after layer 3 (summaries). Bound to localhost; put a TLS reverse proxy in front (docs/DEPLOY.md §4).
+  app:
+    <<: *app
+    profiles: ["ui"]
+    restart: unless-stopped
+    command: ["make", "serve"]
+    environment:
+      DATABASE_URL: postgresql://db:5432/suva
+      PGUSER: suva_api
+      # Empty: the API login has no password (src/db/logins.py) and the app cannot connect. Set it to run the app.
+      PGPASSWORD: ${SUVA_API_PASSWORD:-}
+      MODE: ${MODE:-replay}
+      LLM_NAME: ${LLM_NAME:-}
+      LLM_NAME_SMALL: ${LLM_NAME_SMALL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    volumes:
+      - suva_data:/app/data
+      - suva_results:/app/results
+    networks:
+      - backend
+      - egress
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          pids: 512
+
+  # Backups (profile ops): a custom-format pg_dump per run, as the owner, into the backups volume.
+  backup:
+    image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+    profiles: ["ops"]
+    platform: linux/amd64
+    restart: "no"
+    entrypoint: ["sh", "-c", "pg_dump --format=custom --file=/backups/suva-$$(date -u +%Y%m%dT%H%M%SZ).dump && ls -l /backups | tail -n 3"]
+    environment:
+      PGHOST: db
+      PGDATABASE: suva
+      PGUSER: suva
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (docs/DEPLOY.md §4)}
+    volumes:
+      - ${BACKUP_TARGET:-backups}:/backups
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+networks:
+  backend:
+    internal: true
+  egress: {}
 
 volumes:
   pgdata:
+  suva_data:
+  suva_results:
+  hf_base:
+  apertus_weights:
+  backups:

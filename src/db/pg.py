@@ -48,11 +48,17 @@ def database_url(url: str | None = None) -> str:
     return found
 
 
-def connect(url: str | None = None, *, actor: str = "pipeline", run_id: str | None = None) -> psycopg.Connection:
+def connect(
+    url: str | None = None, *, actor: str = "pipeline", run_id: str | None = None, pipeline: bool = True
+) -> psycopg.Connection:
+    """A session with app.actor set. `pipeline=True` (every step and loader) takes the pipeline role (F-11);
+    `pipeline=False` keeps the login's own rights, for owner operations only (src/db/logins.py sets the login
+    passwords and proves what a login itself may do)."""
     conn = psycopg.connect(database_url(url))
     try:
         set_session(conn, actor=actor, run_id=run_id)
-        set_role(conn)
+        if pipeline:
+            set_role(conn)
     except BaseException:
         conn.close()
         raise
@@ -112,10 +118,14 @@ def sha256_text(text: str) -> str:
 
 
 def git_state() -> tuple[str | None, bool]:
-    """(commit, dirty) of the working tree, or (None, True) outside git."""
+    """(commit, dirty) of the working tree. Outside git (the container image holds no .git), the commit the image
+    was built from (SUVA_GIT_COMMIT, SUVA_GIT_DIRTY: Dockerfile build args); (None, True) when unknown."""
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True)
         status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        return None, True
+        built = os.environ.get("SUVA_GIT_COMMIT", "").strip()
+        if not built:
+            return None, True
+        return built, os.environ.get("SUVA_GIT_DIRTY", "1").strip() != "0"
     return commit.stdout.strip(), bool(status.stdout.strip())
