@@ -1,6 +1,6 @@
 # LAYER2: the Apertus relevance judge on the database
 
-> **Status: V1 in `main` since 28 Nov 2026 (PR #45, branch `triage/layer2-db`); DDL-1, DDL-2 and the replay policy from branch `triage/layer2-ddl` (§4, §7).** Decisions D-075 to D-080 in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Traceability, state and gaps: `docs/LAYER2_TRACEABILITY.md`. Owner: the layer-2 owner (`docs/agents/finetune.md`).
+> **Status: V1 in `main` since 28 Nov 2026 (PR #45, branch `triage/layer2-db`); DDL-1, DDL-2 and the replay policy from branch `triage/layer2-ddl` (§4, §7).** Decisions D-075 to D-080 and D-085, all DECIDED, in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Traceability, state and gaps: `docs/LAYER2_TRACEABILITY.md`. Owner: the layer-2 owner (`docs/agents/finetune.md`).
 
 ## 1. What it does
 

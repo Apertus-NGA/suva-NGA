@@ -488,14 +488,19 @@ Each with SQL tests red on the old DDL (G9), `make db-reset && make db-deploy &&
 
 ## 21. Phase 1: D-lines to record (numbers given at recording; D-075 onward if free)
 
+Recorded on 28 Nov as D-075 to D-080, plus D-085 (replay misses). D-075 was DECIDED at recording; D-076 to D-080 and
+D-085 were DECIDED by the lead on 28 Nov (gate G0). The supersession of the 70B planned below as D-080 is part of the
+recorded D-076; the recorded D-080 is the profile `default` V0.3.0. The table keeps the plan as written, with the
+final status.
+
 | Proposed | Content | Status |
 |---|---|---|
-| D-075 | L2-D01 + L2-D02: layer 2 on the six-schema DB, a scorer that keeps `potentially` | PROPOSED, needs G0 |
-| D-076 | L2-D03 + L2-D04 + L2-D10 + L2-D11: V1.0.0 = D-074 chain byte-identical, 8B judge, prompt file, neutraliser, cut kept and disclosed; 70B = V2.0.0 off by default | PROPOSED |
-| D-077 | L2-D05: `score_raw` = logit, `score_0_100` display; requirement R-1 for ranking | PROPOSED |
-| D-078 | L2-D06 + L2-D07 + L2-D08: candidates, persistence, failures | PROPOSED |
-| D-079 | L2-D09 + L2-D13 + L2-D14: traceability, model resolution, certification | PROPOSED |
-| D-080 | Supersedes in part the S3 line of `docs/ARCHITECTURE.md` and the judge row of `MODELS.md` (70B → 8B for layer 2), with the D-074 evidence | PROPOSED |
+| D-075 | L2-D01 + L2-D02: layer 2 on the six-schema DB, a scorer that keeps `potentially` | DECIDED (D-075) |
+| D-076 | L2-D03 + L2-D04 + L2-D10 + L2-D11: V1.0.0 = D-074 chain byte-identical, 8B judge, prompt file, neutraliser, cut kept and disclosed; 70B = V2.0.0 off by default | DECIDED (D-076) |
+| D-077 | L2-D05: `score_raw` = logit, `score_0_100` display; requirement R-1 for ranking | DECIDED (D-077) |
+| D-078 | L2-D06 + L2-D07 + L2-D08: candidates, persistence, failures | DECIDED (D-078) |
+| D-079 | L2-D09 + L2-D13 + L2-D14: traceability, model resolution, certification | DECIDED (D-079) |
+| D-080 | Supersedes in part the S3 line of `docs/ARCHITECTURE.md` and the judge row of `MODELS.md` (70B → 8B for layer 2), with the D-074 evidence | DECIDED (in D-076) |
 
 Also: L2-D16 is recorded as a while-open line of D-024; FT-Q3's answer stays with D-021.
 
@@ -620,6 +625,6 @@ Both layers are in `main` (PR #44 layer 1, PR #45 layer 2). The layer-1 session 
 | **DDL-2** | `triage.v_scope_pipeline`: outside a release, only `succeeded`/`partial` non-eval runs, and only assessments whose upstream chain reaches the ruling's current layer-1 decision; deterministic tie-break | same test file (failed, aborted, eval ignored; partial counts; stale and rootless judgements ignored); red with the old view. Speed on the dev DB (14,144 assessments): 114 ms (old view 99 ms); two slower forms were measured and rejected: a recursive walk (22 s) and a self-join on a CTE (8 s, re-sorted once per row), replaced by three indexed hops (an upstream is always an earlier step of four) and one window pass |
 | Fixtures | the fixture run is `succeeded` (DDL-2); the layer-2 calls carry their prompt, declared by the layer-2 version (DDL-1) | `tests/sql/_fixtures.sql`; 11/11 SQL test files green |
 
-Recorded as **D-085** (PROPOSED; the lead agreed on 28 Nov, 11:10 CET, as the layer-1 session asked before a number is
+Recorded as **D-085** (DECIDED by the lead on 28 Nov with D-076 to D-080, gate G0; recorded at 11:10 CET, as the layer-1 session asked before a number is
 taken), refining D-078: in replay mode a missing recorded answer is "not judged in this run", not a failure. Also pending with the lead: the Q3/2025 points (audit dossier §11.2).
 
