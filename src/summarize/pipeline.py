@@ -48,6 +48,9 @@ from src.summarize.prompts import category_of  # noqa: E402
 
 PIPELINE_VERSION = "1"
 REFINE_BUDGET = 80  # Apertus calls of refine per ruling: the shared record and both languages
+WRITERS = ("extract", "v2")  # extract: the fiche from the ruling's own sentences (src/summarize/extract); v2: prompt
+EXTRACT_CHOICE_BUDGET = 60  # Apertus calls to read the ruling once (ranking and choice), shared by DE and FR
+EXTRACT_FICHE_BUDGET = 70  # Apertus calls per fiche: one per sentence, its checks, the flow and the polish
 LANGUAGES = ("de", "fr")
 MODES = ("live", "replay")
 CATEGORIES = ("uv", "iv", "kv", "bv", "vvg", "other")
@@ -108,21 +111,65 @@ def lexicon(conn, language: str, target_docket: str) -> str:
     return "\n".join(body for (body,) in rows)
 
 
+def _extract(ruling: dict, category: str, make_model, lexicons: dict[str, str] | None) -> dict:
+    """The extractive fiches {language: fiche}; a language whose fiche failed is missing (the caller falls back to
+    the prompt-written fiche for it, so every ruling gets one)."""
+    from src.summarize import extract
+    from src.summarize.refine.model import ModelFailed
+
+    out: dict = {}
+    try:
+        choice = extract.choose.choose(ruling["text"], make_model(EXTRACT_CHOICE_BUDGET))
+    except ModelFailed as exc:
+        return {"_error": f"choice failed: {exc}"}
+    source = {"text": ruling["text"], "language": ruling.get("language"), "category": category,
+              "starred": ruling.get("starred")}  # fmt: skip
+    for language in LANGUAGES:
+        model = make_model(EXTRACT_FICHE_BUDGET)
+        try:
+            known = {**source, "lexicon": (lexicons or {}).get(language, "")}
+            fiche = extract.write.write_fiche(choice, language, known, model, frame="question")
+        except ModelFailed as exc:
+            out[f"_error_{language}"] = str(exc)
+            continue
+        if not fiche.text.strip() or all(w.status not in ("written", "cleaned") for w in fiche.sentences):
+            out[f"_error_{language}"] = "no sentence was kept"
+            continue
+        out[language] = {"text": fiche.text, "raw": "", "finish_notes": fiche.notes, "writer": "extract",
+                         "extract": {"version": extract.VERSION, "draft": "", "calls": fiche.calls,
+                                     "checks_before": {}, "checks_after": {},
+                                     "trace": extract.as_steps(choice, fiche)}}  # fmt: skip
+    return out
+
+
 def write(
     ruling: dict,
     shots: dict[str, list[dict]],
     ask: Ask | None = None,
     refine_model=None,
     lexicons: dict[str, str] | None = None,
+    extract_model=None,
 ) -> dict:
-    """Both fiches of one ruling, finished, and refined when `refine_model` is given. Nothing is stored here."""
+    """Both fiches of one ruling, finished. With `extract_model` (a function budget -> Model) the extractive writer
+    writes them, and the prompt-written fiche (v2) stands in for a language it could not write; else v2, refined
+    when `refine_model` is given. Nothing is stored here."""
     category = route(ruling["area"])
     result = {"docket": ruling["docket"], "category": category, "languages": {}}
+    extracted = _extract(ruling, category, extract_model, lexicons) if extract_model is not None else {}
+    if extract_model is not None:
+        result["extract_errors"] = {k: v for k, v in extracted.items() if k.startswith("_")}
     record = None
     for language in LANGUAGES:
+        if language in extracted:
+            fiche = extracted[language]
+            fiche["problems"] = summarize.review(
+                language, finish.without_note(fiche["text"]), ruling["text"], ruling["docket"]
+            )
+            result["languages"][language] = fiche
+            continue
         raw, _ = summarize.write_fiche(language, ruling, shots[language], category, ask)
         text, notes = finish.finish(language, raw, ruling["text"], ruling["starred"])
-        fiche = {"text": text, "raw": raw, "finish_notes": notes}
+        fiche = {"text": text, "raw": raw, "finish_notes": notes, "writer": "v2"}
         if refine_model is not None:
             from src.summarize import refine
 
@@ -147,7 +194,7 @@ def _refine_params(result: dict) -> dict | None:
     """What the run stores about refine: per language the draft, the step statuses and the checks."""
     out = {}
     for language, fiche in result["languages"].items():
-        trace = fiche.get("refine")
+        trace = fiche.get("refine") or fiche.get("extract")  # the interface reads both the same way
         if trace:
             out[language] = {
                 "version": trace["version"], "draft": trace["draft"], "calls": trace["calls"],
@@ -173,7 +220,10 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
             "mode": result.get("mode"),
             "problems": {lang: p["problems"] for lang, p in result["languages"].items()},
             "finish_notes": {lang: p["finish_notes"] for lang, p in result["languages"].items()},
+            "writer": {lang: p.get("writer", "v2") for lang, p in result["languages"].items()},
         }
+        if result.get("extract_errors"):
+            params["extract_errors"] = result["extract_errors"]
         if refined := _refine_params(result):
             params["refine"] = refined
         out["run_id"] = conn.execute(
@@ -206,6 +256,15 @@ def refine_on() -> bool:
     return os.environ.get("SUMMARY_REFINE", "0").strip() in ("1", "true", "yes", "on")
 
 
+def writer_from_env() -> str:
+    """SUMMARY_WRITER: "v2" (the library's default, which the pipeline's tests rely on) or "extract" (the v1
+    summaries: set in .env.example, so a deployment writes them)."""
+    value = os.environ.get("SUMMARY_WRITER", "v2").strip().lower() or "v2"
+    if value not in WRITERS:
+        raise ValueError(f"SUMMARY_WRITER must be one of {WRITERS}, got {value!r}")
+    return value
+
+
 def summarise_ruling(
     conn,
     ruling_id: int,
@@ -214,6 +273,7 @@ def summarise_ruling(
     mode: str = "live",
     refine: bool | None = None,
     refine_transport=None,
+    writer: str | None = None,
 ) -> dict:
     """Route, write, finish and store the fiches of one ruling. Returns the result with what was stored.
 
@@ -225,13 +285,17 @@ def summarise_ruling(
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
-    refining = refine if refine is not None else refine_on()
-    if refining and refine_transport is None and ask is not None:
+    writer = writer or writer_from_env()
+    if writer not in WRITERS:
+        raise ValueError(f"writer must be one of {WRITERS}, got {writer!r}")
+    refining = (refine if refine is not None else refine_on()) and writer == "v2"  # extract polishes on its own
+    extracting = writer == "extract"
+    if (refining or extracting) and refine_transport is None and ask is not None:
         raise ValueError("an injected ask needs an injected refine_transport")
     ruling = load_ruling(conn, ruling_id)
     shots = {language: examples(conn, language, ruling["docket"]) for language in LANGUAGES}
-    refine_model = None
-    if refining:
+    refine_model = make_model = None
+    if refining or extracting:
         from src.llm.client import client_from_env
         from src.summarize.refine import Model, gateway
         from src.summarize.refine.model import gateway_labeler
@@ -241,9 +305,19 @@ def summarise_ruling(
             refine_transport, labeler = gateway(client=client), gateway_labeler(client=client)
         else:
             labeler = getattr(refine_transport, "label", None)
-        refine_model = Model(refine_transport, budget=REFINE_BUDGET, labeler=labeler)
-    lexicons = {language: lexicon(conn, language, ruling["docket"]) for language in LANGUAGES} if refine_model else None
-    result = write(ruling, shots, ask or functools.partial(_chat, mode=mode), refine_model, lexicons)
+        if refining:
+            refine_model = Model(refine_transport, budget=REFINE_BUDGET, labeler=labeler)
+        if extracting:
+            transport = refine_transport
+
+            def make_model(budget: int):
+                return Model(transport, budget=budget, labeler=labeler)
+
+    lexicons = (
+        {language: lexicon(conn, language, ruling["docket"]) for language in LANGUAGES}
+        if (refine_model or make_model) else None
+    )  # fmt: skip
+    result = write(ruling, shots, ask or functools.partial(_chat, mode=mode), refine_model, lexicons, make_model)
     result["mode"] = "injected" if ask is not None else mode
     result["stored"] = store(conn, ruling_id, result, model or os.environ.get("LLM_NAME") or "unknown")
     return result
@@ -289,6 +363,7 @@ def main(argv: list[str] | None = None) -> int:
         "--mode", choices=MODES, default="live", help="live: call Apertus; replay: answer from the replay cache only"
     )
     parser.add_argument("--refine", action="store_true", help="refine each fiche step by step (or SUMMARY_REFINE=1)")
+    parser.add_argument("--writer", choices=WRITERS, help="extract (the v1 summaries) or v2 (default: SUMMARY_WRITER)")
     args = parser.parse_args(argv)
 
     from suva_data import db
@@ -314,7 +389,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             continue
         try:
-            result = summarise_ruling(conn, ruling_id, mode=args.mode, refine=args.refine or refine_on())
+            result = summarise_ruling(conn, ruling_id, mode=args.mode, refine=args.refine or refine_on(),
+                                      writer=args.writer)  # fmt: skip
         except (NotSummarisable, ReplayMiss, SystemExit) as e:
             failed += 1
             print(f"  failed: {e}", flush=True)

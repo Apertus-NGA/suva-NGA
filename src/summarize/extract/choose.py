@@ -19,7 +19,7 @@ from src.summarize.extract import profiles
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 
-VERSION = "choose@11"
+VERSION = "choose@10"  # choose@11 (lower court "rarely") lowered recall on iterate: reverted
 MIN, MAX = 5, 12  # what the prompt asks for
 MIN_VALID = 3  # what code accepts ("fewer for a simple ruling")
 MAX_PASSAGES = 4
@@ -70,8 +70,7 @@ Choose {min} to {max} sentences, fewer for a simple ruling. A sentence stays who
 Prefer the court's general statement of the law to its application to one party's argument. Code marks what a
 sentence holds: [lower court] (the court reports the lower court's reasoning), [article], [case law], [rule
 formula] (the court's own wording for a rule), [names a party]. A rule usually carries one of [article], [case
-law], [rule formula]; a sentence that names a party is usually application or facts. A digest rarely restates the
-lower court: choose a [lower court] sentence only when the court adopts it as the decisive reasoning.
+law], [rule formula]; a sentence that names a party is usually application or facts.
 {profile}
 - a_chosen: the ids, in the ruling's order, each with its role."""
 

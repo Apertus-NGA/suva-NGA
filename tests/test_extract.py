@@ -520,3 +520,82 @@ def test_code_shortens_a_repeated_lead_in_and_a_long_name_after_its_first_mentio
     assert out[0] == texts[0]  # the first mention keeps the full name
     assert out[1] == "Elle a en outre retenu qu'aucun acte illicite n'était imputable à l'office AI."
     assert len(notes) == 2
+
+
+# --- the pipeline -------------------------------------------------------------------------------------------------
+
+
+class Echo:
+    """A declared fake of the gateway for the whole extractive writer: it ranks every consideration yes, chooses
+    the first candidates offered, gives every sentence back as written (a translation: one fixed French sentence),
+    and finds nothing to polish."""
+
+    def __init__(self, fail_choice: bool = False) -> None:
+        self.sent: list[str] = []
+        self.fail_choice = fail_choice
+
+    def label(self, messages, prompt_version):
+        self.sent.append(prompt_version)
+        return 0.97
+
+    def __call__(self, messages, response_format, prompt_version, max_tokens):
+        import json
+        import re
+
+        self.sent.append(prompt_version)
+        content = messages[-1]["content"]
+        if prompt_version.startswith(f"{choose.VERSION}/passages"):
+            if self.fail_choice:
+                raise RuntimeError("gateway down")
+            return json.dumps({"a_point": "the point", "b_passages": []})
+        if prompt_version.startswith(f"{choose.VERSION}/sentences"):
+            ids = re.findall(r"(?m)^(S\d+)\b", content)[:4]
+            return json.dumps({"a_chosen": [{"a_id": i, "b_role": "rule"} for i in ids]})
+        if prompt_version.startswith("write@"):
+            if content.startswith("Translate"):  # a French fiche of a German ruling: one fixed French sentence
+                return json.dumps({"a_sentence": "Le droit aux prestations de l'assurance-accidents suppose un lien de "
+                                                 "causalité naturelle entre l'accident et l'atteinte à la santé."})  # fmt: skip
+            return json.dumps({"a_sentence": re.findall(r"<sentence>\n(.*?)\n</sentence>", content, re.S)[-1]})
+        if prompt_version.startswith("flow@"):
+            pairs = re.findall(r"(?m)^(s\d+): (.*)$", content)
+            return json.dumps({"a_sentences": [{"a_id": i, "b_text": t} for i, t in pairs]})
+        return json.dumps({"items": []})  # refine's terms and language steps: nothing to change
+
+
+@pytest.mark.db
+def test_the_pipeline_writes_extractive_fiches_and_stores_where_each_sentence_comes_from(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn, text=RULING)  # long enough for a choice (the shared fixture has 3 sentences)
+    echo = Echo()
+    result = pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=echo,
+                                       writer="extract")  # fmt: skip
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    stored = dict(db_conn.execute("SELECT language, body FROM summaries WHERE ruling_id = %s", (rid,)).fetchall())
+    assert params["writer"] == {"de": "extract", "fr": "extract"}
+    for language in ("de", "fr"):
+        assert stored[language] == result["languages"][language]["text"] and stored[language].strip()
+        steps = params["refine"][language]["steps"]
+        assert [s["step"] for s in steps][:3] == ["choose", "write", "flow"]
+        written = [f for f in steps[1]["findings"] if f["accepted"]]
+        assert written and all(f["evidence"] and f["quote"] for f in written)  # the source of every sentence
+    from suva_app import workspace
+
+    checks = workspace.ruling_page(db_conn, rid)["summaries"]["de"]["checks"]
+    assert checks[1]["step"] == "write" and checks[1]["findings"][0]["quote"]  # the expert sees the source
+    assert sum(v.startswith(f"{choose.VERSION}/passages") for v in echo.sent) == 1  # one reading for DE and FR
+
+
+@pytest.mark.db
+def test_a_ruling_the_extractive_writer_cannot_read_still_gets_the_prompt_written_fiches(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn)
+    pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=Echo(fail_choice=True),
+                              writer="extract")  # fmt: skip
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    assert params["writer"] == {"de": "v2", "fr": "v2"}
+    assert "choice failed" in params["extract_errors"]["_error"]
+    assert db_conn.execute("SELECT count(*) FROM summaries WHERE ruling_id = %s", (rid,)).fetchone()[0] == 2
