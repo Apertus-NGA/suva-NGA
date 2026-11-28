@@ -15,10 +15,11 @@ import re
 from dataclasses import dataclass
 
 from src.summarize.extract import candidates as cand
+from src.summarize.extract import profiles
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 
-VERSION = "choose@8"
+VERSION = "choose@9"
 MIN, MAX = 5, 12  # what the prompt asks for
 MIN_VALID = 3  # what code accepts ("fewer for a simple ruling")
 MAX_PASSAGES = 4
@@ -69,6 +70,7 @@ Choose {min} to {max} sentences, fewer for a simple ruling. A sentence stays who
 Prefer the court's general statement of the law to its application to one party's argument. Code marks what a
 sentence holds: [article], [case law], [rule formula] (the court's own wording for a rule), [names a party]. A
 rule usually carries one of the first three; a sentence that names a party is usually application or facts.
+{profile}
 - a_chosen: the ids, in the ruling's order, each with its role."""
 
 
@@ -189,7 +191,7 @@ def consensus(first: list, second: list, scores: dict[str, float]) -> list:
     return ranked[: max(len(first), len(second))]
 
 
-def choose(text: str, model: Model, passages: str = "rank") -> Choice:
+def choose(text: str, model: Model, passages: str = "rank", use_profiles: bool = True) -> Choice:
     found = cand.candidates(text)
     if len(found.kept) < MIN:
         raise ModelFailed(f"only {len(found.kept)} candidate sentences")
@@ -213,15 +215,15 @@ def choose(text: str, model: Model, passages: str = "rank") -> Choice:
     # Call 2: the sentences, among those passages only.
     ids = [c.id for c in found.kept if c.id in allowed]
     shape = obj({"a_chosen": array(obj({"a_id": enum(ids), "b_role": enum(ROLES)}), MAX + 4)})
-    prompt = SENTENCES.format(point=evidence.as_data(point), ruling=lines(found, labels), digest=DIGEST, min=MIN,
-                              max=MAX)  # fmt: skip
     readings = []
+    hint_text = profiles.hint(profiles.detect(text), profiles.remanded(text)) if use_profiles else ""
     # Two readings: the passages in the ruling's order, then best-ranked first (the same sentences, shown in
     # another order: a choice that depends on the order it was shown in is not a stable one).
     by_score = sorted(labels - {"facts"}, key=lambda label: -scores.get(label, 0.0)) + ["facts"]
     for tag, order in (("court", None), ("ranked", by_score)):
         text_ = lines(found, labels) if order is None else "\n".join(lines(found, {label}) for label in order)
-        prompt = SENTENCES.format(point=evidence.as_data(point), ruling=text_, digest=DIGEST, min=MIN, max=MAX)
+        prompt = SENTENCES.format(point=evidence.as_data(point), ruling=text_, digest=DIGEST, min=MIN, max=MAX,
+                                  profile=hint_text)  # fmt: skip
         for attempt in range(2):
             answer = model.ask([system, {"role": "user", "content": prompt}], "choose", shape,
                                f"{VERSION}/sentences/{tag}/{attempt}", max_tokens=500)  # fmt: skip
@@ -234,5 +236,10 @@ def choose(text: str, model: Model, passages: str = "rank") -> Choice:
     if not readings:
         raise ModelFailed(f"fewer than {MIN_VALID} valid sentence ids, twice")
     chosen = consensus(readings[0], readings[1], scores) if len(readings) == 2 else readings[0]
-    chosen, notes = complete(found, chosen[:MAX])
+    notes: list[str] = []
+    chosen = chosen[:MAX]
+    if use_profiles:
+        chosen, notes = profiles.check(found, chosen, text, scores)
+    chosen, more = complete(found, chosen)
+    notes += more
     return Choice(point, tuple(chosen), len(found.kept), found.reasons(), scores, notes)

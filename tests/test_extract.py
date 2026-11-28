@@ -238,3 +238,75 @@ def test_real_rulings_keep_considerations_and_facts_and_drop_the_operative_part(
     assert reasons.get("operative", 0) > 0 and reasons.get("admissibility", 0) > 0
     assert set(reasons) <= {"operative", "admissibility", "costs", "procedural_law", "citation", "party_argument",
                             "proceedings", "reported", "fragment"}  # fmt: skip
+
+
+# --- profiles -----------------------------------------------------------------------------------------------------
+
+INCOME = """Urteil vom 3. Juni 2025
+
+Sachverhalt:
+A. Die Versicherte verletzte sich am Knie.
+
+Erwägungen:
+1. Die Beschwerde ist zulässig.
+
+2. Streitig ist das Invalideneinkommen. Das Invalideneinkommen ist gestützt auf die Tabellenlöhne der LSE zu bestimmen, wenn die versicherte Person keine Erwerbstätigkeit mehr ausübt.
+
+3. Massgebend ist das Kompetenzniveau 1 der Tabelle TA1, weil die Versicherte keine Ausbildung hat. Das Valideneinkommen beträgt Fr. 60'000. Ein Abzug vom Tabellenlohn ist hier nicht gerechtfertigt, weil die Einschränkungen bereits im Zumutbarkeitsprofil berücksichtigt sind.
+
+Demnach erkennt das Bundesgericht:
+1. Die Beschwerde wird teilweise gutgeheissen und die Sache wird zu neuer Verfügung an die Suva zurückgewiesen.
+2. Die Gerichtskosten werden der Suva auferlegt.
+"""
+
+
+def test_a_profile_is_detected_by_its_own_terms_when_its_article_is_not_cited():
+    from src.summarize.extract import profiles
+
+    assert profiles.detect(INCOME).id == "income_comparison"
+    assert profiles.detect(RULING) is None  # one mention of causation is not a profile
+    assert profiles.remanded(INCOME)
+
+
+def test_a_referral_of_the_costs_alone_is_not_a_remand():
+    from src.summarize.extract import profiles
+
+    costs_only = INCOME.replace(
+        "1. Die Beschwerde wird teilweise gutgeheissen und die Sache wird zu neuer Verfügung an die Suva zurückgewiesen.",
+        "1. Die Beschwerde wird abgewiesen.",
+    ).replace("2. Die Gerichtskosten werden der Suva auferlegt.", "2. Die Sache wird zur Neuverlegung der Kosten zurückgewiesen.")
+    assert not profiles.remanded(costs_only)
+
+
+def test_the_profile_adds_the_sentence_for_an_item_the_court_discusses_and_the_choice_missed():
+    from src.summarize.extract import profiles
+
+    found = cand.candidates(INCOME)
+    first = next(c for c in found.kept if c.text.startswith("Das Invalideneinkommen ist gestützt"))
+    chosen, notes = profiles.check(found, [(first, "rule")], INCOME, {"E.2": 0.9, "E.3": 0.8})
+    added = [c.text for c, _ in chosen[1:]]
+    assert len(added) == 2  # skill level and deduction are missing; no sentence of this ruling concludes
+    assert any("Kompetenzniveau" in t for t in added)
+    assert any("Abzug vom Tabellenlohn" in t for t in added)
+    assert len(notes) == 2  # the remand is in the operative part only: the considerations give nothing to add
+
+
+def test_the_courts_conclusion_is_added_when_the_choice_has_none():
+    from src.summarize.extract import profiles
+
+    text = RULING.replace("Die Vorinstanz hat die\nLeistungseinstellung daher zu Recht bestätigt.",
+                          "Die Vorinstanz hat das richtig gesehen.\nSomit hat die Vorinstanz die Leistungseinstellung zu Recht bestätigt.")  # fmt: skip
+    found = cand.candidates(text)
+    rule = next(c for c in found.kept if c.label == "E.2.1")
+    chosen, notes = profiles.check(found, [(rule, "rule")], text, {"E.2.1": 0.9, "E.3": 0.8})
+    assert chosen[-1][0].text.startswith("Somit hat die Vorinstanz") and chosen[-1][1] == "holding"
+    assert notes == [f"{chosen[-1][0].id} added for answer"]
+
+
+def test_a_bracketed_placeholder_is_refused_and_the_outcome_keeps_so_far_as_admissible():
+    assert any("brackets" in p for p in write._problems("Der Betrag von [Betrag] Fr. wurde festgelegt und bestätigt.",
+                                                        "Le montant de 196 fr. 80 a été fixé et confirmé.", "de", RULING, []))  # fmt: skip
+    source = RULING.replace("1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist.")
+    assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith(
+        "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist.")
+    assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", RULING).endswith("abgewiesen.")

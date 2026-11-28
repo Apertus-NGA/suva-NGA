@@ -28,7 +28,7 @@ from src.summarize.refine import checks, entail, evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 from src.summarize.refine.steps.common import CALQUES, NAME, new_terms, polish
 
-VERSION = "write@1"  # prompts unchanged in write@1 checks v2 (stems, cleaned length)
+VERSION = "write@2"
 FLOW_VERSION = "flow@1"
 
 SYSTEM = (
@@ -61,9 +61,22 @@ text, and change nothing else:
 - a_sentences: every id with its text, changed or not."""
 
 ROLES = {
-    "de": "die versicherte Person, der Versicherte, die Beschwerdeführerin, der Arbeitgeber, die Ärztin, der Gutachter",
-    "fr": "la personne assurée, l'assuré, la recourante, l'employeur, le médecin, l'expert",
+    "de": "der Versicherte or die Versicherte, die Beschwerdeführerin, der Arbeitgeber, die Ärztin, der Gutachter",
+    "fr": "l'assuré or l'assurée, la recourante, l'employeur, le médecin, l'expert",
 }
+# Terms of art the judge failed in run x2 (28 Nov) and the v2 glossary lacks. From the law, not from Suva's texts;
+# kept here so the current pipeline's glossary (src/summarize/v2/glossary.json) stays as it is.
+EXTRA_TERMS = [
+    {"de": "Wagnis", "fr": "entreprise téméraire", "it": "atto temerario"},
+    {"de": "Wagnisse", "fr": "entreprises téméraires", "it": "atti temerari"},
+    {"de": "Einsprache", "fr": "opposition", "it": "opposizione"},
+    {"de": "Einspracheentscheid", "fr": "décision sur opposition", "it": "decisione su opposizione"},
+]
+EXTRA_CALQUES = {
+    "de": ["Einsprache (nicht: Einspruch)", "Wagnis (nicht: tollkühne oder temeräre Unternehmung)"],
+    "fr": ["l'assuré (pas: la personne assurée)", "lien de causalité (pas: rapport de causalité)"],
+}
+_BRACKETED = re.compile(r"\[[^\]]{1,40}\]")  # "[Betrag]": a placeholder the model invented (run x2, 8C_178)
 MIN_RATIO, MAX_RATIO = 0.35, 1.6  # length of the written sentence against the ruling's (references come out)
 FLOW_RATIO = (0.7, 1.5)
 
@@ -118,7 +131,7 @@ def required_terms(sentence: str, source_language: str, language: str, category:
 
     low = sentence.lower()
     out = []
-    for row in pairs(category):
+    for row in [*pairs(category), *EXTRA_TERMS]:
         src, dst = row.get(source_language), row.get(language)
         if src and dst and len(src) > 3 and src.lower() in low and (src, dst) not in out:
             out.append((src, dst))
@@ -145,6 +158,8 @@ def _problems(new: str, sentence: str, language: str, source: str, terms: list[t
         problems.append(f"written in {NAME.get(found, found)}")
     if _PLACEHOLDER.search(new):
         problems.append("anonymisation placeholder left")
+    if _BRACKETED.search(new):
+        problems.append(f"a placeholder in brackets: {_BRACKETED.search(new).group(0)}")
     if language == "de" and "ß" in new:
         problems.append("ß")
     # against the sentence without its references, which the digest leaves out
@@ -167,7 +182,7 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
         prompt = ADAPT.format(lang=lang, sentence=evidence.as_data(candidate.text), roles=ROLES[language])
     else:
         listed = "".join(f"- Translate '{src}' as '{dst}'.\n" for src, dst in terms)
-        calques = "; ".join(CALQUES[language])
+        calques = "; ".join(CALQUES[language] + EXTRA_CALQUES[language])
         prompt = TRANSLATE.format(source_lang=NAME.get(source_language, source_language), lang=lang,
                                   sentence=evidence.as_data(candidate.text), roles=ROLES[language],
                                   terms=listed + f"- Swiss {lang} terms: {calques}.\n")  # fmt: skip
@@ -242,6 +257,25 @@ def flow(texts: list[str], language: str, ruling: dict, model: Model) -> tuple[l
     return out, log
 
 
+_SO_FAR = re.compile(r"soweit (?:darauf )?einzutreten ist|dans la mesure o(?:ù|u) (?:il est recevable|il est "
+                     r"recevable)|nella misura in cui (?:è )?ammissibile", re.IGNORECASE)  # fmt: skip
+_QUALIFIED = {
+    "de": ("Die Beschwerde wird abgewiesen.", "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist."),
+    "fr": ("Le recours est rejeté.", "Le recours est rejeté dans la mesure où il est recevable."),
+}
+
+
+def with_admissibility(text: str, language: str, source: str) -> str:
+    """The court's "so far as admissible" in the outcome sentence when point 1 of the operative part says it (run
+    x2: F2 failed on 8C_720/2024 for leaving it out)."""
+    operative = " ".join(evidence.passages(source).get("operative", "").split())
+    first = re.search(r"\b1\.\s+(.*?)(?=\s2\.\s|$)", operative)
+    plain, qualified = _QUALIFIED.get(language, ("", ""))
+    if plain and first and _SO_FAR.search(first.group(1)) and plain in text and qualified not in text:
+        return text.replace(plain, qualified, 1)
+    return text
+
+
 def write_fiche(choice: Choice, language: str, ruling: dict, model: Model) -> Fiche:
     """The finished fiche in `language` from the chosen sentences. `ruling`: text, language, category, starred."""
     start = model.calls
@@ -250,4 +284,5 @@ def write_fiche(choice: Choice, language: str, ruling: dict, model: Model) -> Fi
     texts, flow_log = flow(texts, language, ruling, model)
     body = " ".join(t if t.endswith((".", "!", "?")) else t + "." for t in texts)
     text, notes = finish.finish(language, body, ruling["text"], ruling.get("starred"))
+    text = with_admissibility(text, language, ruling["text"])
     return Fiche(text, written, flow_log, model.calls - start, notes)

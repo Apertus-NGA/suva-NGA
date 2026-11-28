@@ -143,7 +143,7 @@ def recall(chosen: list[str], wanted: list[str]) -> float:
     return len(set(chosen) & set(wanted)) / len(wanted) if wanted else 0.0
 
 
-def choose_all(name_set: str, name: str, passages: str = "rank") -> None:
+def choose_all(name_set: str, name: str, passages: str = "rank", use_profiles: bool = True) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
     from src.llm.client import client_from_env
@@ -164,7 +164,7 @@ def choose_all(name_set: str, name: str, passages: str = "rank") -> None:
     def one(ruling: dict) -> dict:
         model = Model(transport, budget=80, labeler=labeler)
         try:
-            picked = choose.choose(ruling["text"], model, passages)
+            picked = choose.choose(ruling["text"], model, passages, use_profiles)
         except Exception as exc:  # noqa: BLE001 -- one ruling's failure is recorded, the others go on
             return {"docket": ruling["docket"], "error": f"{type(exc).__name__}: {exc}", "calls": model.calls}
         return {"docket": ruling["docket"], **picked.as_dict(), "calls": model.calls}
@@ -307,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--set", default="iterate", choices=("iterate", "holdout"))
     parser.add_argument("--name", default="c1")
     parser.add_argument("--passages", default="rank", choices=("rank", "list"))
+    parser.add_argument("--no-profiles", action="store_true", help="choose without the profiles (profiles.py)")
     parser.add_argument("--choice", default="c6", help="the stored choice a `write` run starts from")
     args = parser.parse_args(argv)
     from src.summarize import summarize
@@ -317,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
         summary = filter_report(args.set)
         (results / f"extract_filter_{args.set}.json").write_text(json.dumps(summary, indent=2) + "\n")
     elif args.command == "choose":
-        choose_all(args.set, args.name, args.passages)
+        choose_all(args.set, args.name, args.passages, not args.no_profiles)
         return 0
     elif args.command == "write":
         write_all(args.set, args.name, args.choice)
