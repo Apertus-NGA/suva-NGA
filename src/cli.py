@@ -176,9 +176,12 @@ def run_layer2_stage(mode: str, limit: int | None) -> int:
             f"or {SHIPPED_STORE.relative_to(REPO_ROOT)}"
         )
         return 0
+    # Replay reads the local store when it has answers, else the store shipped with the repo (D-106): a fresh clone
+    # or the cluster (data/derived is a volume, empty unless SUVA_DERIVED_SOURCE is set) judges from replay/llm.
+    store = SHIPPED_STORE if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir() else DEFAULT_STORE
     with connect(actor="make-run") as conn:
         try:
-            out = run_layer2(conn, mode=mode, limit=limit, actor="make-run")
+            out = run_layer2(conn, mode=mode, limit=limit, actor="make-run", store=store)
         except LookupError as exc:
             print(f"SKIPPED run S3 judgement: {exc}")
             return 0
