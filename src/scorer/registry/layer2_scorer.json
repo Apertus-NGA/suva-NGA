@@ -346,6 +346,139 @@
       "decision": "D-094",
       "validation": null,
       "changelog": "Major (D-094): replaces the 8B Ja/Nein judge by the Suva Scout scorer. The score is a sign-constrained logistic regression over eleven facts read by code and one consensus of six Apertus 70B readings; each rule moves the score in one fixed direction only. Weights fitted on the kept rulings of the two listed quarters. Loaded from a stored run of the scorer (src/scorer), not recomputed."
+    },
+    {
+      "version": [
+        2,
+        1,
+        0
+      ],
+      "name": "Suva Scout scorer: twelve sign-constrained rules, one fed by six Apertus 70B readings",
+      "bump_kind": "minor",
+      "previous": [
+        2,
+        0,
+        0
+      ],
+      "config": {
+        "scorer": "scorer@2",
+        "pipeline": "triage_pipeline@2",
+        "readings": "readings@1",
+        "features": [
+          "area_uvmv",
+          "area_iv",
+          "appeal_by_institution",
+          "five_judges",
+          "publication",
+          "manifestly_unfounded",
+          "suva_party",
+          "single_judge",
+          "consensus",
+          "core_topics",
+          "long_accident",
+          "other_accident_insurer"
+        ],
+        "intercept": -4.018592192500416,
+        "rule_weights": {
+          "area_iv": {
+            "mean": 0.3126934984520124,
+            "sign": 1,
+            "scale": 0.46359063243108667,
+            "weight": 2.253644342758227
+          },
+          "area_uvmv": {
+            "mean": 0.14860681114551083,
+            "sign": 1,
+            "scale": 0.35570047346984845,
+            "weight": 1.2844302632394957
+          },
+          "consensus": {
+            "mean": -0.03249156586054247,
+            "sign": 1,
+            "scale": 0.3775944095439077,
+            "weight": 0.27626443293908626
+          },
+          "suva_party": {
+            "mean": 0.10371517027863777,
+            "sign": 1,
+            "scale": 0.3048906914497588,
+            "weight": 1.0766068854984348
+          },
+          "core_topics": {
+            "mean": 0.9535603715170279,
+            "sign": 1,
+            "scale": 1.3194231378272516,
+            "weight": 0.24371321785986477
+          },
+          "five_judges": {
+            "mean": 0.05727554179566564,
+            "sign": 1,
+            "scale": 0.23236835866287553,
+            "weight": 0.3475800976189778
+          },
+          "publication": {
+            "mean": 0.02476780185758514,
+            "sign": 1,
+            "scale": 0.15541672319518354,
+            "weight": 0.05864289115424223
+          },
+          "single_judge": {
+            "mean": 0.3637770897832817,
+            "sign": -1,
+            "scale": 0.4810855627973981,
+            "weight": -2.261908977345298
+          },
+          "long_accident": {
+            "mean": 0.010835913312693499,
+            "sign": 1,
+            "scale": 0.10353017094245263,
+            "weight": 0.34149174040500174
+          },
+          "manifestly_unfounded": {
+            "mean": 0.07430340557275542,
+            "sign": -1,
+            "scale": 0.26226400723897747,
+            "weight": -0.28685622433915725
+          },
+          "appeal_by_institution": {
+            "mean": 0.08978328173374613,
+            "sign": 1,
+            "scale": 0.28587102695947364,
+            "weight": 0.36805807025586934
+          },
+          "other_accident_insurer": {
+            "mean": 0.04953560371517028,
+            "sign": 1,
+            "scale": 0.2169834732871246,
+            "weight": 0.5788984852547913
+          }
+        },
+        "apertus_rules": [
+          "consensus"
+        ],
+        "score_raw": "logit",
+        "score_mapping": "probability_x100"
+      },
+      "rules": [
+        "SC_AREA_UVMV",
+        "SC_AREA_IV",
+        "SC_APPEAL_BY_INSTITUTION",
+        "SC_FIVE_JUDGES",
+        "SC_PUBLICATION",
+        "SC_MANIFESTLY_UNFOUNDED",
+        "SC_SUVA_PARTY",
+        "SC_SINGLE_JUDGE",
+        "SC_CONSENSUS",
+        "SC_CORE_TOPICS",
+        "SC_LONG_ACCIDENT",
+        "SC_OTHER_ACCIDENT_INSURER"
+      ],
+      "models": {
+        "judge": "apertus-v1-5-70b"
+      },
+      "decision": "D-105",
+      "validation": null,
+      "changelog": "The same twelve rules, features, readings and score mapping as V2.0.0, with the weights and the intercept refit by src/triage/pipeline.py in replay on the frontend developer's published dataset (suva-nga/bger-rulings @ 7eb6025, 6,055 rulings; dump SHA-256 9b4440d5). V2.0.0 holds the weights of the earlier LIVE run on 6,464 rulings; a stored run is loaded only under the version whose weights produced it (D-105)."
     }
   ]
 }

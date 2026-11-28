@@ -1,0 +1,107 @@
+{
+ "generated_from": "the six-schema database after the consolidation loads of 28 Nov 2026 (docs/FRONTEND_CONSOLIDATION.md section 7)",
+ "closure": [
+  {
+   "source": "bger_neuheiten",
+   "row_count": 7770,
+   "loaded_refs": 5432,
+   "exclusions": 2338,
+   "unaccounted_rows": 0,
+   "closure_ok": true
+  },
+  {
+   "source": "hf_bger",
+   "row_count": 194883,
+   "loaded_refs": 6072,
+   "exclusions": 188811,
+   "unaccounted_rows": 0,
+   "closure_ok": true
+  }
+ ],
+ "publication_observations": {
+  "hf_first_seen": 4620,
+  "hf_poller": 1435,
+  "neuheiten": 5432
+ },
+ "publication_observations_starred_neuheiten": 130,
+ "subject_observations": {
+  "hf_legal_area": 4327,
+  "neuheiten": 5432
+ },
+ "neuheiten_exclusions_by_reason": {
+  "OUT_OF_WINDOW": 2338
+ },
+ "suva_reference_summaries": 55,
+ "assessments_by_profile_step_label": [
+  {
+   "profile": "default",
+   "version": "V0.5.0",
+   "step": "layer2_judge",
+   "in_suva_scope": "potentially",
+   "n": 1318
+  },
+  {
+   "profile": "scout",
+   "version": "V0.2.0",
+   "step": "layer2_judge",
+   "in_suva_scope": "potentially",
+   "n": 925
+  },
+  {
+   "profile": "scout",
+   "version": "V0.2.0",
+   "step": "ranking",
+   "in_suva_scope": "in_scope",
+   "n": 205
+  }
+ ],
+ "layer2_runs": [
+  {
+   "run_id": "823a94a7-8b86-4469-93b9-5e8a986733bc",
+   "profile": "default V0.5.0",
+   "mode": "REPLAY",
+   "status": "partial",
+   "params": {}
+  },
+  {
+   "run_id": "cadb436e-8b59-45c8-be5c-d6c691587ddf",
+   "profile": "scout V0.2.0",
+   "mode": "LIVE",
+   "status": "succeeded",
+   "params": {
+    "source": "stored scorer run",
+    "scorer": "scorer@2",
+    "file_sha256": "e025e88fa4a5e1182d07756f135c2f45273906ae9941d0de299acfe7a441a169",
+    "source_run_id": 1
+   }
+  },
+  {
+   "run_id": "a05d1cbd-8553-4cdc-b176-9e47802d4577",
+   "profile": "default V0.5.0",
+   "mode": "LIVE",
+   "status": "succeeded",
+   "params": {}
+  }
+ ],
+ "llm_calls_layer2_by_mode": {
+  "LIVE": 552,
+  "REPLAY": 766
+ },
+ "committed_inputs": {
+  "replay/bger_neuheiten": {
+   "files": 365,
+   "manifest_sha256": "aad20eac893c561ad90d394f3f7fc3c19ab1fd484af9148901a16c9ba75a1d67"
+  },
+  "replay/scorer/run.json": {
+   "sha256": "e025e88fa4a5e1182d07756f135c2f45273906ae9941d0de299acfe7a441a169"
+  },
+  "replay/llm/cache": {
+   "answers": 24993
+  },
+  "source_dataset": {
+   "repo": "suva-nga/bger-rulings (private)",
+   "revision": "7eb6025dcac351e426a0fcae1cba3a02c332e7ed",
+   "dump_sha256": "9b4440d50e724086b24de11e349c3331bb8e3060673f4926018046524566becb"
+  }
+ }
+}

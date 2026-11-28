@@ -101,6 +101,65 @@ def run_layer1_stage() -> int:
     return 0
 
 
+SCORER_RUN = REPO_ROOT / "replay" / "scorer" / "run.json"  # the stored Suva Scout scorer run (D-105, D-106)
+SCORER_PROFILE = "scout"
+
+
+def _module(args: list[str]) -> int:
+    """Run `python -m <args>` in this interpreter, with this environment; its output goes to the console."""
+    import subprocess
+
+    return subprocess.run([sys.executable, "-m", *args], cwd=REPO_ROOT, check=False).returncode
+
+
+def run_sources_stage() -> int:
+    """S0 sources (D-106): Suva's 55 reference summaries (judgements/, gold.suva_summary) with their snapshot and
+    closure; idempotent. Skipped with its reason when the database or the base is absent.
+
+    Not here on purpose: the Neuheiten pages (make sources-neuheiten). Their rubric is the first one layer 1 reads, so
+    loading them changes layer 1's decisions, and layer1_filter V1.1.0 is certified on the HF inputs only
+    (expected/layer1/V1.1.0.json, D-064): they join make pipeline with a layer-1 version certified on them."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        print("SKIPPED run S0 sources: no DATABASE_URL")
+        return 0
+    from src.db.pg import connect
+
+    with connect(actor="make-run") as conn, conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM corpus.ruling")
+        if cur.fetchone()[0] == 0:
+            print("SKIPPED run S0 sources: corpus.ruling is empty (python -m src.ingest base --parquet PATH)")
+            return 0
+    status = _module(["src.ingest.suva_summary", "--database-url", url, "--actor", "make-run"])
+    if status:
+        print(f"run S0 sources FAILED: suva summaries exited {status}", file=sys.stderr)
+        return status
+    print("run S0 sources: Suva reference summaries loaded (or already loaded); Neuheiten: make sources-neuheiten")
+    return 0
+
+
+def run_scorer_stage() -> int:
+    """S3b (D-099, D-105, D-106): the Suva Scout scorer on the profile `scout`: layer 1 on that profile, then the
+    stored scorer run (replay/scorer/run.json) loaded as layer 2 and ranking, checked against the registered weights
+    (src/scorer/load.py refuses a run they do not give). Idempotent on the file's SHA-256."""
+    if not os.environ.get("DATABASE_URL"):
+        print("SKIPPED run S3b scorer: no DATABASE_URL")
+        return 0
+    if not SCORER_RUN.is_file():
+        print(f"SKIPPED run S3b scorer: no stored scorer run at {SCORER_RUN.relative_to(REPO_ROOT)}")
+        return 0
+    for name, args in (
+        ("layer 1 on scout", ["src.layer1", "run", "--profile", SCORER_PROFILE]),
+        ("scorer load", ["src.scorer", "load", "--profile", SCORER_PROFILE, "--file", str(SCORER_RUN)]),
+    ):
+        status = _module(args)
+        if status:
+            print(f"run S3b scorer FAILED: {name} exited {status}", file=sys.stderr)
+            return status
+    print(f"run S3b scorer: stored run loaded on the profile {SCORER_PROFILE} (or already loaded)")
+    return 0
+
+
 def run_layer2_stage(mode: str, limit: int | None) -> int:
     """S3: layer 2 on layer 1's candidates (docs/LAYER2.md). Skipped with its reason, never faked: without
     DATABASE_URL, without a succeeded layer-1 run, or in replay mode without a replay cache."""
@@ -109,10 +168,13 @@ def run_layer2_stage(mode: str, limit: int | None) -> int:
         return 0
     from src.db.pg import connect
     from src.layer2.run import Layer2RunFailed, run_layer2
-    from src.llm.client import DEFAULT_STORE
+    from src.llm.client import DEFAULT_STORE, SHIPPED_STORE
 
-    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir():
-        print(f"SKIPPED run S3 judgement: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)}")
+    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir() and not (SHIPPED_STORE / "cache").is_dir():
+        print(
+            f"SKIPPED run S3 judgement: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)} "
+            f"or {SHIPPED_STORE.relative_to(REPO_ROOT)}"
+        )
         return 0
     with connect(actor="make-run") as conn:
         try:
@@ -148,12 +210,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     for name, what in STAGES:
         if args.dry_run:
             print(f"  [dry-run] {name}: {what}")
+        elif name == "S0 ingest":
+            status = run_sources_stage()
+            if status:
+                return status
         elif name == "S2 layer 1":
             status = run_layer1_stage()
             if status:
                 return status
         elif name == "S3 judgement":
-            status = run_layer2_stage(mode, None if args.all else args.limit)
+            status = run_layer2_stage(mode, None if args.all else args.limit) or run_scorer_stage()
             if status:
                 return status
         else:
