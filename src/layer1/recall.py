@@ -6,7 +6,8 @@ report holds aggregate counts only (D-031): no Suva label per docket leaves the 
 
 `validate` runs a baseline and a candidate profile, records recall, compares them ruling by ruling and fails on a
 ruling that goes potentially -> out_of_scope or that the candidate does not decide, rulings that differ between the
-runs, a labelled ruling the candidate drops, or a failed run (a golden mismatch fails one).
+runs, a labelled ruling the candidate drops, or a failed run (a golden mismatch fails one). Its runs are of kind
+`eval` (measurements): `latest_run`, the label and layer 2 read `layer1` runs only.
 """
 
 from __future__ import annotations
@@ -164,7 +165,8 @@ def validate(
     identity, not by count), no ruling the baseline keeps is dropped or left undecided by the candidate, and, when
     Suva's labels are loaded, the candidate keeps every labelled ruling. The baseline's recall is reported, not
     required: a candidate may fix it. Aggregates only (D-031). Event `layer1.validation.passed|failed` on the
-    candidate run.
+    candidate run. Both runs are of kind `eval`: a measurement never forms the label (triage.v_scope_pipeline) and is
+    never layer 2's candidate source, so the release gate leaves the delivered label as it found it.
     """
     from src.layer1.run import RUNS_DIR, STEP, run_layer1
 
@@ -172,7 +174,7 @@ def validate(
     failures: list[str] = []
     for role, prof in (("baseline", baseline_profile), ("candidate", profile)):
         try:
-            outs[role] = run_layer1(conn, profile=prof, runs_dir=runs_dir or RUNS_DIR, actor=actor)
+            outs[role] = run_layer1(conn, profile=prof, runs_dir=runs_dir or RUNS_DIR, actor=actor, kind="eval")
         except Exception as exc:  # recorded as a failed run by run_layer1; the validation reports it
             outs[role] = None
             failures.append(f"{role} run ({prof}) failed: {type(exc).__name__}: {exc}"[:500])

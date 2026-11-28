@@ -19,6 +19,22 @@ SELECT pg_temp.expect_error($q$
   INSERT INTO ops.span (run_id, operation, status, started_at) VALUES ('00000000-0000-4000-8000-000000000001', 'x', 'ok', now())$q$, 'closed_chk');
 SELECT pg_temp.expect_error($q$DELETE FROM ops.span WHERE span_id = '00000000-0000-4000-8000-000000000b01'$q$, 'append-only');
 
+-- a run closes once (integration review, 28 Nov): the label reads its status (DDL-2), so a closed run is never
+-- reopened or flipped. Red before: both updates passed and the label moved
+INSERT INTO ops.pipeline_run (run_id, profile_version_id, kind, mode, git_dirty, params_sha256, triggered_by)
+VALUES ('00000000-0000-4000-8000-000000000b02', (SELECT profile_version_id FROM ops.pipeline_profile_version WHERE profile_code = 'default'),
+        'layer1', 'REPLAY', false, repeat('6', 64), 'ci');
+SELECT pg_temp.expect_error($q$UPDATE ops.pipeline_run SET error_summary = 'x' WHERE run_id = '00000000-0000-4000-8000-000000000b02'$q$,
+  'an update must close it');
+UPDATE ops.pipeline_run SET status = 'partial', finished_at = clock_timestamp() WHERE run_id = '00000000-0000-4000-8000-000000000b02';
+SELECT pg_temp.expect_error(format($q$UPDATE ops.pipeline_run SET status = %L, finished_at = %s WHERE run_id = %L$q$, v.st, v.fin, v.id),
+  'already closed')
+FROM (VALUES ('running', 'NULL', '00000000-0000-4000-8000-000000000001'), ('failed', 'finished_at', '00000000-0000-4000-8000-000000000001'),
+             ('succeeded', 'finished_at', '00000000-0000-4000-8000-000000000b02')) AS v(st, fin, id);
+DO $$ BEGIN
+  ASSERT (SELECT status::text FROM ops.pipeline_run WHERE run_id = '00000000-0000-4000-8000-000000000b02') = 'partial', 'closed once';
+END $$;
+
 -- events: today's partition, the default partition for a day without one
 INSERT INTO ops.log_event (run_id, seq, ts, span_id, ruling_id, step, level, event_code, message, attributes) VALUES
   ('00000000-0000-4000-8000-000000000001', 1, now(), '00000000-0000-4000-8000-000000000b01', pg_temp.rid('8C_493/2025'), 'layer2_judge',

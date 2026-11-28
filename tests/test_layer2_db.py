@@ -445,3 +445,72 @@ def test_replay_with_a_partial_cache_judges_what_it_has_and_counts_the_rest(db):
     assert label == [("layer2_judge", True)]  # the earlier judgement keeps its place: a miss writes no row
     with pytest.raises(Layer2RunFailed, match="none of the 3 candidates"):
         run(url, tmp, client(tmp / "store_empty", Gateway(), mode="replay"), mode="replay")
+
+
+def test_a_validation_or_an_identical_layer1_rerun_keeps_the_layer2_label(db):
+    """Integration review, 28 Nov: the release gate's `validate` and `make run` S2 both run layer 1 again. The
+    validation's runs are measurements (kind eval): they never form the label and are never layer 2's source. A new
+    pipeline run that decides every ruling the same way keeps each judgement in the label (DDL-2 matches the layer-1
+    decision, not the assessment id). Red before: one validation dropped every layer2_judge row from the label."""
+    from src.layer1.recall import validate
+    from src.layer1.run import run_layer1
+    from src.layer2.run import layer1_source
+
+    url, tmp = db
+    q = """SELECT r.docket, p.step::text, p.assessment_id::text FROM triage.v_scope_pipeline p
+           JOIN corpus.ruling r USING (ruling_id) ORDER BY 1"""
+    before = rows(url, q)
+    assert sum(step == "layer2_judge" for _, step, _ in before) == 3  # the earlier tests judged the 3 candidates
+    with pipeline(url) as conn:
+        report = validate(conn, "default", "default", runs_dir=tmp / "runs", actor="test")
+    assert report["validation"]["passed"]
+    measured = [r["run_id"] for r in report["runs"]]
+    kinds = rows(url, "SELECT DISTINCT kind::text FROM ops.pipeline_run WHERE run_id = ANY(%s::uuid[])", measured)
+    assert kinds == [("eval",)]
+    assert rows(url, q) == before  # the gate leaves the label as it found it
+    with pipeline(url) as conn:
+        rerun = run_layer1(conn, runs_dir=tmp / "runs", actor="test")
+        with conn.cursor() as cur:
+            pvid = cur.execute(
+                "SELECT profile_version_id::text FROM ops.pipeline_run WHERE run_id = %s", (rerun["run_id"],)
+            ).fetchone()[0]
+            assert layer1_source(cur, pvid) == rerun["run_id"] not in measured
+    after = rows(url, q)
+    judged = [r for r in before if r[1] == "layer2_judge"]
+    assert [r for r in after if r[1] == "layer2_judge"] == judged  # same decisions: their judgements stay the label
+    assert [(d, s) for d, s, _ in after] == [(d, s) for d, s, _ in before]  # the drop now shows the rerun's decision
+
+
+def test_model_and_prompt_bindings_are_compared_both_ways_and_never_on_layer1(db, tmp_path):
+    """Integration review, 28 Nov: the binder skipped a version whose file entry had no models or prompts (a dropped
+    binding passed silently), and a layer-1 version could take a model through the step registry. Both are refused
+    now; reloading the shipped files still adds nothing. Edited copies of the registry files, in tmp_path only."""
+    from src.db.llm_registry import bind_resources
+    from src.db.registry import RegistryConflict, load_step_registry
+    from src.ingest.__main__ import REGISTRIES
+
+    url, _ = db
+    root = Path(__file__).resolve().parents[1]
+    layer2 = json.loads((root / "src" / "layer2" / "registry" / "layer2_judge.json").read_text(encoding="utf-8"))
+    count = (
+        "SELECT (SELECT count(*) FROM ops.component_version_model)"
+        " + (SELECT count(*) FROM ops.component_version_prompt)"
+    )
+    before = rows(url, count)
+    with pipeline(url) as conn:
+        assert bind_resources(conn, root / "src" / "layer2" / "registry" / "layer2_judge.json") == ["V1.0.0"]
+        for drop in ("models", "prompts"):
+            edited = json.loads(json.dumps(layer2))
+            edited["versions"][0].pop(drop)
+            path = tmp_path / f"layer2_without_{drop}.json"
+            path.write_text(json.dumps(edited), encoding="utf-8")
+            with pytest.raises(RegistryConflict, match="bindings differ from the file"):
+                bind_resources(conn, path)
+        path_l1, config_model, rule_model, code = next(r for r in REGISTRIES if "layer1_filter" in r[0])
+        layer1 = json.loads((root / path_l1).read_text(encoding="utf-8"))
+        layer1["versions"][1]["models"] = {"judge": JUDGE}
+        path = tmp_path / "layer1_filter.json"
+        path.write_text(json.dumps(layer1), encoding="utf-8")
+        with pytest.raises(RegistryConflict, match="runs code only declares no model or prompt"):
+            load_step_registry(conn, path, config_model, rule_model, code)
+    assert rows(url, count) == before

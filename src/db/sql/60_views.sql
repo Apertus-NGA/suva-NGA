@@ -100,7 +100,8 @@ WITH usable AS (
          CASE WHEN a.step = 'layer1_filter' THEN a.assessment_id
               WHEN u1.step = 'layer1_filter' THEN u1.assessment_id
               WHEN u2.step = 'layer1_filter' THEN u2.assessment_id
-              WHEN u3.step = 'layer1_filter' THEN u3.assessment_id END AS layer1_root
+              WHEN u3.step = 'layer1_filter' THEN u3.assessment_id END AS layer1_root,
+         p.profile_code AS default_profile
   FROM triage.assessment a
   JOIN ops.pipeline_run pr ON pr.run_id = a.run_id
   JOIN ops.pipeline_profile_version pv ON pv.profile_version_id = pr.profile_version_id
@@ -109,25 +110,40 @@ WITH usable AS (
   LEFT JOIN triage.assessment u2 ON u2.assessment_id = u1.upstream_assessment_id
   LEFT JOIN triage.assessment u3 ON u3.assessment_id = u2.upstream_assessment_id
   WHERE a.repetition_idx = 0 AND pr.kind <> 'eval' AND pr.status IN ('succeeded', 'partial')
-), ranked AS (
-  -- each ruling's current layer-1 decision (its latest usable one), on every row of the ruling, in one window pass (a
-  -- self-join on the CTE was re-sorted once per row: 8 s on 14,000 assessments)
+), rooted AS (
+  -- the decision of each assessment's layer-1 root, when that root comes from a usable run of the default pipeline:
+  -- its layer1_filter version, input fingerprint, scope, reason code and outcome. Two layer-1 runs that decide a
+  -- ruling identically (same version, same input, same result) give it the same decision, so a rerun of layer 1
+  -- (make run S2) keeps the judgements made on that decision (D-085); a changed decision makes them stale
   SELECT u.*,
-         first_value(CASE WHEN u.step = 'layer1_filter' THEN u.assessment_id END) OVER (
-           PARTITION BY u.ruling_id ORDER BY (u.step = 'layer1_filter') DESC, u.created_at DESC, u.assessment_id DESC
-         ) AS current_layer1
+         CASE WHEN lpv.profile_version_id IS NOT NULL
+              THEN format('%s|%s|%s|%s|%s', l1.component_version_id, l1.input_fingerprint, l1.in_suva_scope,
+                          l1.reason_code, l1.outcome) END AS root_decision
   FROM usable u
+  LEFT JOIN triage.assessment l1 ON l1.assessment_id = u.layer1_root
+  LEFT JOIN ops.pipeline_run lpr ON lpr.run_id = l1.run_id AND lpr.kind <> 'eval' AND lpr.status IN ('succeeded', 'partial')
+  LEFT JOIN ops.pipeline_profile_version lpv ON lpv.profile_version_id = lpr.profile_version_id
+                                            AND lpv.profile_code = u.default_profile
+), ranked AS (
+  -- each ruling's current layer-1 decision (that of its latest usable layer-1 assessment), on every row of the ruling,
+  -- in one window pass (a self-join on the CTE was re-sorted once per row: 8 s on 14,000 assessments)
+  SELECT r.*,
+         first_value(CASE WHEN r.step = 'layer1_filter' THEN r.root_decision END) OVER (
+           PARTITION BY r.ruling_id ORDER BY (r.step = 'layer1_filter') DESC, r.created_at DESC, r.assessment_id DESC
+         ) AS current_decision
+  FROM rooted r
 ), candidates AS (
   SELECT a.*, 1 AS prio, 'release'::text AS label_origin
   FROM triage.assessment a
   JOIN triage.v_current_release cur ON a.run_id = cur.ranking_run_id
   WHERE a.step = 'ranking' AND a.repetition_idx = 0
   UNION ALL
-  -- a usable assessment counts only if it descends from its ruling's current layer-1 decision (DDL-2): a judgement made
-  -- on an older layer-1 decision, or with no layer-1 root, never forms the label
+  -- a usable assessment counts only if it descends from its ruling's current layer-1 decision (DDL-2), matched on the
+  -- decision, not on the assessment id: a judgement made on another layer-1 decision, or with no usable layer-1 root,
+  -- never forms the label; an identical rerun of layer 1 leaves it in place
   SELECT u.assessment_id, u.run_id, u.ruling_id, u.step, u.repetition_idx, u.component_version_id, u.span_id, u.upstream_assessment_id, u.input_text_id, u.input_segmentation_id, u.input_fingerprint, u.in_suva_scope, u.outcome, u.score_raw, u.score_0_100, u.score_source, u.reason_code, u.explanation_de, u.mode, u.started_at, u.finished_at, u.created_at, 2 AS prio, 'latest_run'::text AS label_origin
   FROM ranked u
-  WHERE u.layer1_root = u.current_layer1
+  WHERE u.root_decision = u.current_decision
 )
 SELECT DISTINCT ON (c.ruling_id)
   c.ruling_id,
@@ -149,7 +165,7 @@ FROM candidates c
 LEFT JOIN ops.reason_code rc ON rc.code = c.reason_code
 ORDER BY c.ruling_id, c.prio, c.step DESC, c.created_at DESC, c.assessment_id DESC;
 COMMENT ON VIEW triage.v_scope_pipeline IS
-  'THE label (D-063): the default pipeline''s furthest-step assessment per ruling, from its current release, else from its usable runs (succeeded or partial, not eval) and only along the lineage of its current layer-1 decision (DDL-2). not_assessed = no row.';
+  'THE label (D-063): the default pipeline''s furthest-step assessment per ruling, from its current release, else from its usable runs (succeeded or partial, not eval) and only along the lineage of its current layer-1 decision (DDL-2), matched on the decision (layer1_filter version, input fingerprint, scope, reason code, outcome), so an identical rerun of layer 1 keeps the later steps. not_assessed = no row.';
 
 CREATE OR REPLACE VIEW triage.v_scope_current AS
 SELECT

@@ -12,7 +12,8 @@ certified decision, proven by the golden check), the loader prints a notice inst
 run records the hash of its own run paths (params.code_sha256, F-09; a path set that can differ from the version's
 code_path, src/db/runs.py). The rules bound to a version are compared too: a file that drops, reorders or
 re-versions one is refused. A step version may also declare the models and prompts it uses (`models`, `prompts`:
-layer2_judge); src/db/llm_registry.py binds them and compares them strictly; any other extra key is refused.
+layer2_judge); src/db/llm_registry.py binds them and compares them strictly, both ways; a step that runs code only
+(CODE_ONLY_STEPS) may declare neither; any other extra key is refused.
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ Version = tuple[int, int, int]
 DECISION_REF = r"^D-[0-9]{3}$"  # = ops.component_version.decision_ref CHECK
 VALIDATION_REF = r"^expected/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # = ops.component_version.validation_ref CHECK
 PROMPT_PATH = r"^prompts/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # a versioned prompt file (src/db/llm_registry.py)
+# Steps that run code only: no model, no prompt (= ops.check_component_version_resource in 80_triggers.sql)
+CODE_ONLY_STEPS = frozenset({"ingest", "segment", "parse", "layer1_filter", "ranking", "export"})
 
 
 class RegistryConflict(RuntimeError):
@@ -216,6 +219,8 @@ def load_step_registry(
             ver = StepVersionEntry.model_validate(raw)
             v = ver.version
             config_model.model_validate(ver.config)
+            if step in CODE_ONLY_STEPS and (ver.models or ver.prompts):
+                raise RegistryConflict(f"{step} {label(v)}: a step that runs code only declares no model or prompt")
             previous = uuid5("cv|{}|{}|{}|{}".format(step, *ver.previous)) if ver.previous else None
             cur.execute(
                 """INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id,
