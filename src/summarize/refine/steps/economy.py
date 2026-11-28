@@ -14,9 +14,9 @@ from src.summarize.refine import checks, entail
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, guarded, polish, terms_hint
+from src.summarize.refine.steps.common import NAME, guarded, new_terms, polish, terms_hint
 
-VERSION = "economy@2"
+VERSION = "economy@3"
 MAX_FIX = 2
 
 PROMPT = (
@@ -55,7 +55,7 @@ class Economy(Step):
             found = checks.language_of(new)
             if found is not None and found != ctx.language:
                 problems.append(f"written in {found}")
-            problems += checks.new_identifiers(new, sentence, ctx.source)
+            problems += checks.new_identifiers(new, sentence, ctx.source) + new_terms(new, sentence, ctx)
             if len(new) > len(sentence):
                 problems.append("longer than before")
             if problems:

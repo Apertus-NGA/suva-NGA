@@ -15,9 +15,9 @@ from src.summarize.refine import checks, entail
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, editable, guarded, polish, terms_hint
+from src.summarize.refine.steps.common import NAME, editable, guarded, new_terms, polish, terms_hint
 
-VERSION = "language@4"
+VERSION = "language@5"
 MAX_FIX = 3
 PROBLEMS = ["grammar", "calque_or_foreign_word", "wrong_word", "not_impersonal_register", "placeholder", "clumsy"]
 
@@ -88,7 +88,7 @@ class Language(Step):
         detail: dict = {}
 
         def check(before: Draft, after: Draft) -> list[str]:
-            problems = checks.same_identifiers(new, sentence)
+            problems = checks.same_identifiers(new, sentence) + new_terms(new, sentence, ctx)
             found = checks.language_of(new)
             if found is not None and found != ctx.language:
                 problems.append(f"written in {found}")

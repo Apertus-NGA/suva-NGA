@@ -453,11 +453,11 @@ def test_economy_takes_a_restated_outcome_out_of_another_sentence():
         "Die Beschwerde wird abgewiesen."
     )
     answer = {"a_action": "rewrite", "b_sentence": "Der natürliche Kausalzusammenhang fehlte."}
-    result = refine(draft, ctx_for(Fake(**{"economy@2": [answer]})), [Economy()])
+    result = refine(draft, ctx_for(Fake(**{"economy@3": [answer]})), [Economy()])
     assert result.text == facts + "Der natürliche Kausalzusammenhang fehlte.\n\nDie Beschwerde wird abgewiesen."
     refused = refine(
         draft,
-        ctx_for(Fake(**{"economy@2": [{"a_action": "rewrite", "b_sentence": "Die Beschwerde wurde abgewiesen."}]})),
+        ctx_for(Fake(**{"economy@3": [{"a_action": "rewrite", "b_sentence": "Die Beschwerde wurde abgewiesen."}]})),
         [Economy()],
     )
     assert "still states the outcome" in refused.trace[0].findings[0]["why_not"]
@@ -629,3 +629,14 @@ def test_the_p_yes_reading_is_taken_from_the_first_token():
     logprobs = {"content": [{"top_logprobs": [{"token": "Ja", "logprob": -0.1}, {"token": "Nein", "logprob": -2.4}]}]}
     assert round(p_yes_from(logprobs), 3) == round(0.9048 / (0.9048 + 0.0907), 3)
     assert p_yes_from({"content": [{"top_logprobs": [{"token": "Vielleicht", "logprob": -0.1}]}]}) is None
+
+
+def test_a_rewording_may_not_bring_in_a_procedural_term():
+    from src.summarize.refine.steps.common import new_terms
+
+    ctx = ctx_for(Fake())
+    old = "Die Rügen der Versicherten gegen das Gutachten sind unbegründet."
+    assert new_terms("Die Einsprache der Versicherten gegen das Gutachten ist unbegründet.", old, ctx) == [
+        "brings in the term 'Einsprache'"
+    ]
+    assert new_terms("Die Einwände der Versicherten gegen das Gutachten sind unbegründet.", old, ctx) == []

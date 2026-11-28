@@ -38,6 +38,29 @@ CALQUES = {
 }  # fmt: skip
 
 
+# Procedural terms of art: a rewording that brings one in changes the law the sentence states (run r7: a 'clumsy'
+# fix turned the insured's objections into an "Einsprache", the formal objection procedure; T1 failed).
+PROCEDURAL = {
+    "de": ("Einsprache", "Beschwerde", "Rekurs", "Revision", "Wiedererwägung", "Rückweisung", "Klage", "Verfügung",
+           "Einspracheentscheid", "Nichteintreten"),
+    "fr": ("opposition", "recours", "révision", "reconsidération", "renvoi", "action", "décision sur opposition",
+           "irrecevab", "non-entrée en matière"),
+}  # fmt: skip
+
+
+def new_terms(new: str, old: str, ctx) -> list[str]:
+    """Terms of art (the matter's glossary and the procedural ones) in `new` that `old` did not use."""
+    from src.summarize.refine.steps.terms import pairs
+
+    vocabulary = [row[ctx.language] for row in pairs(ctx.category)] + list(PROCEDURAL[ctx.language])
+    low_new, low_old = new.lower(), old.lower()
+    return [
+        f"brings in the term '{t}'"
+        for t in dict.fromkeys(vocabulary)
+        if t.lower() in low_new and t.lower() not in low_old
+    ]
+
+
 def terms_hint(ctx) -> str:
     """The matter's glossary in the fiche's language, for any prompt that writes text (src/summarize/v2)."""
     from src.summarize.refine.steps.terms import pairs
