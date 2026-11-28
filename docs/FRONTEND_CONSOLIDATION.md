@@ -68,6 +68,20 @@ Every call is a relative `/api/...` to `src/suva_app` (`src/web/src/lib/api.ts:1
 
 `make run` keeps serving Suva Scout until W6; the switch is a lead decision after the submission.
 
+### 3.3 Increment 1 (28 Nov, 14:00 CET): W1, W2 (reads and the alias) and W3 done
+
+| Piece | What it does | Evidence |
+|---|---|---|
+| UI backend switch | `VITE_BACKEND=api` builds the UI against `src/api`; unset, it calls Suva Scout exactly as before (`mark_relevant` absent from the Scout bundle) | `src/web/src/lib/api.ts` (`SIX_BACKEND`), `src/web/src/lib/sixApi.ts` (the adapters), `src/web/src/vite-env.d.ts` |
+| Ids | ruling ids are strings in the UI (UUIDs on `src/api`, numbers turned into strings on Scout) | `src/web/src/App.tsx`, `RulingPage.tsx` |
+| Robustness | error boundary instead of a white screen; the "why" card tolerates missing rules, readings and facts; `t()` returns an unknown key instead of crashing; a refused decision from the list is caught | `src/web/src/components/ErrorBoundary.tsx`, `RelevanceCard.tsx`, `i18n.tsx` |
+| `src/api` additions (contract only grows, `docs/API.md`) | `confirm_relevant` alias of `mark_relevant`; row fields `rubric`, `star`, `has_reference`; relevance `rules`, `readings`, `read_by_apertus` from the scorer's `signal` rows, `reason_code: NOT_ASSESSED`; scoring `rules` and `intercept` when the pinned `layer2_judge` is the scorer | `src/api/app.py`, `src/api/queries.py`, `src/api/settings.py` |
+| UI served by `src/api` | `make web-api` builds `src/web/dist-api`; `make api` serves it at `/` (`API_UI_DIST`), API routes first | `Makefile`; `src/api/app.py` `_mount_ui` |
+
+Tests: `tests/test_api_unit.py` 24 passed, `tests/test_api_db.py` 8 passed; both UI builds pass (`npm run build`, `VITE_BACKEND=api npx vite build --outDir dist-api`). End-to-end smoke on the throwaway database loaded with the pinned HF file (6,055 rulings), Suva's labels, layer 1 and a replayed layer 2 on the default profile (383 judged, 552 without a recorded answer, 0 failed): 11 of 11 checks passed against `src/api` serving the built UI (health; list; facets; detail with text and relevance for `8C_514/2025` (DE), `8C_256/2025` (FR), `8C_254/2025` (IT); decide with `confirm_relevant`, then reopen; scoring; `/` serves the UI). Not checked in a browser (the shared Playwright browser was busy).
+
+Left: a refresh on a client-side route answers 404 (`html=True` serves `index.html` for `/` only: a fallback route is needed); revise and updates answer 501 on this backend; the scorer branch of `relevance` and `scoring` has a unit test with a fake cursor only (the default profile runs the 8B judge, D-099); the summary workspace waits on W4.
+
 ## 4. Where the frontend developer's database is
 
 Not in git. Her push ships the means to rebuild and to fetch it:

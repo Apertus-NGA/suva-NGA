@@ -43,15 +43,18 @@ export function RelevanceCard({ relevance, onShowScoring }: Props) {
     );
   }
 
-  const shown = relevance.rules.filter((r) => r.applies && r.effect !== 0);
+  // A backend may leave out rules, readings or facts: each reads as empty, never as a crash.
+  const allRules = relevance.rules ?? [];
+  const readings = relevance.readings ?? [];
+  const shown = allRules.filter((r) => r.applies && r.effect !== 0);
   const pro = shown.filter((r) => r.effect > 0).sort((a, b) => b.effect - a.effect);
   const contra = shown.filter((r) => r.effect < 0).sort((a, b) => a.effect - b.effect);
-  const { facts } = relevance;
-  const topics = facts.core_topics.map((name) => tx("topic", name)).join(", ");
+  const facts = relevance.facts;
+  const topics = (facts?.core_topics ?? []).map((name) => tx("topic", name)).join(", ");
   const topicsScored = shown.some((r) => r.rule === "core_topics");
   // Facts that carry no weight. The topics are listed with their rule when that rule counts.
   const notes = [
-    facts.appeal_upheld ? t("rel.fact.upheld") : null,
+    facts?.appeal_upheld ? t("rel.fact.upheld") : null,
     topics && !topicsScored ? t("rel.fact.topics", { list: topics }) : null,
   ].filter(Boolean);
 
@@ -81,7 +84,7 @@ export function RelevanceCard({ relevance, onShowScoring }: Props) {
         </span>
       </summary>
 
-      {relevance.rules.length === 0 ? (
+      {allRules.length === 0 ? (
         <p className="px-5 pb-4 pt-2 text-[13px] leading-5 text-muted">{t("rel.oldRun")}</p>
       ) : (
         <div className="px-5 pb-2 pt-3">
@@ -96,7 +99,7 @@ export function RelevanceCard({ relevance, onShowScoring }: Props) {
           <>
             <p className="mt-0.5 max-w-[62ch] text-[12px] leading-[18px] text-faint">{t("rel.readings.note")}</p>
             <ul className="mt-2.5 grid grid-cols-1 gap-x-8 gap-y-1.5 xl:grid-cols-2">
-              {relevance.readings.map((reading) => (
+              {readings.map((reading) => (
                 <li key={reading.reading} className="flex items-start justify-between gap-3 text-[12px] leading-[18px]">
                   <span className="min-w-0 text-muted">{tx("reading", reading.reading)}</span>
                   <Level level={reading.level} label={t("rel.readingFailed")} />

@@ -33,6 +33,7 @@ class Settings:
     db_wait_s: float = 5.0  # how long a request waits for a free session before 503
     host: str = "127.0.0.1"
     port: int = 8000
+    ui_dist: str | None = None  # the built UI served at "/" (API_UI_DIST); default: src/web/dist when it exists
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -78,4 +79,5 @@ class Settings:
             max_db_sessions=sessions,
             host=env.get("API_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=port,
+            ui_dist=env.get("API_UI_DIST", "").strip() or None,
         )

@@ -8,7 +8,7 @@ ARGS ?=
 # DB target: DATABASE_URL when set (CI), else psql inside the compose service db (docs/DB_DDL_PLANNING.md §15)
 DB_TARGET ?= $(if $(DATABASE_URL),,--compose)
 
-.PHONY: help run run-live serve summaries replay-cache triage pipeline pipeline-live api bridge smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall layer1-golden layer1-verify layer1-validate
+.PHONY: help run run-live serve summaries replay-cache triage pipeline pipeline-live api web-api bridge smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall layer1-golden layer1-verify layer1-validate
 
 help: ## list the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -43,8 +43,11 @@ pipeline: ## the six-schema pipeline from the loaded base (MODE=replay|live, SER
 pipeline-live: ## the same with real calls; needs LLM_* and ARGS="--limit N" or ARGS="--all"
 	$(PY) -m src.cli run --mode live $(ARGS)
 
-api: ## serve the six-schema HTTP API (src/api, docs/API.md)
-	$(PY) -m src.cli serve $(ARGS)
+api: ## serve the six-schema HTTP API (src/api, docs/API.md) and, when built (make web-api), the UI at / (D-101)
+	API_UI_DIST=$(or $(API_UI_DIST),src/web/dist-api) $(PY) -m src.cli serve $(ARGS)
+
+web-api: ## build the UI for src/api into src/web/dist-api (VITE_BACKEND=api, D-101); make run keeps the Scout build
+	cd src/web && npm ci && VITE_BACKEND=api npx vite build --outDir dist-api
 
 bridge: ## copy Suva Scout's stored scores into the six-schema database as layer 2 and ranking on the profile scout (D-094, D-099): make bridge FROM=<Scout database URL>
 	$(PY) -m src.layer1 run --profile scout

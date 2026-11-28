@@ -942,8 +942,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return {
       lang,
       setLang,
-      t: (key, vars) =>
-        vars ? messages[key].replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole)) : messages[key],
+      t: (key, vars) => {
+        // An unknown key (a code the backend sent that has no text yet) shows as the key, never a crash.
+        const text: string | undefined = (messages as Record<string, string | undefined>)[key];
+        if (text === undefined) return key;
+        return vars ? text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole)) : text;
+      },
       tx: (group, code) => (code ? ((messages as Record<string, string>)[`${group}.${code}`] ?? code) : "–"),
       formatDate: (iso) => (iso ? dates.format(new Date(iso + "T00:00:00Z")) : "–"),
       formatNumber: (n) => numbers.format(n),
