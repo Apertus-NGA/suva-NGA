@@ -122,9 +122,7 @@ def test_finish_is_stable_when_applied_twice():
 
 
 def test_an_article_missing_from_the_ruling_is_removed():
-    text, dropped = f.cited_articles_in_the_ruling(
-        "Art. 6 Abs. 2 UVG gilt. Art. 99 ATSG gilt nicht.", RULING
-    )
+    text, dropped = f.cited_articles_in_the_ruling("Art. 6 Abs. 2 UVG gilt. Art. 99 ATSG gilt nicht.", RULING)
     assert text == "Art. 6 Abs. 2 UVG gilt. gilt nicht."
     assert dropped == ["Art. 99 ATSG"]
 
@@ -139,7 +137,9 @@ def test_manifestly_ill_founded_needs_either_language_in_the_ruling():
     from src.summarize.summarize import blocking
 
     assert "critique: manifestly ill-founded copied" not in blocking("de", bare, french_ruling)
-    assert "critique: manifestly ill-founded copied" in blocking("fr", "Le recours est manifestement non fondé.", RULING)
+    assert "critique: manifestly ill-founded copied" in blocking(
+        "fr", "Le recours est manifestement non fondé.", RULING
+    )
 
 
 def test_placeholder_is_reported_not_rewritten():
