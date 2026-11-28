@@ -62,7 +62,9 @@
           "appealed_court_raw"
         ]
       },
-      "changelog": "Q2/2026 union (decision + publication), Q4/2025 and Q1/2026 by decision date, and the rulings of Suva's exports outside those windows (D-062). HF legal_area kept as a rubric observation (D-072)."
+      "changelog": "Q2/2026 union (decision + publication), Q4/2025 and Q1/2026 by decision date, and the rulings of Suva's exports outside those windows (D-062). HF legal_area kept as a rubric observation (D-072).",
+      "decision": "D-072",
+      "validation": "expected/ingest/V1.0.0.json"
     }
   ]
 }

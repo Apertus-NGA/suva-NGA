@@ -3,7 +3,8 @@
 -- Date: 2026-11-28
 -- Description: Everything "current" is computed here, never stored (counters and labels are projections).
 --              The label shown and used is the default pipeline's (D-063); expert reviews sit beside it
---              (D-066). Gate functions are used by the release trigger (80_triggers.sql) and by tests.
+--              (D-066). The layer-1 rule ledger and the ingest closure are read here (F-01, F-04).
+--              Gate functions are used by the release trigger (80_triggers.sql) and by tests.
 -- SGBD: PostgreSQL 17
 -- Doc: docs/DB_DDL_PLANNING.md §8.4, §9.3, §10.3, §11.6, §12, §13.5, §13.7
 -- ============================================================================
@@ -47,6 +48,36 @@ LEFT JOIN LATERAL (
 LEFT JOIN corpus.ruling_text t ON t.ruling_id = r.ruling_id AND t.is_primary
 LEFT JOIN corpus.segmentation s ON s.text_id = t.text_id AND s.is_primary;
 COMMENT ON VIEW corpus.v_ruling IS 'Ruling with its best publication date (Neuheiten > HF poller), the approximation kept apart, quarter_by_publication from exact dates only (D-050), primary text and segmentation.';
+
+CREATE OR REPLACE VIEW corpus.v_ingest_closure AS
+WITH refs AS (
+  SELECT snapshot_id, count(*) AS loaded_refs, count(*) FILTER (WHERE NOT is_twin) AS base_refs,
+         count(*) FILTER (WHERE is_twin) AS twin_refs
+  FROM corpus.ruling_source_ref GROUP BY snapshot_id
+), exc AS (
+  SELECT snapshot_id, sum(n) AS exclusions, sum(n_by_row) AS exclusions_by_row_index,
+         jsonb_object_agg(reason_code, n ORDER BY reason_code) AS exclusions_by_reason
+  FROM (SELECT snapshot_id, reason_code, count(*) AS n,
+               count(*) FILTER (WHERE external_id ~ '^row:[0-9]+$') AS n_by_row
+        FROM corpus.ingest_exclusion GROUP BY snapshot_id, reason_code) x
+  GROUP BY snapshot_id
+)
+SELECT
+  s.snapshot_id, s.source, s.revision, s.file_sha256, s.row_count,
+  coalesce(r.loaded_refs, 0)                       AS loaded_refs,
+  coalesce(r.base_refs, 0)                         AS base_refs,
+  coalesce(r.twin_refs, 0)                         AS twin_refs,
+  coalesce(e.exclusions, 0)::bigint                AS exclusions,
+  coalesce(e.exclusions_by_reason, '{}'::jsonb)    AS exclusions_by_reason,
+  coalesce(e.exclusions_by_row_index, 0)::bigint   AS exclusions_by_row_index,
+  s.row_count - coalesce(r.loaded_refs, 0) - coalesce(e.exclusions, 0)::bigint AS unaccounted_rows,
+  coalesce(s.row_count = coalesce(r.loaded_refs, 0) + coalesce(e.exclusions, 0)::bigint, false) AS closure_ok
+FROM ops.source_snapshot s
+LEFT JOIN refs r ON r.snapshot_id = s.snapshot_id
+LEFT JOIN exc e ON e.snapshot_id = s.snapshot_id
+WHERE r.snapshot_id IS NOT NULL OR e.snapshot_id IS NOT NULL;
+COMMENT ON VIEW corpus.v_ingest_closure IS
+  'Every row of a source file accounted for (F-04, G5), per snapshot that has source refs or exclusions: closure_ok = row_count = loaded refs (base + twins) + exclusions. Source refs are kept per snapshot, so a new revision of a file closes on its own, the rows an earlier revision loaded included. A row with a missing or duplicate source id is recorded as row:<index> (exclusions_by_row_index) and counted inside exclusions. unaccounted_rows > 0 = rows lost without a reason; NULL row_count = closure unknown (false).';
 
 -- --- triage ------------------------------------------------------------------
 
@@ -138,7 +169,8 @@ SELECT
   (SELECT jsonb_object_agg(cvm.model_role, m.gateway_id)
      FROM ops.component_version_model cvm JOIN ops.model m ON m.model_id = cvm.model_id
     WHERE cvm.component_version_id = cv.component_version_id)                          AS declared_models,
-  (SELECT count(*) FROM triage.assessment_reason ar WHERE ar.assessment_id = a.assessment_id) AS reason_count,
+  (SELECT count(*) FROM triage.assessment_reason ar WHERE ar.assessment_id = a.assessment_id AND ar.outcome = 'fired') AS reason_count,
+  (SELECT count(*) FROM triage.assessment_reason ar WHERE ar.assessment_id = a.assessment_id) AS evaluated_rule_count,
   lc.llm_call_id, lc.served_model, lc.latency_ms, lc.input_tokens, lc.output_tokens, lc.cache_hit, lc.finish_reason,
   lj.p_yes,
   t.source AS text_source, t.content_sha256 AS text_sha256,
@@ -159,7 +191,32 @@ LEFT JOIN triage.justification js ON js.assessment_id = a.assessment_id
 LEFT JOIN ops.llm_call lc ON lc.llm_call_id = coalesce(lj.llm_call_id, js.llm_call_id)
 LEFT JOIN corpus.ruling_text t ON t.text_id = a.input_text_id
 LEFT JOIN ops.source_snapshot snap ON snap.snapshot_id = t.snapshot_id;
-COMMENT ON VIEW triage.v_scope_trace IS 'The "show me why" panel: one row per step of the label''s lineage, with run, profile and component versions, models, reasons, LLM call, input text, source snapshot, span and event counts (D-064, D-065).';
+COMMENT ON VIEW triage.v_scope_trace IS 'The "show me why" panel: one row per step of the label''s lineage, with run, profile and component versions, models, reasons (reason_count = rules that fired; evaluated_rule_count = ledger rows, every rule of the version), LLM call, input text, source snapshot, span and event counts (D-064, D-065). Rule by rule: triage.v_layer1_ledger.';
+
+CREATE OR REPLACE VIEW triage.v_layer1_ledger AS
+SELECT
+  a.assessment_id, a.run_id, a.ruling_id, r.docket, r.decision_date,
+  ppv.profile_code, ppv.version_label AS profile_version,
+  cv.version_label                    AS component_version,
+  a.in_suva_scope,
+  a.reason_code                       AS decision_reason_code,
+  ar.ordinal, rl.rule_code, rl.version_label AS rule_version, ar.effect, ar.outcome,
+  (ar.outcome = 'fired' AND ar.reason_code IS NOT DISTINCT FROM a.reason_code) AS is_decisive,
+  ar.evidence_field, ar.examined_value, ar.char_start, ar.char_end, ar.matched_text, ar.detail,
+  rc.label_de, rc.label_fr,
+  a.input_text_id, t.content_sha256   AS text_sha256
+FROM triage.assessment a
+JOIN triage.assessment_reason ar ON ar.assessment_id = a.assessment_id
+JOIN ops.rule rl ON rl.rule_id = ar.rule_id
+JOIN corpus.ruling r ON r.ruling_id = a.ruling_id
+JOIN ops.pipeline_run pr ON pr.run_id = a.run_id
+JOIN ops.pipeline_profile_version ppv ON ppv.profile_version_id = pr.profile_version_id
+JOIN ops.component_version cv ON cv.component_version_id = a.component_version_id
+LEFT JOIN ops.reason_code rc ON rc.code = ar.reason_code
+LEFT JOIN corpus.ruling_text t ON t.text_id = a.input_text_id
+WHERE a.step = 'layer1_filter';
+COMMENT ON VIEW triage.v_layer1_ledger IS
+  'Layer 1 rule by rule (F-01, F-02): one row per assessment and rule of its version, with the outcome (fired, not_fired, not_applicable, blocked), the evidence, the German and French labels, and is_decisive (the fired rule whose reason code is the decision''s). Order by assessment_id, ordinal.';
 
 CREATE OR REPLACE VIEW triage.v_export_ranked AS
 SELECT

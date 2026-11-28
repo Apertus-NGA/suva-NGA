@@ -1,0 +1,23 @@
+{
+  "canonical": "layer1-golden-1",
+  "step": "layer1_filter",
+  "version": "V1.2.0",
+  "ingest_version": "V1.0.0",
+  "snapshot": {
+    "hf_revision": "35b17aa9c3fad71011b72f78f6ab79650ec0cf96",
+    "file_sha256": "d2b2df1dedb05c62d91d834ddb6ba8084c31fae61a427fd4541a72ed35bb3711"
+  },
+  "rulings": 6055,
+  "kept": 944,
+  "dropped": 5111,
+  "by_reason": {
+    "L1_DROP_RUBRIC_OUT": 1056,
+    "L1_DROP_WRONG_COURT": 4055,
+    "L1_KEEP_ACCIDENT_TERM": 51,
+    "L1_KEEP_CONTRACT_TERM": 10,
+    "L1_KEEP_RUBRIC": 860,
+    "L1_KEEP_RUBRIC_MISSING": 19,
+    "L1_KEEP_TITLE_RUBRIC": 4
+  },
+  "decisions_sha256": "7c5e4593b664a3df53bef9b625d70039fd3e60faefe22f24ca62a42d8f2300af"
+}

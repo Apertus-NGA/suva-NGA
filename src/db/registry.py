@@ -2,27 +2,78 @@
 
 Each step ships a registry file (for example src/layer1/registry/layer1_filter.json) and a pydantic model
 of its configuration. Loading is idempotent and strict: a version that already exists must be identical
-(configuration, code hash, rules); any change needs a new version number. docs/DB_DDL_PLANNING.md §7.
+(configuration, rules, rule definitions and kinds, the decision and validation file that approved it); any
+change needs a new version number. docs/DB_DDL_PLANNING.md §7.
+
+Every version entry names the decision that approved it (`decision`, a D-NNN line of docs/DECISIONS.md) and, for a
+step version, the certified expected file that validates it (`validation`, null while it has none), F-12. The
+code hash a version records is the code that created it: when today's code differs (an engine fix that keeps every
+certified decision, proven by the golden check), the loader prints a notice instead of refusing the version; each
+run records the hash of its own run paths (params.code_sha256, F-09; a path set that can differ from the version's
+code_path, src/db/runs.py). The rules bound to a version are compared too: a file that drops, reorders or
+re-versions one is refused. A step version may also declare the models and prompts it uses (`models`, `prompts`:
+layer2_judge); src/db/llm_registry.py binds them and compares them strictly; any other extra key is refused.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import psycopg
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.db.pg import ROOT, uuid5
 
 Version = tuple[int, int, int]
+DECISION_REF = r"^D-[0-9]{3}$"  # = ops.component_version.decision_ref CHECK
+VALIDATION_REF = r"^expected/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # = ops.component_version.validation_ref CHECK
+PROMPT_PATH = r"^prompts/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # a versioned prompt file (src/db/llm_registry.py)
 
 
 class RegistryConflict(RuntimeError):
     """An existing version differs from the file: bump the version instead of editing it."""
+
+
+class StepVersionEntry(BaseModel):
+    """One entry of `versions` in a step registry file (src/*/registry/<step>.json)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: Version
+    name: str = Field(min_length=1)
+    bump_kind: Literal["initial", "major", "minor", "patch"]
+    previous: Version | None
+    config: dict
+    rules: list[str] = Field(default_factory=list, description="rule codes, in order (ordinal 1, 2, ...)")
+    changelog: str = Field(min_length=1)
+    decision: str = Field(pattern=DECISION_REF, description="the docs/DECISIONS.md line that approved the version")
+    validation: str | None = Field(
+        pattern=VALIDATION_REF, description="the certified expected file of the version; null while it has none"
+    )
+    models: dict[str, str] = Field(
+        default_factory=dict, description="model role -> gateway id (MODELS.md); bound by src/db/llm_registry.py"
+    )
+    prompts: dict[str, Annotated[str, Field(pattern=PROMPT_PATH)]] = Field(
+        default_factory=dict, description="prompt role -> prompt file under prompts/; bound by src/db/llm_registry.py"
+    )
+
+
+class ProfileVersionEntry(BaseModel):
+    """One entry of `versions` of a profile in src/db/seed/profiles.json."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: Version
+    bump_kind: Literal["initial", "major", "minor", "patch"]
+    previous: Version | None
+    changelog: str = Field(min_length=1)
+    steps: dict[str, Version] = Field(min_length=1)
+    decision: str = Field(pattern=DECISION_REF, description="the docs/DECISIONS.md line that approved the version")
 
 
 def _sha(obj: Any) -> str:
@@ -69,6 +120,27 @@ def ensure_schema(
     if stored != sha:
         raise RegistryConflict(f"{code} {label(version)}: the pydantic model changed; bump the schema version")
     return str(sid)
+
+
+def _check_rule_binding(
+    cur: psycopg.Cursor, step: str, version: Version, cvid: str, wanted: Sequence[tuple[str, str]]
+) -> None:
+    """The rules bound to a step version, in ordinal order, are exactly the file's (code and rule version).
+
+    The binding insert is ON CONFLICT DO NOTHING, so a file that drops, reorders or re-versions a rule of an existing
+    version would otherwise load without error and disagree with ops.component_version_rule.
+    """
+    cur.execute(
+        """SELECT r.rule_code, r.version_label, b.rule_id::text FROM ops.component_version_rule b
+           JOIN ops.rule r USING (rule_id) WHERE b.component_version_id = %s ORDER BY b.ordinal""",
+        (cvid,),
+    )
+    stored = cur.fetchall()
+    if [rid for _, _, rid in stored] != [rid for _, rid in wanted]:
+        raise RegistryConflict(
+            f"{step} {label(version)}: its rules are {[f'{c} {vl}' for c, vl, _ in stored]} in the database, "
+            f"{[c for c, _ in wanted]} in the file; a version's rules are immutable (bump the version)"
+        )
 
 
 def load_step_registry(
@@ -140,50 +212,62 @@ def load_step_registry(
                 rule_ids[rule["rule_code"]] = str(rid)
 
         ids: dict[Version, str] = {}
-        for ver in reg["versions"]:
-            v = tuple(ver["version"])
-            config_model.model_validate(ver["config"])
-            previous = uuid5("cv|{}|{}|{}|{}".format(step, *ver["previous"])) if ver.get("previous") else None
+        for raw in reg["versions"]:
+            ver = StepVersionEntry.model_validate(raw)
+            v = ver.version
+            config_model.model_validate(ver.config)
+            previous = uuid5("cv|{}|{}|{}|{}".format(step, *ver.previous)) if ver.previous else None
             cur.execute(
                 """INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id,
-                   config, config_sha256,
-                                                      code_path, code_sha256, status, bump_kind, previous_version_id,
-                                                          changelog,
-                                                      created_by_actor)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s, %s, %s, current_setting('app.actor',
-                       true))
+                   config, config_sha256, code_path, code_sha256, status, bump_kind, previous_version_id, changelog,
+                   decision_ref, validation_ref, created_by_actor)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s, %s, %s, %s, %s,
+                       current_setting('app.actor', true))
                    ON CONFLICT (step, v_major, v_minor, v_patch) DO NOTHING""",
                 (
                     step,
-                    ver["name"],
+                    ver.name,
                     *v,
                     config_schema_id,
-                    json.dumps(ver["config"]),
-                    _sha(ver["config"]),
+                    json.dumps(ver.config),
+                    _sha(ver.config),
                     ",".join(sorted(code_paths)),
                     code_hash,
-                    ver["bump_kind"],
+                    ver.bump_kind,
                     previous,
-                    ver["changelog"],
+                    ver.changelog,
+                    ver.decision,
+                    ver.validation,
                 ),
             )
             cvid = uuid5("cv|{}|{}|{}|{}".format(step, *v))
             cur.execute(
-                "SELECT config_sha256, code_sha256 FROM ops.component_version WHERE component_version_id = %s", (cvid,)
+                "SELECT config_sha256, code_sha256, decision_ref, validation_ref FROM ops.component_version "
+                "WHERE component_version_id = %s",
+                (cvid,),
             )
-            stored_config, stored_code = cur.fetchone()
-            if stored_config != _sha(ver["config"]):
+            stored_config, stored_code, stored_decision, stored_validation = cur.fetchone()
+            if stored_config != _sha(ver.config):
                 raise RegistryConflict(f"{step} {label(v)}: configuration differs from the file; bump the version")
-            if stored_code != code_hash:
+            if (stored_decision, stored_validation) != (ver.decision, ver.validation):
                 raise RegistryConflict(
-                    f"{step} {label(v)}: code changed ({', '.join(code_paths)}); bump the patch version"
+                    f"{step} {label(v)}: approved by {stored_decision} / {stored_validation} in the database, "
+                    f"{ver.decision} / {ver.validation} in the file; an approval is immutable (a new version, or "
+                    "make db-reset for a row written before the registry carried it)"
                 )
-            for ordinal, code in enumerate(ver.get("rules", []), start=1):
+            if stored_code != code_hash:
+                print(
+                    f"notice: {step} {label(v)} was created by other code ({stored_code[:12]}, now {code_hash[:12]}: "
+                    f"{', '.join(sorted(code_paths))}); kept, each run records its own code_sha256",
+                    file=sys.stderr,
+                )
+            for ordinal, code in enumerate(ver.rules, start=1):
                 cur.execute(
                     """INSERT INTO ops.component_version_rule (component_version_id, rule_id, ordinal)
                        VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
                     (cvid, rule_ids[code], ordinal),
                 )
+            _check_rule_binding(cur, step, v, cvid, [(code, rule_ids[code]) for code in ver.rules])
             ids[v] = cvid
     return ids
 
@@ -199,21 +283,29 @@ def load_profiles(conn: psycopg.Connection, path: Path) -> list[str]:
                    VALUES (%s, %s, %s, %s) ON CONFLICT (profile_code) DO NOTHING""",
                 (prof["code"], prof["name"], prof.get("description"), prof.get("is_default", False)),
             )
-            for ver in prof["versions"]:
-                v = tuple(ver["version"])
-                previous = (
-                    uuid5("profile|{}|{}|{}|{}".format(prof["code"], *ver["previous"])) if ver.get("previous") else None
-                )
+            for raw in prof["versions"]:
+                ver = ProfileVersionEntry.model_validate(raw)
+                v = ver.version
+                previous = uuid5("profile|{}|{}|{}|{}".format(prof["code"], *ver.previous)) if ver.previous else None
                 cur.execute(
                     """INSERT INTO ops.pipeline_profile_version (profile_code, v_major, v_minor, v_patch, status,
-                       bump_kind,
-                                                                  previous_version_id, changelog, created_by_actor)
-                       VALUES (%s, %s, %s, %s, 'active', %s, %s, %s, current_setting('app.actor', true))
+                       bump_kind, previous_version_id, changelog, decision_ref, created_by_actor)
+                       VALUES (%s, %s, %s, %s, 'active', %s, %s, %s, %s, current_setting('app.actor', true))
                        ON CONFLICT (profile_code, v_major, v_minor, v_patch) DO NOTHING""",
-                    (prof["code"], *v, ver["bump_kind"], previous, ver["changelog"]),
+                    (prof["code"], *v, ver.bump_kind, previous, ver.changelog, ver.decision),
                 )
                 pvid = uuid5("profile|{}|{}|{}|{}".format(prof["code"], *v))
-                wanted = {step: uuid5("cv|{}|{}|{}|{}".format(step, *sv)) for step, sv in ver["steps"].items()}
+                cur.execute(
+                    "SELECT decision_ref FROM ops.pipeline_profile_version WHERE profile_version_id = %s", (pvid,)
+                )
+                stored_decision = cur.fetchone()[0]
+                if stored_decision != ver.decision:
+                    raise RegistryConflict(
+                        f"profile {prof['code']} {label(v)}: approved by {stored_decision} in the database, "
+                        f"{ver.decision} in the file; an approval is immutable (a new profile version, or make "
+                        "db-reset for a row written before the seed carried it)"
+                    )
+                wanted = {step: uuid5("cv|{}|{}|{}|{}".format(step, *sv)) for step, sv in ver.steps.items()}
                 cur.execute(
                     "SELECT step::text, component_version_id::text FROM ops.pipeline_profile_step WHERE "
                     "profile_version_id = %s",

@@ -249,6 +249,8 @@ def test_live_run_stores_every_judgement_with_its_lineage(db):
     assert calls == [(False, "LIVE", 200, 1, True, True)] * 3
     spans = dict(rows(url, "SELECT operation, count(*) FROM ops.span WHERE run_id = %s GROUP BY 1", rid))
     assert spans == {"layer2.run": 1, "layer2.judge": 3, "llm.call": 3}
+    code = "SELECT params -> 'code_paths', length(params ->> 'code_sha256') FROM ops.pipeline_run WHERE run_id = %s"
+    assert rows(url, code, rid) == [(["src/layer2/engine.py", "src/layer2/models.py", "src/layer2/run.py"], 64)]
     trace = rows(
         url,
         """SELECT r.docket, t.served_model, t.p_yes IS NOT NULL FROM triage.v_scope_trace t

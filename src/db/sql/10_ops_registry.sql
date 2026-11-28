@@ -4,7 +4,9 @@
 -- Description: Versioned step components (V<major>.<minor>.<patch>), their models, prompts and rules,
 --              the JSON Schema templates their configurations follow, the reason-code vocabulary, and
 --              pipeline profiles (the "default pipeline" pins one version per step). Registry rows are
---              insert-only: only status (and updated_at) may change; a fix is a new version.
+--              insert-only: only status (and updated_at) may change; a fix is a new version. A step version
+--              names the decision (D-NNN) and the expected file that approved it, a profile version its
+--              decision (F-12).
 --              The DB is agnostic to configuration shapes: configurations are jsonb, checked by the
 --              application against ops.json_schema (docs/DB_DDL_PLANNING.md §7.4).
 -- SGBD: PostgreSQL 17
@@ -106,15 +108,21 @@ CREATE TABLE IF NOT EXISTS ops.component_version (
   bump_kind             ops.bump_kind NOT NULL,
   previous_version_id   uuid REFERENCES ops.component_version(component_version_id) ON DELETE RESTRICT,
   changelog             text NOT NULL CHECK (length(btrim(changelog)) > 0),
+  decision_ref          text,
+  validation_ref        text,
   created_by_actor      text,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT component_version_uq UNIQUE (step, v_major, v_minor, v_patch),
-  CONSTRAINT component_version_bump_chk CHECK ((bump_kind = 'initial') = (previous_version_id IS NULL))
+  CONSTRAINT component_version_bump_chk CHECK ((bump_kind = 'initial') = (previous_version_id IS NULL)),
+  CONSTRAINT component_version_decision_ref_chk CHECK (decision_ref ~ '^D-[0-9]{3}$'),
+  CONSTRAINT component_version_validation_ref_chk CHECK (validation_ref ~ '^expected/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$')
 );
 COMMENT ON TABLE ops.component_version IS
-  'One version (V<major>.<minor>.<patch>) of one pipeline step: code hash, configuration (jsonb, shape checked by the application against config_schema_id), models, prompts, rules. MAJOR = outputs not comparable, MINOR = re-measure, PATCH = identical outputs. Insert-only except status. Id = uuid5(''cv|<step>|<major>|<minor>|<patch>''). docs/DB_DDL_PLANNING.md §7.1, §7.3.';
+  'One version (V<major>.<minor>.<patch>) of one pipeline step: code hash, configuration (jsonb, shape checked by the application against config_schema_id), models, prompts, rules, and the decision and validation file that approved it. MAJOR = outputs not comparable, MINOR = re-measure, PATCH = identical outputs. Insert-only except status. Id = uuid5(''cv|<step>|<major>|<minor>|<patch>''). docs/DB_DDL_PLANNING.md §7.1, §7.3.';
 COMMENT ON COLUMN ops.component_version.config IS 'Step configuration. The DB checks only that it is an object; its shape is versioned in ops.json_schema (§7.4).';
+COMMENT ON COLUMN ops.component_version.decision_ref IS 'The docs/DECISIONS.md line that approved this version (D-NNN), from the registry file (F-12). NULL only for rows written before the registry carried it; insert-only like the rest of the row, so the loader compares it strictly.';
+COMMENT ON COLUMN ops.component_version.validation_ref IS 'The certified expected file that validates this version (e.g. expected/layer1/V1.1.0.json), from the registry file (F-12). Repo-relative path under expected/; NULL when the version has no certified output yet.';
 
 CREATE TABLE IF NOT EXISTS ops.component_version_model (
   component_version_id  uuid NOT NULL REFERENCES ops.component_version(component_version_id) ON DELETE RESTRICT,
@@ -170,7 +178,7 @@ CREATE TABLE IF NOT EXISTS ops.component_version_rule (
   PRIMARY KEY (component_version_id, rule_id),
   CONSTRAINT component_version_rule_ordinal_uq UNIQUE (component_version_id, ordinal)
 );
-COMMENT ON TABLE ops.component_version_rule IS 'The rules a step version applies, in order, with their parameters. The rule must belong to the same step (trigger). Append-only.';
+COMMENT ON TABLE ops.component_version_rule IS 'The rules a step version applies, in order, with their parameters. The rule must belong to the same step (trigger). Append-only, and sealed once an assessment uses the version or a profile pins it: a new rule is a new version, so a certified rule ledger never goes stale (trigger, F-10). Reloading the same binding is a no-op.';
 
 CREATE TABLE IF NOT EXISTS ops.pipeline_profile (
   profile_code   text PRIMARY KEY CHECK (profile_code ~ '^[a-z0-9_]+$'),
@@ -196,13 +204,16 @@ CREATE TABLE IF NOT EXISTS ops.pipeline_profile_version (
   bump_kind            ops.bump_kind NOT NULL,
   previous_version_id  uuid REFERENCES ops.pipeline_profile_version(profile_version_id) ON DELETE RESTRICT,
   changelog            text NOT NULL CHECK (length(btrim(changelog)) > 0),
+  decision_ref         text,
   created_by_actor     text,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT pipeline_profile_version_uq UNIQUE (profile_code, v_major, v_minor, v_patch),
-  CONSTRAINT pipeline_profile_version_bump_chk CHECK ((bump_kind = 'initial') = (previous_version_id IS NULL))
+  CONSTRAINT pipeline_profile_version_bump_chk CHECK ((bump_kind = 'initial') = (previous_version_id IS NULL)),
+  CONSTRAINT pipeline_profile_version_decision_ref_chk CHECK (decision_ref ~ '^D-[0-9]{3}$')
 );
-COMMENT ON TABLE ops.pipeline_profile_version IS 'A version of a profile. Id = uuid5(''profile|<profile_code>|<major>|<minor>|<patch>''). A version with major >= 1 refuses any V0.x step (trigger).';
+COMMENT ON TABLE ops.pipeline_profile_version IS 'A version of a profile, and the decision that approved it. Id = uuid5(''profile|<profile_code>|<major>|<minor>|<patch>''). A version with major >= 1 refuses any V0.x step (trigger).';
+COMMENT ON COLUMN ops.pipeline_profile_version.decision_ref IS 'The docs/DECISIONS.md line that approved this profile version (D-NNN), from src/db/seed/profiles.json (F-12). NULL only for rows written before the seed carried it; insert-only like the rest of the row, so the loader compares it strictly.';
 
 CREATE TABLE IF NOT EXISTS ops.pipeline_profile_step (
   profile_version_id    uuid NOT NULL REFERENCES ops.pipeline_profile_version(profile_version_id) ON DELETE RESTRICT,

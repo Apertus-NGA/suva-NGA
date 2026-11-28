@@ -1,8 +1,16 @@
 # DB_DDL_PLANNING: the data layer (PostgreSQL) for rulings, scope labels, versions, logs and summaries
 
-> **Status: v0.4 — Phase 1 (doctrine freeze) and Phase 2 (SQL/schema) delivered on branch `platform/db-ddl`, 28 Nov 2026, 02:45 CET.** Decisions recorded as D-061 to D-071 in `docs/DECISIONS.md`. The DDL is in `src/db/sql/` (15 files, 57 tables), its tests in `tests/sql/` (8 files, green on PostgreSQL 17) and `tests/test_db_deploy.py`; `make db-reset`, `make db-deploy`, `make db-test`; a CI `db` job. Next: Phase 3 (docs sync) and Phase 5 (loaders, step writers). Owner: platform (the lead, while D-024 is open).
+> **Status: v0.6 — 28 Nov 2026, 09:00 CET: layer-1 traceability and governance (D-081, D-082) on branch `triage/layer1-traceability`.** Phase 1 (doctrine freeze) and Phase 2 (SQL/schema) were delivered on branch `platform/db-ddl` (v0.4, 02:45 CET); decisions D-061 to D-071 in `docs/DECISIONS.md`. The DDL is in `src/db/sql/` (15 files, 58 tables, 45 ENUMs), its tests in `tests/sql/` (10 files, green on PostgreSQL 17) and `tests/test_db_*.py`; `make db-reset`, `make db-deploy`, `make db-test`; a CI `db` job. Next: Phase 3 (docs sync) and Phase 5 (loaders, step writers). Owner: platform (the lead, while D-024 is open).
 > Evidence: the read-only audit of 27 Nov (`tmp/audits/audit-data-layer-2026-11-27.md`, git-ignored) and DuckDB queries on the pinned HF file (`bger.parquet`, commit `35b17aa9c3fad71011b72f78f6ab79650ec0cf96`, SHA-256 `d2b2df1d…`). Numbers marked *estimate* are not measured.
 > Reading order: §0, §7 (versions and registry), §9 (scope label), §11 (logs), §12 (expert reviews), §13 (summaries), §17 (open questions).
+
+**Changes in v0.6 (28 Nov, layer-1 traceability and governance, branch `triage/layer1-traceability`, D-081 to D-083; any existing database needs `make db-reset && make db-deploy`):**
+- **Rule ledger (D-081):** `triage.assessment_reason` holds every enabled rule of the version, with its outcome (new ENUM `rule_outcome`: `fired`, `not_fired`, `not_applicable`, `blocked`), `examined_value` and `detail`. It is certified row by row (`t30_check`) and per assessment at commit (new deferred trigger `t50_ledger`), and sealed once committed. It **replaces** the debug events `layer1.rule.evaluated` and `layer1.rule.fired` of v0.5 (§10.2, §11.3). New view `triage.v_layer1_ledger` (§10.3).
+- **Ingest exclusion ledger (D-081):** new table `corpus.ingest_exclusion`, so 58 tables. `corpus.ruling_source_ref` is keyed per snapshot. `ops.source_snapshot.row_count` counts every row of the file. A row is a ref or an exclusion, never both (trigger `t31_exclusive`, serialised per snapshot by `corpus.lock_source_rows`). New view `corpus.v_ingest_closure` (§8.4).
+- **Governance (D-082):** `decision_ref` and `validation_ref` on `ops.component_version`, `decision_ref` on `ops.pipeline_profile_version`, compared strictly by the loader (§7.3, §7.6). A used or pinned version's rule set is sealed (§7.5). The audit log records the role a session acted as (`db_role`), and pipeline sessions run `SET ROLE suva_g_pipeline` (§14, §15.6).
+- `corpus.ruling_text.content` refuses a text made only of whitespace, by the engine's definition (`ruling_text_content_visible_chk`, §8.4).
+- New reason codes `ING_DOCKET_MALFORMED`, `ING_DECISION_DATE_MISSING`, `ING_SOURCE_ID_MISSING`, `ING_SOURCE_ID_DUPLICATE`, `L1_KEEP_TEXT_UNAVAILABLE`, `L1_KEEP_TITLE_RUBRIC`. The labels of `L1_KEEP_RUBRIC` and of the three `L1_DROP_*` codes state only their own condition and name no configured value (F-03).
+- The DDL change list, with the finding and the test behind each item, is the handoff report `tmp/handoff/ddl-report-layer1-traceability-2026-11-28.md` (git-ignored).
 
 **Changes in v0.5 (28 Nov, layer 1 on the DB, branch `triage/layer1-enterprise`):**
 - One table added: `corpus.subject_observation` (a ruling's rubric per source, D-072), so 57 tables; enum `subject_source`.
@@ -43,7 +51,8 @@
 - **Summaries:** one (ruling, preset) pair has immutable versions; **each version is always a German + French pair**; each text is split into claims; claims cite considerations through a database link (G1) and carry the verifier's checks.
 - **Presets live in the DB** and can be selected at run time. Perspective goes from 0 (insured person) to 10 (insurer), using written anchors at 0, 3, 5, 7 and 10. The perspective changes emphasis, never facts. `suva_house` is the mandatory preset for every in-scope ruling.
 - **Roles follow least privilege:** an owner role that never logs in, three groups, and experts writing only through narrow functions. A **Postgres service in CI from now on** runs the SQL tests.
-- **Scope:** 57 tables in P0 (built: `src/db/sql/`), many of them small lookup or join tables. P1 adds parties, references, splits and search.
+- **Every filtering decision is traceable (D-081):** layer 1 stores every rule of its version with its outcome and evidence, and every row of a source file is either loaded or excluded with a reason code; the database certifies both.
+- **Scope:** 58 tables in P0 (built: `src/db/sql/`), many of them small lookup or join tables. P1 adds parties, references, splits and search.
 
 ---
 
@@ -230,10 +239,11 @@ ops.pipeline_profile ── _version ── _step ──────────
                                                                                 ├── ops.artifact ── ops.release
                                                                                 └── ops.source_snapshot      ops.blob
 CORPUS
-corpus.ruling ── ruling_source_ref │ publication_observation │ ruling_text ── segmentation ── consideration (tree)
+corpus.ruling ── ruling_source_ref (per snapshot) │ publication_observation │ subject_observation │ ruling_text ── segmentation ── consideration (tree)
               ── ruling_parse │ ingest_issue │ population_member ── population
+ops.source_snapshot ── corpus.ruling_source_ref │ corpus.ingest_exclusion   (every row of the file: loaded or excluded, never both)
 TRIAGE
-triage.assessment (per step, span, component version) ── assessment_reason (rule, evidence)
+triage.assessment (per step, span, component version) ── assessment_reason (the rule ledger: every rule, its outcome, its evidence)
                   ├── llm_judgement (layer 2)   ├── justification ── assessment_evidence ── corpus.consideration
                   └── ranking_entry ── ranking ── threshold                          (ops.release points to a ranking)
 GOLD
@@ -250,14 +260,16 @@ audit.change_log ← triggers on every mutable row
 |---|---|---|
 | `ops` registry (12) | reason_code, json_schema, model, prompt_version, component_version, component_version_model, component_version_prompt, rule, component_version_rule, pipeline_profile, pipeline_profile_version, pipeline_profile_step | |
 | `ops` execution (12) | source_snapshot, pipeline_run, work_item, user_request, span, log_event, run_metric, llm_call, llm_call_example, blob, artifact, release | |
-| `corpus` (10) | ruling, ruling_source_ref, publication_observation, ruling_text, segmentation, consideration, ruling_parse, ingest_issue, population, population_member | ruling_party, ruling_reference |
+| `corpus` (12) | ruling, ruling_source_ref, ingest_exclusion, publication_observation, subject_observation, ruling_text, segmentation, consideration, ruling_parse, ingest_issue, population, population_member | ruling_party, ruling_reference |
 | `triage` (8) | assessment, assessment_reason, llm_judgement, justification, assessment_evidence, threshold, ranking, ranking_entry | |
 | `gold` (3) | label, expert_review, suva_summary | split_set, split_member |
 | `summ` (10) | perspective_anchor, preset, preset_version, preset_version_prompt, summary, summary_version, summary_text, summary_claim, claim_citation, verification_check | |
 | `audit` (1) | change_log | |
 
-P0 = 57 tables. Expected volumes:
+P0 = 58 tables (`tests/sql/00_structure_test.sql` counts them, and the 45 ENUMs). Expected volumes:
 - about 6,055 rulings
+- ingest exclusions: one per row of a source file that is not loaded, per snapshot (the HF file: 188,811, `results/ingest_closure.json`)
+- rule ledger: one row per rule of the version per layer-1 assessment (54,495 per `V1.1.0` run, 66,605 per `V1.2.0` run: `results/layer1_validation.json`)
 - considerations: 150,000 to 250,000 rows per segmentation version (*estimate*)
 - assessments: one per ruling per step per run
 - LLM calls: a few thousand per night
@@ -325,13 +337,15 @@ Columns:
 | `config_schema_id` | FK `ops.json_schema` |
 | `config` | jsonb, CHECK it is an object |
 | `config_sha256` | |
-| `code_path`, `code_sha256` | e.g. `src/layer1/engine.py` and `src/layer1/models.py` |
+| `code_path`, `code_sha256` | e.g. `src/layer1/engine.py` and `src/layer1/models.py`: the code that **created** the version. A later run whose code differs gets a notice from the loader, not a refusal (an engine fix that keeps every certified decision, proven by the golden check, needs no new version). Each run records the hash of its own run paths in `ops.pipeline_run.params` (`code_paths`, `code_sha256`; D-082): compare it with another run's, never with this column |
 | `git_commit` | |
 | `status` | `draft` \| `active` \| `deprecated` \| `retired` |
 | `bump_kind`, `previous_version_id`, `changelog` | |
+| `decision_ref` | the `docs/DECISIONS.md` line that approved the version (CHECK `^D-[0-9]{3}$`), from the registry file's `decision` (D-082) |
+| `validation_ref` | the certified expected file that validates it (CHECK `^expected/<dir>/<file>.json$`, e.g. `expected/layer1/V1.1.0.json`), from the registry file's `validation`; NULL while the version has none |
 | `created_by_actor`, `created_at` | |
 
-Insert-only: only `status` may change, and it is audited. **`ops.component_version_prompt`**: (`component_version_id`, `prompt_role`) → `prompt_version_id`.
+Insert-only: only `status` may change, and it is audited. `decision_ref` and `validation_ref` are insert-only like the rest of the row, so the loader compares them strictly with the registry file; `tests/test_registry_refs.py` checks that each decision is a row of `docs/DECISIONS.md` and that each validation file certifies that step and version. **`ops.component_version_prompt`**: (`component_version_id`, `prompt_role`) → `prompt_version_id`.
 
 ### 7.4 Configuration templates: the DB is agnostic, but ready
 
@@ -361,9 +375,9 @@ How it is enforced:
 - `description`, `status`, `changelog`
 - UNIQUE (`rule_code`, version)
 
-**`ops.component_version_rule`**: (`component_version_id`, `rule_id`) PK, `ordinal` (UNIQUE per component version), `enabled`, `params` (jsonb).
+**`ops.component_version_rule`**: (`component_version_id`, `rule_id`) PK, `ordinal` (UNIQUE per component version), `enabled`, `params` (jsonb). **Sealed once used (D-082):** trigger `t30_check` refuses a new or changed binding on a version that an assessment uses or a profile pins. A rule added later would leave every certified ledger of that version incomplete. Reloading an identical binding (the loader's `ON CONFLICT DO NOTHING`) passes. The loader also refuses a registry file that drops, reorders or re-versions a rule of an existing version, sealed or not.
 
-The tables that store results point to the **exact rule version** that fired: `triage.assessment_reason.rule_id`, `summ.verification_check.rule_id`.
+The tables that store results point to the **exact rule version** they evaluated: `triage.assessment_reason.rule_id` (every rule of the version, whatever it did: the ledger, §10.2), `summ.verification_check.rule_id`.
 
 **`ops.reason_code`** (one vocabulary for the whole DB): `code` PK, `domain` (`triage` \| `verify` \| `ingest` \| `work`), `label_de` NOT NULL, `label_fr`, `description`. It replaces the separate lookups of v0.1.
 
@@ -372,7 +386,7 @@ The tables that store results point to the **exact rule version** that fired: `t
 | Table | Columns |
 |---|---|
 | `ops.pipeline_profile` | `profile_code` PK (`default`, `experiment_8b`…), `name`, `description`, `is_default` (partial UNIQUE: exactly one), `retired_at` |
-| `ops.pipeline_profile_version` | the version (V…), `status`, `changelog`, `bump_kind`; UNIQUE (`profile_code`, version) |
+| `ops.pipeline_profile_version` | the version (V…), `status`, `changelog`, `bump_kind`, `decision_ref` (CHECK `^D-[0-9]{3}$`, from `src/db/seed/profiles.json`, compared strictly, D-082); UNIQUE (`profile_code`, version) |
 | `ops.pipeline_profile_step` | (`profile_version_id`, `step`) PK → `component_version_id`; trigger: the component version's `step` = `step`; a profile version with major ≥ 1 refuses a `V0.x` step |
 
 `ops.pipeline_run.profile_version_id` is NOT NULL. A trigger checks that every assessment's `component_version_id` is the version its run's profile pins for that step. "By the default pipeline" means: the current release (`ops.release.is_current`) of the `default` profile.
@@ -381,10 +395,10 @@ The tables that store results point to the **exact rule version** that fired: `t
 
 | Step | Configuration template (keys) | Rules (initial set) |
 |---|---|---|
-| `ingest` | `sources.hf_bger.revision`, `windows[]` (populations to build), `twin_rule: same_date`, `columns[]` (read list; `judges`, `clerks`, `outcome`, `marked_for_publication` never in it; `legal_area` read as a rubric observation, D-072) | `ING_TWIN_SAME_DATE` |
+| `ingest` | `sources.hf_bger.revision`, `windows[]` (populations to build), `twin_rule: same_date`, `columns[]` (read list; `judges`, `clerks`, `outcome`, `marked_for_publication` never in it; `legal_area` read as a rubric observation, D-072) | exclusion reason codes (`corpus.ingest_exclusion`, D-081): `OUT_OF_WINDOW`, `ING_TWIN_SAME_DATE`, `ING_DECISION_DATE_MISSING`, `ING_DOCKET_MALFORMED`, `ING_SOURCE_ID_MISSING`, `ING_SOURCE_ID_DUPLICATE` |
 | `segment` | `method: hf_erwaegungen \| own_splitter`, `hf_file.revision`, `min_citable_depth: 1`, `locate_offsets: true`, `expected_count_source: hf_structure`, `acceptance: {count_match_min, coverage_min}` | `SEG_COUNT_MATCH`, `SEG_COVERAGE`, `SEG_OFFSET_FOUND` |
 | `parse` | `dispositive_markers{de,fr,it}`, `bench_pattern`, `outcome_patterns{…}`, `parties_markers{…}` | `PAR_OUTCOME_*` |
-| `layer1_filter` | `courts{digit: {letters, rubrics}}`, `rubric_sources: [neuheiten, hf_legal_area, gegenstand_head]`, `normalise{casefold, nfkc, apostrophes, nbsp}`, `accident_terms`, `contract_terms`, `closed_rubrics` (model: `src/layer1/models.py`) | `L1_KEEP_RUBRIC`, `L1_KEEP_RUBRIC_MISSING`, `L1_KEEP_ACCIDENT_TERM`, `L1_KEEP_CONTRACT_TERM`, `L1_FLAG_CLOSED_RUBRIC`, `L1_DROP_WRONG_COURT`, `L1_DROP_WRONG_LETTER`, `L1_DROP_RUBRIC_OUT`, `L1_SIGNAL_RUBRIC_FROM_TITLE` (D-073; `docs/LAYER1.md` §6.2) |
+| `layer1_filter` | `courts{digit: {letters, rubrics}}`, `rubric_sources: [neuheiten, hf_legal_area, gegenstand_head]`, `normalise{casefold, nfkc, apostrophes, nbsp}`, `accident_terms`, `contract_terms`, `closed_rubrics` (model: `src/layer1/models.py`) | `L1_KEEP_RUBRIC`, `L1_KEEP_RUBRIC_MISSING`, `L1_KEEP_ACCIDENT_TERM`, `L1_KEEP_CONTRACT_TERM`, `L1_FLAG_CLOSED_RUBRIC`, `L1_DROP_WRONG_COURT`, `L1_DROP_WRONG_LETTER`, `L1_DROP_RUBRIC_OUT`, `L1_SIGNAL_RUBRIC_FROM_TITLE` (D-073; `docs/LAYER1.md` §6.2); `V1.2.0` adds `L1_KEEP_TEXT_UNAVAILABLE`, `L1_KEEP_TITLE_RUBRIC` and the optional `title_rubric.cut_at` (D-083) |
 | `layer2_judge` | `model_role: judge`, `question_prompt` (ref), `answer_tokens: [Ja, Nein]`, `top_logprobs: 20`, `text_cap: {head: 12000, tail: 2000}`, `score_mapping: p_yes_x100`, `temperature: 0`, `max_tokens: 1` | `L2_FAIL_NO_YESNO_TOKEN` |
 | `justification` | `model_role`, `json_mode_cascade`, `max_tokens: 400`, `key_statement_max: 300`, `repair_attempts: 1` | `JUS_PARTY_SUVA_ACTING_ONLY_IF_PARTY`, `JUS_ACTING_PARTY_IN_BLOCK`, `JUS_EVIDENCE_IN_SET` |
 | `ranking` | `threshold_policy: f2_cross_quarter_frozen`, `threshold_ref`, `tie_break`, `populations: [2026Q2_union, 2026Q2_publication]`, `top_k: [10, 30]` | `RANK_BELOW_THRESHOLD` |
@@ -395,6 +409,19 @@ The tables that store results point to the **exact rule version** that fired: `t
 ### 7.8 Lifecycle and immutability
 
 Registry rows are **insert-only**. Only `status` changes (`draft → active → deprecated → retired`), and each change is audited. Correcting a version means creating the next version. A version referenced by a run can never be deleted (FKs are `ON DELETE RESTRICT`).
+
+Registry semantics (D-082), what the loader (`src/db/registry.py`) compares when a version number already exists:
+
+| Item | Different from the stored version |
+|---|---|
+| configuration, rule definitions, rule kinds, configuration and rule schemas | refused: bump the version |
+| rules bound to the version (dropped, reordered, bound at another rule version) | refused by the loader; refused by the trigger once the version is used or pinned (§7.5) |
+| `decision_ref`, `validation_ref` (step versions), `decision_ref` (profile versions) | refused. A `validation` set in the registry file after the version was loaded (the order of a new version: register, validate, certify) is refused too: rebuild the database (`make db-reset && make db-deploy`, then reload) |
+| `code_sha256` (today's code differs from the code that created the version) | notice only; each run records its own code hash |
+
+**Known gap (schema history):** the loader stores each registry file's current configuration and rule schemas only, as `bump_kind` `initial` with no previous version. On a fresh database `layer1_filter.config` and `layer1_filter.rule` exist at `V1.1.0` only (the schemas `V1.2.0` needs); on a database loaded before, `V1.1.0` would be a second `initial` row next to `V1.0.0`. The history is in the registry file's changelogs. Recording it in `ops.json_schema` needs a change in `src/db/registry.py` (platform).
+
+What a version certifies is in `expected/<step>/<version>.json` (counts and a SHA-256 over the canonical decisions), checked by `make layer1-golden` and inside every comparable layer-1 run (`docs/LAYER1.md` §7.4). A certified file is never edited.
 
 ---
 
@@ -414,7 +441,8 @@ Built from the pinned HF files only (bger.ch Neuheiten pages add observations la
 | Rulings of `judgements/` outside those windows | 23 | exact | `suva_reference` |
 
 Loader rules:
-- **Twins:** a `-DYYYYMMDD` row is dropped only when its base row has the same date (18 rows); 6B_920/2025 and 7B_1356/2025 are real second decisions. Every source row is kept in `corpus.ruling_source_ref`, with `is_twin`.
+- **Twins:** a `-DYYYYMMDD` row is dropped only when its base row has the same date (18 rows); 6B_920/2025 and 7B_1356/2025 are real second decisions. A loaded source row is kept in `corpus.ruling_source_ref`, with `is_twin`.
+- **Every row of the file is accounted for (D-081):** a row that is not loaded is a `corpus.ingest_exclusion` row with its reason code (`OUT_OF_WINDOW`, `ING_TWIN_SAME_DATE`, `ING_DECISION_DATE_MISSING`, `ING_DOCKET_MALFORMED`, `ING_SOURCE_ID_MISSING`, `ING_SOURCE_ID_DUPLICATE`). `ops.source_snapshot.row_count` is the number of rows of the file. Before commit the loader checks `row_count` = refs + exclusions (`corpus.v_ingest_closure`); otherwise the run fails and writes nothing. One pure classification function serves both the loaded rows and the exclusions, so the certified loaded set (`expected/ingest/V1.0.0.json`) is unchanged.
 - **Taken from HF:** `decision_id`, `docket_number`, `decision_date`, `publication_date`, `scraped_at`, `language`, `title` (empty for 47 of the 2,096), `full_text` (present for 2,096 of 2,096), `appealed_court_raw`, `cited_decisions`, `content_hash`, `source_url`.
 - **Never taken:** `judges`, `clerks` (D-038), `outcome`, `marked_for_publication` (D-011).
 - **Taken as a rubric observation:** `legal_area` (empty for 1,683 of 2,096), into `corpus.subject_observation` only when filled (D-072).
@@ -460,9 +488,10 @@ A splitter version becomes **primary** for the corpus only when its acceptance c
 | Table | Columns and rules |
 |---|---|
 | `corpus.ruling` | `ruling_id` (`uuid5('bger|'||docket||'|'||decision_date)`), `docket` (CHECK `^[0-9]{1,2}[A-Z]_[0-9]+/[0-9]{4}$`), `decision_date`, UNIQUE (`docket`, `decision_date`); generated `court`, `register_letter`, `filing_year`, `quarter_by_decision`; `language`; `gegenstand` (NULL when empty); `previous_instance`; `bger_url` (built by code); `origin` (`base_dataset` \| `user_added`); `created_by_run_id` |
-| `corpus.ruling_source_ref` | (`source`, `external_id`) PK, `ruling_id`, `snapshot_id`, `is_twin` |
+| `corpus.ruling_source_ref` | (`snapshot_id`, `source`, `external_id`) PK (D-081: one reference per snapshot, so each revision of a file closes on its own, and a row whose docket or date changed points to its new ruling), `ruling_id`, `is_twin`; index (`source`, `external_id`); trigger `t31_exclusive`: never also an exclusion of the same snapshot |
+| `corpus.ingest_exclusion` | (`snapshot_id`, `source`, `external_id`) PK; `source` CHECK in (`hf_decision_id`, `aza_id`, `team_list_2096`); `docket_raw` (unchecked: a malformed docket is a reason, not a refusal); `decision_date` (nullable); `reason_code` FK (domain `ingest`, or `OUT_OF_WINDOW`; trigger); `detail` jsonb object (the dates compared, a twin's base id; identity values only, never text); `component_version_id` (an ingest version; trigger), `run_id`; index (`snapshot_id`, `reason_code`); append-only. A row without a usable id is `row:<index>`. Triggers: the snapshot is of the row's kind of file (`hf_decision_id` → `hf_bger`), and `t31_exclusive` (never also a source ref of the same snapshot), serialised across sessions by `corpus.lock_source_rows(snapshot_id)`, one advisory transaction lock per snapshot, which the loader also takes |
 | `corpus.publication_observation` | `ruling_id`, `source` (`neuheiten` \| `hf_poller` \| `hf_first_seen`), `quality` (`exact` \| `approx_first_seen`), `observed_date`, `star`, `sachgebiet`, `snapshot_id`; UNIQUE (`ruling_id`, `source`); CHECK `hf_first_seen` ⇔ `approx_first_seen` |
-| `corpus.ruling_text` | `text_id` (`uuid5(ruling, source, sha)`), `ruling_id`, `source` (`hf` \| `bger` \| `entscheidsuche`), `content` (CHECK non-blank), `content_sha256`, `char_length`, `clean_length`, `is_primary` (partial UNIQUE), `snapshot_id` |
+| `corpus.ruling_text` | `text_id` (`uuid5(ruling, source, sha)`), `ruling_id`, `source` (`hf` \| `bger` \| `entscheidsuche`), `content` (CHECK `ruling_text_content_visible_chk`: at least one character outside Python's `str.isspace()` set, the engine's definition of an absent text, so layer 1 never meets a stored text it treats as absent), `content_sha256`, `char_length`, `clean_length`, `is_primary` (partial UNIQUE), `snapshot_id` |
 | `corpus.subject_observation` | `observation_id`, `ruling_id`, `source` (`neuheiten` \| `hf_legal_area`), `rubric` (CHECK non-blank), `star`, `snapshot_id`; UNIQUE (`ruling_id`, `source`); written only when the source has a value (D-072) |
 | `corpus.segmentation` | §8.3 |
 | `corpus.consideration` | `consideration_id` (`uuid5(segmentation, ordinal)`), `segmentation_id`, `ordinal` (UNIQUE per segmentation; generated `cid = 'c' || ordinal`), `e_number`, `depth`, `parent_consideration_id`, generated `is_citable` (`depth >= 1`), `char_start` / `char_end`, `content`, `content_sha256` |
@@ -471,6 +500,7 @@ A splitter version becomes **primary** for the corpus only when its acceptance c
 | `corpus.population` | `code` UNIQUE, `quarter`, `definition` (`decision_date` \| `publication_date` \| `union` \| `reference`), `role` (`target` \| `labelled` \| `reference`), `is_delivery_default` (partial UNIQUE; D-052: `2026Q2_publication`), `manifest_sha256`, `frozen_at`, `built_by_run_id` |
 | `corpus.population_member` | (`population_id`, `ruling_id`) PK, `basis` (`decision_date` \| `publication_exact` \| `publication_approx`); a trigger refuses new members once the population is frozen |
 | `corpus.v_ruling` (view) | ruling + best publication date (`neuheiten` > `hf_poller`), approximation apart, `quarter_by_publication` from exact dates only, primary text stats |
+| `corpus.v_ingest_closure` (view) | per snapshot with refs or exclusions: `row_count`, `loaded_refs` (`base_refs` + `twin_refs`), `exclusions`, `exclusions_by_reason` (jsonb), `exclusions_by_row_index`, `unaccounted_rows`, `closure_ok` (`row_count` = refs + exclusions; false when `row_count` is NULL) |
 
 ---
 
@@ -527,15 +557,15 @@ Invariants:
 | `span_id` FK NOT NULL | the unit of work in the logs (§11) |
 | `upstream_assessment_id` FK | the previous step's assessment (lineage) |
 | `input_text_id`, `input_segmentation_id` FK | what was read |
-| `input_fingerprint` char(64) NOT NULL | SHA-256 over every input: a rerun skips identical inputs (pipeline step 7) |
+| `input_fingerprint` char(64) NOT NULL | SHA-256 over every input: proves what was read; a rerun may skip identical inputs (pipeline step 7). Layer 1 does not skip: every run decides every ruling, a few seconds of code |
 | `in_suva_scope` NOT NULL | §9 |
-| `outcome` | `ok` \| `failed` \| `skipped` |
+| `outcome` | `ok` \| `failed` \| `skipped`; deferred trigger `t50_ledger` certifies the ledger of every `ok` assessment and of every `out_of_scope` one, whatever its outcome (G5) |
 | `score_raw` double | native value (P(Ja), rule score) |
 | `score_0_100` numeric(5,2) | CHECK 0 to 100 |
 | `score_source` | `judged` \| `signals_only` \| `net` \| `failed` (D-021 point 7) |
 | `reason_code` FK `ops.reason_code` | required when `out_of_scope` |
 | `explanation_de` | German reason shown in the UI |
-| `mode` | `LIVE` \| `REPLAY` |
+| `mode` | `LIVE` \| `REPLAY`; a code-only step such as layer 1 writes `LIVE`: it replays no recorded answer |
 | `started_at`, `finished_at` | |
 
 UNIQUE (`run_id`, `ruling_id`, `step`, `repetition_idx`).
@@ -544,25 +574,34 @@ UNIQUE (`run_id`, `ruling_id`, `step`, `repetition_idx`).
 
 | Step | Detail table | Stored, exhaustively |
 |---|---|---|
-| `layer1_filter` | `triage.assessment_reason` | **every** rule that fired, kept or dropped: `rule_id` (exact version), `reason_code`, `effect`, `evidence_field`, `evidence_consideration_id`, `char_start` / `char_end`, `matched_text` (≤ 300 characters); rules evaluated without firing are logged as `debug` events (§11.3) |
+| `layer1_filter` | `triage.assessment_reason`, the **rule ledger** (D-081) | **every** enabled rule of the version, whatever it did, kept or dropped: `ordinal` (the rule's ordinal in the version), `rule_id` (exact version), `reason_code`, `effect` (= the rule's kind), `outcome` (`fired` \| `not_fired` \| `not_applicable` \| `blocked`), `evidence_field` (`docket`, `rubric:<source>`, `gegenstand`, `full_text`), `examined_value` (≤ 300 characters; NULL for full text), `char_start` / `char_end` and `matched_text` (≤ 300 characters) for a `fired` or `blocked` match only, `detail` (jsonb ≤ 2,000 bytes: `why`, `blocked_by`, `closed_rubric_match`, `pattern`, `text_chars`, `rubric_source`); UNIQUE (`assessment_id`, `rule_id`). **The ledger replaces the debug events of v0.5:** a rule evaluated without firing is a `not_fired` or `not_applicable` row, not an event (§11.3). Certified by `t30_check` per row and `t50_ledger` at commit (below); sealed once committed |
 | `layer2_judge` | `triage.llm_judgement` (1:1) | `llm_call_id`, `prompt_version_id`, requested and served model, question language, `logprob_yes`, `logprob_no`, `p_yes`, `top_logprobs` (raw, up to 20), `yes_no_in_top`, `text_chars_total`, `text_chars_sent`, `truncation` (`head12000_tail2000`), `input_tokens` |
 | `justification` | `triage.justification` (1:1) + `triage.assessment_evidence` | `llm_call_id`, `repair_llm_call_id`, `json_valid`, `key_statement` (≤ 300), number of consideration ids offered, `party_check_status` (`pass` \| `fail_suva_not_party` \| `fail_party_not_in_block` \| `not_applicable`) + `party_check_rule_id`; evidence = considerations by FK, trigger: same segmentation (G1) |
 | `ranking` | `triage.threshold`, `triage.ranking`, `triage.ranking_entry` | threshold: value, metric (F2), chosen-on and reported-on populations, metrics (recall, precision, F2, hits at 30, CI), policy (D-021 point 8), `scorer_component_version_id`, `frozen_at`; ranking: (run, population, threshold, tie-break); entry: `final_score_0_100`, `rank` (UNIQUE per ranking), `above_threshold`, generated `in_top10` and `in_top30` |
 
 **Comparability trigger:** a ranking entry is refused when its layer-2 assessment's component version does not have the same step, `v_major` and `v_minor` as the threshold's scorer version (§7.1).
 
+**Ledger triggers (D-081, `80_triggers.sql`):**
+- `t30_check` on `triage.assessment_reason`, per row: the rule is an enabled rule of the assessment's version, at its ordinal, with its reason code and its kind as effect. A full-text match is the exact slice of the stored text (`left(substr(content, char_start + 1, char_end - char_start), 300)`), at least one character long, with offsets on `full_text` evidence only. `not_applicable` needs `detail.why` (layer 1: one of `court_not_listed`, `letter_not_listed`, `rubric_missing`, `text_absent`, `gegenstand_absent`; `text_absent` only without an input text). `blocked` is a keep blocked by another enabled flag of the version (`detail.blocked_by`; layer 1 also `detail.closed_rubric_match`). The assessment must have been inserted by the same transaction (`ops.inserted_in_current_xact`): a committed ledger is sealed.
+- `t50_ledger`, a constraint trigger on `triage.assessment` (AFTER INSERT, DEFERRABLE INITIALLY DEFERRED), per assessment at commit. It applies when the version has rules (check rules excepted: they live in `summ.verification_check` and `triage.justification`). Every enabled rule has exactly one row and there is no other row; the blocker of a `blocked` row fired. For layer 1: `potentially` if and only if a keep fired; the reason code is the fired keep with the lowest ordinal, else the fired drop with the lowest ordinal. It certifies every `out_of_scope` assessment, whatever its outcome.
+- The ranking step falls under the same completeness rule: its writer records its rule (`RANK_BELOW_THRESHOLD`) for every assessment.
+
 ### 10.3 Trace view
 
 `triage.v_scope_trace` returns one row per (ruling, step) in the current release, with:
 - the assessment and its run (git commit, mode, profile version)
 - the component version (label, code hash, configuration hash, models per role)
-- the reasons and their evidence
+- the reasons and their evidence: `reason_count` = rules that fired, `evaluated_rule_count` = ledger rows (every rule of the version)
 - the LLM call (served model, latency, tokens, cache hit, finish reason)
 - the input text and segmentation
 - the source snapshot (HF commit, file hash)
 - the span (status, duration) and its number of events by level
 
 It feeds the "show me why" panel (`GET /api/rulings/{docket}/trace`).
+
+Rule by rule (D-081):
+- **`triage.v_layer1_ledger`**: one row per layer-1 assessment and rule of its version. It carries the assessment, run, ruling, docket and decision date; the profile and component version; the scope and the decision's reason code; then `ordinal`, `rule_code`, the rule version, `effect`, `outcome`, `is_decisive` (a fired rule whose reason code is the decision's), the evidence, `detail`, the German and French labels, `input_text_id` and the text's SHA-256. It answers "why was this ruling filtered, which condition matched, which did not" (`docs/LAYER1.md` §7.2).
+- **`corpus.v_ingest_closure`** (§8.4): the rows of a source file that never became a ruling, by reason, and the closure check.
 
 ---
 
@@ -594,10 +633,10 @@ Indexes:
 
 | Step | Events |
 |---|---|
-| ingest | `ingest.snapshot.loaded`, `ingest.ruling.twin_dropped`, `ingest.field.excluded`, `ingest.count.mismatch` |
+| ingest | `ingest.snapshot.loaded`, `ingest.population.frozen`, `ingest.exclusions.recorded` (counts by reason and the closure; the rows themselves are `corpus.ingest_exclusion`, D-081), `ingest.gold.loaded`, `ingest.ruling.twin_dropped`, `ingest.field.excluded`, `ingest.count.mismatch` |
 | segment | `segment.count.mismatch`, `segment.offset.not_found`, `segment.fallback.own_splitter`, `segment.version.promoted` |
 | parse | `parse.outcome.decided`, `parse.parties.not_found` |
-| layer1_filter | `layer1.rule.evaluated` (debug, every rule), `layer1.rule.fired`, `layer1.decision` |
+| layer1_filter | `layer1.decision.made` (info, one per ruling: scope, subject and text decisions), `layer1.run.decided`, `layer1.parity.checked` (warning when a decision differs from `src/courts.py`), `layer1.files.written`, `layer1.golden.matched` (info) \| `layer1.golden.not_comparable` (warning, with the reason), `layer1.validation.passed` (info) \| `layer1.validation.failed` (error, on the candidate run). No event per rule: every rule's outcome is a ledger row (D-081, §10.2); the v0.5 events `layer1.rule.evaluated` and `layer1.rule.fired` are dropped |
 | layer2_judge | `layer2.prompt.built` (characters, tokens, truncation), `layer2.score`, `layer2.yesno.missing` |
 | LLM (any step) | `llm.request`, `llm.retry` (error class, back-off), `llm.response` (served model, finish reason), `llm.cache.hit`, `llm.model.mismatch` |
 | justification | `justification.json.invalid`, `justification.repair`, `justification.party_check.failed` |
@@ -780,7 +819,7 @@ The view `summ.v_mandatory_summary_gaps` lists every member of the release's tar
 
 | Table | Key columns |
 |---|---|
-| `ops.source_snapshot` | `snapshot_id`, `source` (`hf_bger`, `hf_erwaegungen`, `hf_structure`, `bger_neuheiten`, `judgements_workbook`, `judgements_export`, `models_md`, `team_list_2096`), `revision`, `uri`, `file_sha256`, `byte_size`, `row_count`, `retrieved_at`; UNIQUE (`source`, `revision`, `file_sha256`) |
+| `ops.source_snapshot` | `snapshot_id`, `source` (`hf_bger`, `hf_erwaegungen`, `hf_structure`, `bger_neuheiten`, `judgements_workbook`, `judgements_export`, `models_md`, `team_list_2096`), `revision`, `uri`, `file_sha256`, `byte_size`, `row_count` (every row of the file, read or not: the closure's left side, D-081), `retrieved_at`; UNIQUE (`source`, `revision`, `file_sha256`) |
 | `ops.pipeline_run` | `run_id`, `parent_run_id`, `profile_version_id` NOT NULL, `kind` (`ingest` \| `segment` \| `layer1` \| `layer2` \| `justify` \| `rank` \| `summarise` \| `verify` \| `export` \| `refit` \| `eval` \| `full`), `mode`, `status` (`running` \| `succeeded` \| `failed` \| `partial` \| `aborted`), `git_commit`, `git_dirty`, `params` + `params_sha256`, `resolved_models` jsonb, `model_override`, `triggered_by` (`cli` \| `api` \| `ci`), `actor`, `host_label` (no personal name), `started_at`, `finished_at` |
 | `ops.work_item` | (`run_id`, `ruling_id`, `step`, `target_ref`) PK, `status` (`todo` \| `running` \| `done` \| `failed` \| `skipped`), `attempts`, `last_reason_code`, `last_error`, `last_span_id`, `updated_at`. This handles resume, the overnight queue and progress. `target_ref` is the preset code for summary requests, empty otherwise. |
 | `ops.llm_call` (append-only; mirrors `llm_calls.jsonl`) | `llm_call_id`, `run_id`, `span_id`, `ruling_id`, `step`, `purpose`, `language`, `prompt_version_id`, `cache_key`, `cache_hit`, `mode`, `endpoint`, `model_role`, `requested_model`, `served_model`, `served_model_header`, `params` jsonb, `repetition_idx`, `messages_sha256` (→ `ops.blob`), `raw_output`, `finish_reason`, `parsed_ok`, `parse_error`, `http_status`, `error_reason_code`, `attempt`, `input_tokens`, `output_tokens`, `cached_tokens`, `latency_ms`, `started_at`. Never the API key. |
@@ -789,7 +828,7 @@ The view `summ.v_mandatory_summary_gaps` lists every member of the release's tar
 | `ops.blob` | `sha256` PK, `media_type`, `byte_size`, `content`: prompt messages, oversized log attributes, raw pages |
 | `ops.artifact` | `artifact_id`, `run_id`, `release_id`, `kind` (`ranked_csv`, `plain_list`, `summaries_md`, `ingestion_report`, `authored_export`, `log_bundle`), `path`, `sha256`, `row_count` (step 7: "results/ with hash") |
 | `ops.release` | `release_id`, `profile_version_id`, `ranking_id`, `created_at`, `created_by_actor`, `notes`, `is_current` (partial UNIQUE per profile), `warnings` jsonb (e.g. `model_override`); gate trigger: §9.2 invariant 4, §13.7 |
-| `audit.change_log` | `change_id` bigint identity, `occurred_at`, `table_name`, `row_pk`, `action`, `actor` (`current_setting('app.actor', true)`), `run_id` (`current_setting('app.run_id', true)`), `old_row`, `new_row`. Triggers on every mutable row: registry `status`, presets, `summary_version` (`is_current`, `quality_status`), `release`, `work_item` (status only), span closing. |
+| `audit.change_log` | `change_id` bigint identity, `occurred_at`, `table_name`, `row_pk`, `action`, `actor` (`current_setting('app.actor', true)`), `run_id` (`current_setting('app.run_id', true)`), `db_role` (the role the session acted as: its `SET ROLE` role, else its login; `suva_g_pipeline` for every pipeline session, D-082. `audit.log_change()` runs as the owner, so it reads the session's `role` setting, not `current_user`), `old_row`, `new_row`. Triggers on every mutable row: registry `status`, presets, `summary_version` (`is_current`, `quality_status`), `release`, `work_item` (status only), span closing. |
 
 **What people write survives a rebuild:** `make db-export-authored` writes `gold.expert_review`, the expert summary versions (with their texts and claims) and the presets to `data/derived/authored/<UTC timestamp>/*.jsonl`, plus a manifest with SHA-256. It runs automatically after each expert write batch and at each release. `make db-reset` reloads the latest export.
 
@@ -800,7 +839,7 @@ The view `summ.v_mandatory_summary_gaps` lists every member of the release's tar
 1. **Files:** `src/db/sql/00_extensions.sql` (extensions, schemas, ENUMs, shared functions), `10_ops_registry.sql`, `11_ops_execution.sql`, `12_ops_logs.sql` (partitioned table and partition function), `13_audit.sql`, `20_corpus.sql`, `30_triage.sql`, `40_gold.sql`, `50_summ.sql`, `60_views.sql`, `70_functions.sql` (SECURITY DEFINER write functions), `80_triggers.sql`, `85_cross_fks.sql` (foreign keys to later files), `90_roles.sql`, `95_seed_reference.sql` (reason codes, anchors, `suva_house`, V1 review payload schemas). Seeds: `src/db/seed/` (registry, reason codes, anchors), never a model id. Each file has the template's header: description, prerequisites, `Doc: docs/DB_DDL_PLANNING.md §X`.
 2. **Idempotent:** `CREATE … IF NOT EXISTS`; ENUMs in `DO $$ … EXCEPTION WHEN duplicate_object …$$` blocks; loaders use `INSERT … ON CONFLICT DO NOTHING` on natural keys.
 3. **Generated columns use immutable expressions only:** cast numbers to text explicitly (`'V' || v_major::text || '.' || …`), because `text || smallint` is not immutable.
-4. **ENUMs** (closed sets): `lang_code`, `in_suva_scope`, `pipeline_step`, `run_mode`, `run_kind`, `run_status`, `registry_status`, `bump_kind`, `assessment_outcome`, `score_source`, `publication_source`, `publication_quality`, `text_source`, `segmentation_method`, `segmentation_status`, `outcome_kind`, `population_definition`, `population_role`, `member_basis`, `label_source`, `review_target`, `review_verdict`, `creator_kind`, `summary_version_origin`, `summary_quality`, `claim_section`, `check_status`, `work_status`, `span_status`, `log_level`, `model_role`, `rule_kind`, `schema_subject`, `summary_style`, `ruling_origin`. **Lookup tables** (open, labelled for the UI): `ops.reason_code`, `summ.perspective_anchor`.
+4. **ENUMs** (closed sets; 45, all in the loop of `00_extensions.sql`, schema `ops`): `lang_code`, `in_suva_scope`, `pipeline_step`, `run_mode`, `run_kind`, `run_status`, `triggered_by`, `registry_status`, `bump_kind`, `schema_subject`, `model_role`, `rule_kind`, `rule_outcome`, `reason_domain`, `source_kind`, `span_status`, `log_level`, `work_status`, `request_kind`, `request_status`, `artifact_kind`, `assessment_outcome`, `score_source`, `party_check_status`, `publication_source`, `publication_quality`, `text_source`, `segmentation_method`, `segmentation_status`, `outcome_kind`, `ruling_origin`, `subject_source`, `population_definition`, `population_role`, `member_basis`, `label_source`, `review_target`, `review_verdict`, `creator_kind`, `summary_style`, `summary_version_origin`, `summary_quality`, `claim_section`, `claim_status`, `check_status`. **Lookup tables** (open, labelled for the UI): `ops.reason_code`, `summ.perspective_anchor`.
 5. **IDs:** `uuid5` for corpus and registry rows (stable across rebuilds and machines); `gen_random_uuid()` for events (runs, spans, assessments, calls, versions, reviews); `(run_id, seq)` for log events. Exports always carry natural keys (docket, decision date, version label).
 6. **Roles (OQ-13, best practice):**
    - **`suva_owner`** (NOLOGIN): owns every schema and object; the deploy runs `SET ROLE suva_owner`; no application connects as owner or superuser.
@@ -809,6 +848,7 @@ The view `summ.v_mandatory_summary_gaps` lists every member of the release's tar
      - `suva_g_review`: EXECUTE on `gold.submit_review`, `summ.create_expert_version`, `ops.request_work`
      - `suva_g_read`: SELECT on the views
    - **Logins:** `suva_pipeline` ∈ `suva_g_pipeline`; `suva_api` ∈ `suva_g_read` + `suva_g_review`; `suva_report` ∈ `suva_g_read`.
+   - **Pipeline sessions (D-082):** `src.db.pg.connect()` runs `SET ROLE` to `DB_PIPELINE_ROLE` (default `suva_g_pipeline`) whatever login `DATABASE_URL` names, so the pipeline writes with the group's rights and the audit log records that group (`audit.change_log.db_role`). The group inserts into the rule ledger and `corpus.ingest_exclusion` and reads `triage.v_layer1_ledger` and `corpus.v_ingest_closure` through the schema grants, with no UPDATE or DELETE. An exported empty `DB_PIPELINE_ROLE` keeps the login's rights, with a warning. A missing or ungranted role fails the connection and names the fix. The deploy (psql, `SET ROLE suva_owner`) is unaffected. **`SET ROLE` is not a security boundary:** under a superuser or owner login, any code can `RESET ROLE`. Real least privilege needs `DATABASE_URL` to name the `suva_pipeline` login (D-084 point 9).
    - **Hygiene:**
      - `REVOKE ALL ON SCHEMA public FROM PUBLIC`
      - `ALTER DEFAULT PRIVILEGES FOR ROLE suva_owner …` for future objects
@@ -816,7 +856,7 @@ The view `summ.v_mandatory_summary_gaps` lists every member of the release's tar
      - `statement_timeout` and a connection limit on `suva_api`
      - SCRAM-SHA-256 passwords from the environment (never in the repo, G13); the local compose stays `trust` on an internal network with no published port
    - Expert writes go **only** through SECURITY DEFINER functions with `SET search_path` pinned, and they refuse to run without `app.actor`.
-7. **Append-only:** trigger `forbid_update_delete()` plus grants on assessments and their details, thresholds, rankings, LLM calls, labels, reviews, summary texts, claims, citations, checks, log events, metrics, and registry rows (except `status`).
+7. **Append-only:** trigger `forbid_update_delete()` plus grants on assessments and their details (the rule ledger included), ingest exclusions, thresholds, rankings, LLM calls, labels, reviews, summary texts, claims, citations, checks, log events, metrics, and registry rows (except `status`).
 8. **Comments:** `COMMENT ON` every table and every non-obvious column, citing the doctrine (G1, G5, D-051…).
 9. **CI (OQ-14, now):** a `db` job in `.github/workflows/ci.yml` with a `services: postgres` entry using the pinned image digest of `docker-compose.yml`. It runs `make db-reset` then `make db-test` (SQL tests in `tests/sql/` + `pytest -m db`). `make check` stays DB-free. Changes to `ci.yml` and the `Makefile`: lead's approval (G7).
 10. **Excerpt** (the full SQL comes in Phase 2):
@@ -901,6 +941,9 @@ CREATE TABLE IF NOT EXISTS ops.log_event (
 | 27 | `ALTER TABLE` during the event | fresh deploy + reload |
 | 28 | SQL inside stage code | `Registry`, `Store`, `Telemetry` protocols |
 | 29 | the API writing tables directly | SECURITY DEFINER functions, `suva_g_review` |
+| 30 | a filtered ruling whose unmatched conditions live only in logs or span attributes | the rule ledger: one `triage.assessment_reason` row per rule of the version (D-081) |
+| 31 | a source row dropped by a filter with only a counter | `corpus.ingest_exclusion` with its reason code, and the closure check (D-081) |
+| 32 | an expected file edited to make a run pass | a new version; `expected/` is certified behaviour (D-082) |
 
 ---
 
@@ -934,10 +977,13 @@ CREATE TABLE IF NOT EXISTS ops.log_event (
 | OQ-18 | V1: an expert reviews only `in_scope` or `out_of_scope` labels, never `potentially` (CHECK, §12.2); V2 may allow it |
 | OQ-19 | A judges' `LLM_NAME` override warns (`ops.release.warnings`), never blocks (§7.2) |
 | OQ-20 | Splitter promotion: count match ≥ 99 %, coverage ≥ 98 %, written before measuring (§8.3) |
+| D-081 (1) | Layer 1 stores every rule of its version with its outcome and evidence (the rule ledger), certified per row and per assessment at commit, sealed once committed; it replaces the debug events per rule (§10.2, §11.3) |
+| D-081 (2) | Every row of a source file is a source reference or an ingest exclusion with its reason, never both; source references are per snapshot; `row_count` = refs + exclusions is checked before commit (§8.1, §8.4) |
+| D-082 | Golden digest of the certified behaviour in every comparable run; `verify` and `validate`; code identity per run; `decision_ref` / `validation_ref` compared strictly; rule sets sealed once used or pinned; pipeline sessions `SET ROLE suva_g_pipeline`, audited as such (§7.3, §7.5, §7.8, §14, §15.6) |
 
 ### 17.2 Still open
 
-None in this file. Every new question goes to `docs/DECISIONS.md` §2 as `OPEN` (AGENTS.md §2.5).
+None in this file. Every new question goes to `docs/DECISIONS.md` §2 as `OPEN` (AGENTS.md §2.5). The layer-1 points that touch this design are D-084: exclusivity per snapshot or per ingest version (point 8), and least privilege under a superuser login (point 9).
 
 ### 17.3 Project questions this design keeps open (AGENTS.md §2.3)
 
@@ -1003,10 +1049,10 @@ None in this file. Every new question goes to `docs/DECISIONS.md` §2 as `OPEN` 
 | DB-08 ✅ | Roles and grants (`90_roles.sql`) | DB-01..07 | API login cannot UPDATE an assessment (test) |
 | DB-09 | CI `db` job | DB-01..08 | green on a PR (job written 28 Nov; first run on the PR) |
 | DB-10 (in part) | `Registry`, `Store`, `Telemetry` protocols; file, Postgres and tee implementations; registry loader for the seed files of §7.7 (models from `MODELS.md`) | DB-09 | unit tests with a declared fake |
-| DB-11 ✅ (HF bger; structure with DB-12) | Base dataset loader (HF bger, structure) | DB-10 | counts of §8.1 reproduced |
+| DB-11 ✅ (HF bger, with the exclusion ledger and its closure, D-081; structure with DB-12) | Base dataset loader (HF bger, structure) | DB-10 | counts of §8.1 reproduced; every row of the file a ref or an exclusion |
 | DB-12 | Splitter track: download the 4.99 GB file, segmentation V0.x on samples, acceptance criteria, promotion to V1.0.0 | DB-11 | criteria of OQ-20 met, written before measuring |
 | DB-13 ✅ | Gold loader (`judgements/`, D-051 fields dropped) | DB-10 | 59 + 1 rows, 55 summaries, T31 green |
-| DB-14 (layer 1 ✅) | Step writers: layer 1, layer 2, justification, ranking, export | DB-11, DB-12 | every assessment has a span and its pinned version |
+| DB-14 (layer 1 ✅, with the rule ledger, D-081) | Step writers: layer 1, layer 2, justification, ranking, export | DB-11, DB-12 | every assessment has a span, its pinned version and a complete ledger (`t50_ledger`); the ranking writer records `RANK_BELOW_THRESHOLD` for every assessment |
 | DB-15 | Summary writer + verifier writer | DB-14 | gap view empty for the release |
 | DB-16 | API reads and writes on views and functions | DB-07, DB-08 | 5 must-haves + reviews + timeline read the DB |
 | DB-17 | Authored export and reload | DB-16 | a rebuild keeps reviews, edits and presets |

@@ -16,6 +16,8 @@ from src.db.registry import profile_version
 from src.db.runs import begin_run, events, fail_run, finish_run, metrics
 from src.ingest import judgements as jd
 
+CODE_PATHS = ("src/ingest/gold.py", "src/ingest/judgements.py")  # recorded per run (params.code_sha256, F-09)
+
 
 def _exports_sha(refs: list[jd.ExportRef]) -> str:
     lines = [f"{sha256_file(jd.ROOT / r.file)}  {r.file}" for r in refs]
@@ -36,6 +38,7 @@ def load_gold(conn: psycopg.Connection, actor: str) -> dict:
         operation="ingest.gold",
         component_version_id=None,
         params={"source": "judgements/"},
+        code_paths=CODE_PATHS,
         actor=actor,
     )
     try:

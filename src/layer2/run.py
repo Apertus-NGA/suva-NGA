@@ -46,7 +46,7 @@ from src.llm.config import LLMConfig
 from src.llm.served_model import ServedModelError, canonical
 
 STEP = "layer2_judge"
-# The step's code, for the run's code identity: after the layer-1 merge, begin_run(..., code_paths=CODE_PATHS).
+# The step's code, for the run's code identity (F-09): begin_run records params.code_paths and params.code_sha256.
 CODE_PATHS = ("src/layer2/engine.py", "src/layer2/models.py", "src/layer2/run.py")
 PURPOSE = "relevance_judgement"
 RUNS_DIR = ROOT / "data" / "runs"
@@ -756,6 +756,7 @@ def run_layer2(
         operation="layer2.run",
         component_version_id=v.component_version_id,
         params=params,
+        code_paths=CODE_PATHS,
         actor=actor,
         mode=run_mode,
         resolved_models={"judge": res.requested},

@@ -26,7 +26,8 @@
               0,
               0
             ]
-          }
+          },
+          "decision": "D-073"
         },
         {
           "version": [
@@ -52,7 +53,8 @@
               1,
               0
             ]
-          }
+          },
+          "decision": "D-073"
         },
         {
           "version": [
@@ -114,7 +116,39 @@
               0,
               0
             ]
-          }
+          },
+          "decision": "D-073"
+        }
+      ]
+    },
+    {
+      "code": "layer1_candidate",
+      "name": "Layer-1 candidate (layer1_filter V1.2.0)",
+      "is_default": false,
+      "description": "Pins the layer-1 version under validation, layer1_filter V1.2.0 (D-083): python -m src.layer1 validate --baseline-profile default --profile layer1_candidate. The default profile stays on V1.1.0 until the team adopts it.",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "changelog": "layer1_filter V1.2.0 on ingest V1.0.0, for validation against default V0.2.0 (D-083).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              2,
+              0
+            ]
+          },
+          "decision": "D-083"
         }
       ]
     }

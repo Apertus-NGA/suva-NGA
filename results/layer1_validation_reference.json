@@ -1,0 +1,214 @@
+{
+  "runs": [
+    {
+      "run_id": "ae55e2c6-6336-4d05-b079-96cb7fc0be7e",
+      "layer1_filter": "V1.0.0",
+      "profile": "layer1_reference V0.1.0",
+      "started_at": "2026-11-28 08:16:55.382656+00",
+      "git_commit": "c3b73500cf9d685955d978409247d0ad488f572a",
+      "git_dirty": true,
+      "totals": {
+        "dropped": 5124,
+        "kept": 931,
+        "ledger_rows": 54495,
+        "outcome_blocked": 0,
+        "outcome_fired": 8041,
+        "outcome_not_applicable": 16422,
+        "outcome_not_fired": 30032,
+        "parity_different": 0,
+        "parity_same": 6055,
+        "rubric_from_title": 1680,
+        "rulings_in": 6055
+      },
+      "by_reason": {
+        "L1_DROP_RUBRIC_OUT": 1063,
+        "L1_DROP_WRONG_COURT": 4061,
+        "L1_KEEP_ACCIDENT_TERM": 42,
+        "L1_KEEP_CONTRACT_TERM": 11,
+        "L1_KEEP_RUBRIC": 859,
+        "L1_KEEP_RUBRIC_MISSING": 19
+      },
+      "recall": {
+        "all_labelled_kept": 82,
+        "all_labelled_total": 82,
+        "q3_2025_summaries_kept": 23,
+        "q3_2025_summaries_total": 23,
+        "summary_exports_kept": 55,
+        "summary_exports_total": 55,
+        "suva_list_kept": 59,
+        "suva_list_total": 59
+      },
+      "by_population": {
+        "2025Q4_decision": {
+          "rulings": 1931,
+          "kept": 295
+        },
+        "2026Q1_decision": {
+          "rulings": 2005,
+          "kept": 338
+        },
+        "2026Q2_decision": {
+          "rulings": 2096,
+          "kept": 275
+        },
+        "2026Q2_publication": {
+          "rulings": 2060,
+          "kept": 312
+        },
+        "2026Q2_union": {
+          "rulings": 2677,
+          "kept": 380
+        },
+        "suva_reference": {
+          "rulings": 23,
+          "kept": 23
+        }
+      }
+    },
+    {
+      "run_id": "3c450bbf-a592-4327-b7ce-f1e197358f73",
+      "layer1_filter": "V1.1.0",
+      "profile": "default V0.2.0",
+      "started_at": "2026-11-28 08:17:20.849032+00",
+      "git_commit": "c3b73500cf9d685955d978409247d0ad488f572a",
+      "git_dirty": true,
+      "totals": {
+        "dropped": 5120,
+        "kept": 935,
+        "ledger_rows": 54495,
+        "outcome_blocked": 0,
+        "outcome_fired": 8058,
+        "outcome_not_applicable": 16422,
+        "outcome_not_fired": 30015,
+        "parity_different": 17,
+        "parity_same": 6038,
+        "rubric_from_title": 1680,
+        "rulings_in": 6055
+      },
+      "by_reason": {
+        "L1_DROP_RUBRIC_OUT": 1062,
+        "L1_DROP_WRONG_COURT": 4058,
+        "L1_KEEP_ACCIDENT_TERM": 47,
+        "L1_KEEP_CONTRACT_TERM": 10,
+        "L1_KEEP_RUBRIC": 859,
+        "L1_KEEP_RUBRIC_MISSING": 19
+      },
+      "recall": {
+        "all_labelled_kept": 82,
+        "all_labelled_total": 82,
+        "q3_2025_summaries_kept": 23,
+        "q3_2025_summaries_total": 23,
+        "summary_exports_kept": 55,
+        "summary_exports_total": 55,
+        "suva_list_kept": 59,
+        "suva_list_total": 59
+      },
+      "by_population": {
+        "2025Q4_decision": {
+          "rulings": 1931,
+          "kept": 295
+        },
+        "2026Q1_decision": {
+          "rulings": 2005,
+          "kept": 339
+        },
+        "2026Q2_decision": {
+          "rulings": 2096,
+          "kept": 278
+        },
+        "2026Q2_publication": {
+          "rulings": 2060,
+          "kept": 312
+        },
+        "2026Q2_union": {
+          "rulings": 2677,
+          "kept": 383
+        },
+        "suva_reference": {
+          "rulings": 23,
+          "kept": 23
+        }
+      }
+    }
+  ],
+  "scope_changes": {
+    "out_of_scope->potentially": 4
+  },
+  "validation": {
+    "passed": true,
+    "baseline": {
+      "profile": "layer1_reference",
+      "run_id": "ae55e2c6-6336-4d05-b079-96cb7fc0be7e",
+      "layer1_filter": "V1.0.0",
+      "golden": "matched",
+      "rulings": 6055,
+      "kept": 931
+    },
+    "candidate": {
+      "profile": "default",
+      "run_id": "3c450bbf-a592-4327-b7ce-f1e197358f73",
+      "layer1_filter": "V1.1.0",
+      "golden": "matched",
+      "rulings": 6055,
+      "kept": 935
+    },
+    "potentially_to_out_of_scope": 0,
+    "out_of_scope_to_potentially": 4,
+    "potentially_not_decided_by_candidate": 0,
+    "recall": {
+      "baseline": {
+        "all_labelled": {
+          "total": 82,
+          "kept": 82,
+          "not_assessed": 0
+        },
+        "q3_2025_summaries": {
+          "total": 23,
+          "kept": 23,
+          "not_assessed": 0
+        },
+        "summary_exports": {
+          "total": 55,
+          "kept": 55,
+          "not_assessed": 0
+        },
+        "suva_list": {
+          "total": 59,
+          "kept": 59,
+          "not_assessed": 0
+        }
+      },
+      "candidate": {
+        "all_labelled": {
+          "total": 82,
+          "kept": 82,
+          "not_assessed": 0
+        },
+        "q3_2025_summaries": {
+          "total": 23,
+          "kept": 23,
+          "not_assessed": 0
+        },
+        "summary_exports": {
+          "total": 55,
+          "kept": 55,
+          "not_assessed": 0
+        },
+        "suva_list": {
+          "total": 59,
+          "kept": 59,
+          "not_assessed": 0
+        }
+      }
+    },
+    "checks": {
+      "runs_succeeded": true,
+      "same_rulings": true,
+      "no_removal": true,
+      "candidate_recall_complete": true,
+      "golden_not_failed": true
+    },
+    "failures": [],
+    "note": null
+  }
+}

@@ -15,6 +15,13 @@ SELECT pg_temp.expect_error($q$
 INSERT INTO corpus.ruling_text (ruling_id, source, content, content_sha256, snapshot_id)
 VALUES (pg_temp.rid('8C_493/2025'), 'bger', 'Fidelity sample.', encode(sha256(convert_to('Fidelity sample.', 'UTF8')), 'hex'), '00000000-0000-4000-8000-0000000000a1');
 SELECT pg_temp.expect_error($q$UPDATE corpus.ruling_text SET is_primary = true WHERE source = 'bger'$q$, 'duplicate key');
+-- a blank text is no text, whatever whitespace it holds (the engine's text.strip() == '' is text_absent)
+SELECT pg_temp.expect_error($q$
+  INSERT INTO corpus.ruling_text (ruling_id, source, content, content_sha256, snapshot_id)
+  VALUES (pg_temp.rid('8C_307/2025'), 'bger', E'\n\t ', encode(sha256(convert_to(E'\n\t ', 'UTF8')), 'hex'), '00000000-0000-4000-8000-0000000000a1')$q$, 'ruling_text_content_visible_chk');
+SELECT pg_temp.expect_error($q$
+  INSERT INTO corpus.ruling_text (ruling_id, source, content, content_sha256, snapshot_id)
+  VALUES (pg_temp.rid('8C_307/2025'), 'bger', E'\u00a0\u3000\u0085', encode(sha256(convert_to(E'\u00a0\u3000\u0085', 'UTF8')), 'hex'), '00000000-0000-4000-8000-0000000000a1')$q$, 'ruling_text_content_visible_chk');
 
 -- publication: a first-seen date is approximate, never exact; quarter_by_publication only from exact dates
 SELECT pg_temp.expect_error($q$

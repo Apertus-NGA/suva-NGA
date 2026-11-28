@@ -1,15 +1,17 @@
 -- ============================================================================
 -- File: 95_seed_reference.sql (reference data the schema needs on day one)
 -- Date: 2026-11-28
--- Description: The reason-code vocabulary (German and French labels shown to lawyers), the perspective
---              anchors (draft until the summarise owner writes their rubrics), the mandatory preset
---              suva_house (anchor 5), and the V1 review payload schemas (empty payloads).
+-- Description: The reason-code vocabulary (German and French labels shown to lawyers; a layer-1 drop label
+--              states only its own condition, F-03), the perspective anchors (draft until the summarise
+--              owner writes their rubrics), the mandatory preset suva_house (anchor 5), and the V1 review
+--              payload schemas (empty payloads).
 --              Step versions, rules, prompts and profiles are NOT seeded here: the registry loader writes
 --              them from reviewed seed files, and models come from MODELS.md (D-064).
 -- SGBD: PostgreSQL 17
 -- Doc: docs/DB_DDL_PLANNING.md §7.5, §12.2, §13.2-§13.4
 -- ============================================================================
--- PREREQUISITE: 90_roles.sql. Idempotent (ON CONFLICT DO NOTHING).
+-- PREREQUISITE: 90_roles.sql. Idempotent (ON CONFLICT DO NOTHING): a changed label reaches an existing database
+-- only through make db-reset (labels may be edited in place, so a deploy never overwrites them).
 -- ============================================================================
 
 SET ROLE suva_owner;
@@ -17,14 +19,18 @@ SET app.actor = 'seed';
 
 INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
   -- layer 1 (src/layer1, rules in src/layer1/registry/layer1_filter.json) and window
-  ('L1_KEEP_RUBRIC',             'triage', 'Rechtsgebiet in der Liste der Abteilung (4, 8 oder 9)', 'Domaine juridique retenu pour cette cour (4, 8 ou 9)'),
+  ('L1_KEEP_RUBRIC',             'triage', 'Rechtsgebiet in der Liste der Abteilung', 'Domaine juridique retenu pour cette cour'),
   ('L1_KEEP_RUBRIC_MISSING',     'triage', 'Rechtsgebiet fehlt: vorsorglich behalten', 'Domaine juridique absent : conservé par prudence'),
   ('L1_KEEP_ACCIDENT_TERM',      'triage', 'Text nennt die Suva oder die Unfall- oder Militärversicherung', 'Le texte mentionne la Suva ou l''assurance-accidents ou militaire'),
   ('L1_KEEP_CONTRACT_TERM',      'triage', 'Text nennt das VVG oder eine Taggeldversicherung', 'Le texte mentionne la LCA ou une assurance d''indemnités journalières'),
+  ('L1_KEEP_TEXT_UNAVAILABLE',   'triage', 'Kein Urteilstext verfügbar: vorsorglich behalten', 'Texte de l''arrêt indisponible : conservé par prudence'),
+  ('L1_KEEP_TITLE_RUBRIC',       'triage', 'Rechtsgebiet laut Gegenstand in der Liste der Abteilung', 'Domaine juridique selon l''objet retenu pour cette cour'),
   ('L1_FLAG_CLOSED_RUBRIC',      'triage', 'VVG-Begriff im Text, aber Rechtsgebiet ausgeschlossen (z. B. Arbeitslosenversicherung)', 'Terme LCA dans le texte, mais domaine exclu (p. ex. assurance-chômage)'),
-  ('L1_DROP_WRONG_COURT',        'triage', 'Andere Abteilung, und der Text nennt keinen Versicherungsbegriff', 'Autre cour, et le texte ne mentionne aucun terme d''assurance'),
-  ('L1_DROP_WRONG_LETTER',       'triage', 'Verfahrensart hier nicht berücksichtigt, und kein Versicherungsbegriff im Text', 'Type de procédure non retenu, et aucun terme d''assurance dans le texte'),
-  ('L1_DROP_RUBRIC_OUT',         'triage', 'Rechtsgebiet ausserhalb der Liste, und kein Versicherungsbegriff im Text', 'Domaine hors liste, et aucun terme d''assurance dans le texte'),
+  -- a drop label states only its own condition; the explanation states what the text check found (F-03). Labels are
+  -- shared by every version: they never name a configured value (a court list, a rubric); the ledger shows it.
+  ('L1_DROP_WRONG_COURT',        'triage', 'Abteilung nicht in der Liste der Vorauswahl', 'Cour hors de la liste du filtre'),
+  ('L1_DROP_WRONG_LETTER',       'triage', 'Verfahrensart in dieser Abteilung nicht berücksichtigt', 'Type de procédure non retenu pour cette cour'),
+  ('L1_DROP_RUBRIC_OUT',         'triage', 'Rechtsgebiet nicht in der Liste der Abteilung', 'Domaine juridique hors de la liste de cette cour'),
   ('L1_SIGNAL_RUBRIC_FROM_TITLE','triage', 'Rechtsgebiet aus dem Gegenstand gelesen', 'Domaine lu dans l''objet'),
   ('OUT_OF_WINDOW',              'triage', 'Ausserhalb aller Zeitfenster', 'Hors de toutes les périodes'),
   -- layer 2, justification, ranking
@@ -38,6 +44,10 @@ INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
   ('RANK_AT_OR_ABOVE_THRESHOLD', 'triage', 'Relevanzwert auf oder über der Schwelle', 'Score de pertinence au seuil ou au-dessus'),
   -- ingest, segmentation, parse
   ('ING_TWIN_SAME_DATE',               'ingest', 'Doppelte Zeile der Quelle (gleiches Datum)', 'Ligne en double dans la source (même date)'),
+  ('ING_DOCKET_MALFORMED',             'ingest', 'Geschäftsnummer nicht im Format des Bundesgerichts', 'Numéro de dossier hors du format du Tribunal fédéral'),
+  ('ING_DECISION_DATE_MISSING',        'ingest', 'Entscheiddatum fehlt in der Quelle', 'Date de l''arrêt absente de la source'),
+  ('ING_SOURCE_ID_MISSING',            'ingest', 'Zeile der Quelle ohne Kennung', 'Ligne de la source sans identifiant'),
+  ('ING_SOURCE_ID_DUPLICATE',          'ingest', 'Kennung der Quelle doppelt vergeben', 'Identifiant de la source en double'),
   ('ING_TEXT_MISSING',                 'ingest', 'Kein Urteilstext verfügbar', 'Texte de l''arrêt indisponible'),
   ('ING_CONSIDERATIONS_MISSING',       'ingest', 'Erwägungen fehlen in der Quelle', 'Considérants absents de la source'),
   ('ING_CONSIDERATIONS_COUNT_MISMATCH','ingest', 'Anzahl Erwägungen weicht ab', 'Nombre de considérants divergent'),

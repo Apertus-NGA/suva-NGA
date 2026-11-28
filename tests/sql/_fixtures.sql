@@ -127,18 +127,22 @@ INSERT INTO triage.assessment (assessment_id, run_id, ruling_id, step, component
                                in_suva_scope, outcome, score_raw, score_0_100, score_source, reason_code, explanation_de, mode, started_at) VALUES
   ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000001', pg_temp.rid('8C_493/2025'), 'layer1_filter',
    pg_temp.cv('layer1_filter'), pg_temp.span('layer1_filter', '8C_493/2025'), pg_temp.text_of('8C_493/2025'), repeat('a', 64),
-   'potentially', 'ok', NULL, NULL, NULL, NULL, 'Vorauswahl: Abteilung 8C.', 'REPLAY', now()),
+   'potentially', 'ok', NULL, NULL, NULL, 'L1_KEEP_RUBRIC', 'Vorauswahl bestanden: Rechtsgebiet in der Liste der Abteilung.', 'REPLAY', now()),
   ('00000000-0000-4000-8000-000000000102', '00000000-0000-4000-8000-000000000001', pg_temp.rid('8C_307/2025'), 'layer1_filter',
    pg_temp.cv('layer1_filter'), pg_temp.span('layer1_filter', '8C_307/2025'), pg_temp.text_of('8C_307/2025'), repeat('b', 64),
-   'potentially', 'ok', NULL, NULL, NULL, NULL, 'Vorauswahl: Abteilung 8C.', 'REPLAY', now()),
+   'potentially', 'ok', NULL, NULL, NULL, 'L1_KEEP_RUBRIC', 'Vorauswahl bestanden: Rechtsgebiet in der Liste der Abteilung.', 'REPLAY', now()),
   ('00000000-0000-4000-8000-000000000103', '00000000-0000-4000-8000-000000000001', pg_temp.rid('8C_199/2026'), 'layer1_filter',
    pg_temp.cv('layer1_filter'), pg_temp.span('layer1_filter', '8C_199/2026'), pg_temp.text_of('8C_199/2026'), repeat('c', 64),
    'out_of_scope', 'ok', 0, 0, 'net', 'L1_DROP_RUBRIC_OUT', 'Keine Regel der Vorauswahl trifft zu.', 'REPLAY', now());
 
-INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_code, effect, evidence_field, matched_text) VALUES
-  ('00000000-0000-4000-8000-000000000101', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'docket', '8C'),
-  ('00000000-0000-4000-8000-000000000102', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'docket', '8C'),
-  ('00000000-0000-4000-8000-000000000103', 1, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'gegenstand', NULL);
+-- the rule ledger (F-01): every enabled rule of the version, at its ordinal, whatever it did (complete at commit, t50_ledger)
+INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_code, effect, outcome, evidence_field, examined_value, matched_text) VALUES
+  ('00000000-0000-4000-8000-000000000101', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'fired', 'rubric:gegenstand', 'Unfallversicherung', 'Unfallversicherung'),
+  ('00000000-0000-4000-8000-000000000101', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'not_fired', 'rubric:gegenstand', 'Unfallversicherung', NULL),
+  ('00000000-0000-4000-8000-000000000102', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'fired', 'rubric:gegenstand', 'Assurance-accidents', 'Assurance-accidents'),
+  ('00000000-0000-4000-8000-000000000102', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'not_fired', 'rubric:gegenstand', 'Assurance-accidents', NULL),
+  ('00000000-0000-4000-8000-000000000103', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'not_fired', 'rubric:gegenstand', 'Assicurazione contro gli infortuni', NULL),
+  ('00000000-0000-4000-8000-000000000103', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'fired', 'rubric:gegenstand', 'Assicurazione contro gli infortuni', 'Assicurazione contro gli infortuni');
 
 -- layer 2 ---------------------------------------------------------------------
 INSERT INTO ops.llm_call (llm_call_id, run_id, span_id, ruling_id, step, purpose, language, cache_key, cache_hit, mode, endpoint,
@@ -205,6 +209,11 @@ INSERT INTO triage.assessment (assessment_id, run_id, ruling_id, step, component
   ('00000000-0000-4000-8000-000000000603', '00000000-0000-4000-8000-000000000001', pg_temp.rid('8C_199/2026'), 'ranking', pg_temp.cv('ranking'),
    pg_temp.span('ranking', '8C_199/2026'), '00000000-0000-4000-8000-000000000103', repeat('3', 64), 'out_of_scope', 'ok', 0, 'net',
    'RANK_BELOW_THRESHOLD', 'Durch die Vorauswahl ausgeschlossen.', 'REPLAY', now());
+
+INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_code, effect, outcome, evidence_field, examined_value) VALUES
+  ('00000000-0000-4000-8000-000000000601', 1, pg_temp.rule('RANK_BELOW_THRESHOLD'), 'RANK_BELOW_THRESHOLD', 'drop', 'not_fired', 'score_0_100', '92'),
+  ('00000000-0000-4000-8000-000000000602', 1, pg_temp.rule('RANK_BELOW_THRESHOLD'), 'RANK_BELOW_THRESHOLD', 'drop', 'fired', 'score_0_100', '30'),
+  ('00000000-0000-4000-8000-000000000603', 1, pg_temp.rule('RANK_BELOW_THRESHOLD'), 'RANK_BELOW_THRESHOLD', 'drop', 'fired', 'score_0_100', '0');
 
 INSERT INTO triage.ranking_entry (ranking_id, ruling_id, assessment_id, score_assessment_id, final_score_0_100, rank, above_threshold) VALUES
   ('00000000-0000-4000-8000-000000000501', pg_temp.rid('8C_493/2025'), '00000000-0000-4000-8000-000000000601', '00000000-0000-4000-8000-000000000201', 92, 1, true),

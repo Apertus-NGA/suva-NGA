@@ -3,6 +3,10 @@
 The recall check is blocking: a labelled ruling layer 1 drops fails it (TIPS handoff §6.1). Cohorts: Suva's
 relevance list (Q4/2025, Q1/2026), its summary exports, and the Q3/2025 summaries outside the list. The
 report holds aggregate counts only (D-031): no Suva label per docket leaves the database.
+
+`validate` runs a baseline and a candidate profile, records recall, compares them ruling by ruling and fails on a
+ruling that goes potentially -> out_of_scope or that the candidate does not decide, rulings that differ between the
+runs, a labelled ruling the candidate drops, or a failed run (a golden mismatch fails one).
 """
 
 from __future__ import annotations
@@ -118,13 +122,20 @@ def run_summary(cur: psycopg.Cursor, run_id: str) -> dict:
 
 
 def compare(cur: psycopg.Cursor, run_a: str, run_b: str) -> dict:
-    """How many rulings change scope between two runs, in each direction (counts only)."""
+    """How many rulings change scope between two runs, in each direction (counts only).
+
+    Rulings are matched by identity, not counted: a ruling one run assessed and the other did not is a change to or
+    from `not_assessed` (`potentially->not_assessed` is a ruling run A keeps that run B never decided).
+    """
     cur.execute(
-        """SELECT a.in_suva_scope::text, b.in_suva_scope::text, count(*)
-           FROM triage.assessment a JOIN triage.assessment b ON b.ruling_id = a.ruling_id AND b.run_id = %s AND
-               b.step = 'layer1_filter'
-           WHERE a.run_id = %s AND a.step = 'layer1_filter' AND a.in_suva_scope <> b.in_suva_scope GROUP BY 1, 2""",
-        (run_b, run_a),
+        """WITH a AS (SELECT ruling_id, in_suva_scope::text AS scope FROM triage.assessment
+                      WHERE run_id = %(a)s AND step = 'layer1_filter' AND repetition_idx = 0),
+                b AS (SELECT ruling_id, in_suva_scope::text AS scope FROM triage.assessment
+                      WHERE run_id = %(b)s AND step = 'layer1_filter' AND repetition_idx = 0)
+           SELECT coalesce(a.scope, 'not_assessed'), coalesce(b.scope, 'not_assessed'), count(*)
+           FROM a FULL JOIN b ON b.ruling_id = a.ruling_id
+           WHERE a.scope IS DISTINCT FROM b.scope GROUP BY 1, 2""",
+        {"a": run_a, "b": run_b},
     )
     return {f"{x}->{y}": n for x, y, n in cur.fetchall()}
 
@@ -132,3 +143,134 @@ def compare(cur: psycopg.Cursor, run_a: str, run_b: str) -> dict:
 def write_report(path: Path, report: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _next_seq(cur: psycopg.Cursor, run_id: str) -> int:
+    cur.execute("SELECT coalesce(max(seq), 0) + 1 FROM ops.log_event WHERE run_id = %s", (run_id,))
+    return cur.fetchone()[0]
+
+
+def validate(
+    conn: psycopg.Connection,
+    baseline_profile: str,
+    profile: str,
+    *,
+    runs_dir: Path | None = None,
+    actor: str = "layer1-cli",
+) -> dict:
+    """Run a baseline and a candidate profile on the same corpus, record recall, compare (docs/LAYER1.md §6).
+
+    The candidate passes when both runs succeed (a golden mismatch fails a run), they decide the same rulings (by
+    identity, not by count), no ruling the baseline keeps is dropped or left undecided by the candidate, and, when
+    Suva's labels are loaded, the candidate keeps every labelled ruling. The baseline's recall is reported, not
+    required: a candidate may fix it. Aggregates only (D-031). Event `layer1.validation.passed|failed` on the
+    candidate run.
+    """
+    from src.layer1.run import RUNS_DIR, STEP, run_layer1
+
+    outs: dict[str, dict | None] = {}
+    failures: list[str] = []
+    for role, prof in (("baseline", baseline_profile), ("candidate", profile)):
+        try:
+            outs[role] = run_layer1(conn, profile=prof, runs_dir=runs_dir or RUNS_DIR, actor=actor)
+        except Exception as exc:  # recorded as a failed run by run_layer1; the validation reports it
+            outs[role] = None
+            failures.append(f"{role} run ({prof}) failed: {type(exc).__name__}: {exc}"[:500])
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM gold.label")
+        has_labels = cur.fetchone()[0] > 0
+    conn.commit()
+    recalls: dict[str, dict] = {}
+    if has_labels:
+        for role, out in outs.items():
+            if out is not None:
+                full = record_recall(conn, out["run_id"])
+                recalls[role] = {c: {k: v[k] for k in ("total", "kept", "not_assessed")} for c, v in full.items()}
+    base, cand = outs["baseline"], outs["candidate"]
+    with conn.cursor() as cur:
+        report: dict = {"runs": [run_summary(cur, o["run_id"]) for o in (base, cand) if o is not None]}
+        changes = compare(cur, base["run_id"], cand["run_id"]) if base and cand else {}
+    conn.commit()
+    if base and cand:
+        report["scope_changes"] = changes
+    removals = changes.get("potentially->out_of_scope", 0)
+    # kept by the baseline, never decided by the candidate: a removal too
+    unassessed_kept = changes.get("potentially->not_assessed", 0)
+    only_base = sum(n for k, n in changes.items() if k.endswith("->not_assessed"))
+    only_cand = sum(n for k, n in changes.items() if k.startswith("not_assessed->"))
+    candidate_recall = recalls.get("candidate")
+    checks = {
+        "runs_succeeded": base is not None and cand is not None,
+        "same_rulings": bool(base and cand) and only_base == 0 and only_cand == 0,
+        "no_removal": bool(base and cand) and removals == 0 and unassessed_kept == 0,
+        "candidate_recall_complete": (
+            None if candidate_recall is None else all(v["kept"] == v["total"] for v in candidate_recall.values())
+        ),
+        "golden_not_failed": not any("golden check failed" in f for f in failures),
+    }
+    if base and cand and (only_base or only_cand):
+        failures.append(
+            f"the runs decided different rulings: {only_base} only in the baseline, {only_cand} only in the candidate"
+        )
+    if removals:
+        failures.append(f"{removals} ruling(s) go potentially -> out_of_scope")
+    if unassessed_kept:
+        failures.append(f"{unassessed_kept} ruling(s) the baseline keeps are not decided by the candidate")
+    if candidate_recall is not None and not checks["candidate_recall_complete"]:
+        failures.append("the candidate drops a labelled ruling")
+    passed = not failures and all(v is not False for v in checks.values())
+    validation = {
+        "passed": passed,
+        "baseline": {"profile": baseline_profile, **_role(base)},
+        "candidate": {"profile": profile, **_role(cand)},
+        "potentially_to_out_of_scope": removals,
+        "out_of_scope_to_potentially": changes.get("out_of_scope->potentially", 0),
+        "potentially_not_decided_by_candidate": unassessed_kept,
+        "recall": recalls,
+        "checks": checks,
+        "failures": failures,
+        "note": None if has_labels else "gold.label is empty: recall not measured (python -m src.ingest gold)",
+    }
+    report["validation"] = validation
+    if cand is not None:
+        from src.db.runs import Run, events
+
+        with conn.transaction(), conn.cursor() as cur:
+            cur.execute(
+                """SELECT span_id::text, pr.profile_version_id::text, component_version_id::text FROM ops.span s
+                   JOIN ops.pipeline_run pr USING (run_id) WHERE s.run_id = %s AND s.parent_span_id IS NULL""",
+                (cand["run_id"],),
+            )
+            span_id, pvid, cvid = cur.fetchone()
+            run = Run(cand["run_id"], span_id, pvid, cvid)
+            events(
+                cur,
+                run,
+                STEP,
+                [
+                    (
+                        _next_seq(cur, run.run_id),
+                        "info" if passed else "error",
+                        "layer1.validation.passed" if passed else "layer1.validation.failed",
+                        (f"validated against {baseline_profile}" + ("" if passed else ": " + "; ".join(failures)))[
+                            :400
+                        ],
+                        validation,
+                        None,
+                        None,
+                    )
+                ],
+            )
+    return report
+
+
+def _role(out: dict | None) -> dict:
+    if out is None:
+        return {"run_id": None, "layer1_filter": None, "golden": None}
+    return {
+        "run_id": out["run_id"],
+        "layer1_filter": out["version"],
+        "golden": out["golden"],
+        "rulings": out["rulings"],
+        "kept": out["kept"],
+    }

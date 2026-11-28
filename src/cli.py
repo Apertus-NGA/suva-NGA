@@ -77,10 +77,15 @@ def run_layer1_stage() -> int:
         out = run_layer1(conn, actor="make-run")
         print(
             f"run S2 layer 1: {out['kept']} of {out['rulings']} kept ({out['profile']}, layer1_filter "
-            f"{out['version']}), "
+            f"{out['version']}, golden {out['golden']}), "
             f"files in {out['files']}"
         )
-        if has_labels:
+        if not has_labels:
+            print(
+                "SKIPPED run S2 recall: gold.label is empty, so the blocking recall check did not run "
+                "(python -m src.ingest gold, then python -m src.layer1 recall)"
+            )
+        else:
             result = record_recall(conn, out["run_id"])
             missed = {c: v for c, v in result.items() if v["kept"] != v["total"]}
             print("run S2 recall: " + ", ".join(f"{c} {v['kept']}/{v['total']}" for c, v in sorted(result.items())))
