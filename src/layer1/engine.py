@@ -7,10 +7,12 @@ asserts it): a ruling is kept when its court, letter and matter rubric are in th
 is missing on an allowed court, or when its text names Suva, an accident or military insurance term, or the
 insurance-contract act outside the closed rubrics.
 
-Version V1.2.0 (D-083) appends two keeps after the V1.1.0 ordinals, so the decisive rule of every ruling V1.1.0 keeps
-is unchanged: `text_unavailable` keeps a ruling without text on any court (G5: never dropped on its docket prefix
-alone; the term checks cannot run), and `title_rubric_kept` keeps a ruling on an allowed court and letter whose title
-head, cut at any of `config.title_rubric.cut_at`, is in the court's keep set (audit F-06, F-08).
+Version V1.2.0 (D-083) appends two keeps after the V1.1.0 ordinals and only widens keep vocabularies, so it cannot
+drop a ruling V1.1.0 keeps. The decisive rule of such a ruling can still change, through the widened vocabulary only:
+a wider term or rubric can fire a keep of lower ordinal (docs/LAYER1.md §7.6). `text_unavailable` keeps a ruling
+without text on any court (G5: never dropped on its docket prefix alone; the term checks cannot run), and
+`title_rubric_kept` keeps a ruling on an allowed court and letter whose title head, cut at any of
+`config.title_rubric.cut_at`, is in the court's keep set (audit F-06, F-08).
 
 Every rule of the version is evaluated on every ruling and recorded with what it did (F-01, F-02): `fired`,
 `not_fired`, `not_applicable` (a precondition failed, with why) or `blocked` (true but neutralised by another

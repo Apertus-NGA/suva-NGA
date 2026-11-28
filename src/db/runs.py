@@ -2,15 +2,18 @@
 
 `begin_run` commits the run row and its root span first, so a failure later in the run still leaves a
 trace: `fail_run` closes both with the error; `finish_run` closes them on success. A step's own rows
-are written in one transaction between the two: all or nothing.
+are written in one transaction between the two: all or nothing. Both close with `clock_timestamp()`, the real time of
+the close, not `now()` (the transaction start): a step writes its events and metrics in the closing transaction, before
+`finish_run`, so each event the run writes lies within [started_at, finished_at] of its run and root span. What is
+appended to a closed run later (layer 1's `layer1.validation.*` event, its recall metrics) comes after `finished_at`.
 
 Every run records the code that ran it (F-09): `params.code_paths` (the step's run paths, repo-relative) and
 `params.code_sha256` (`src.db.registry.code_sha256` over exactly those paths). It is the same hash function a
 registry version applies to its own `code_path` when created, but the two path sets can differ: a layer-1 run hashes
-src/layer1/{engine,models,run,golden,recall}.py, its version src/layer1/{engine,models}.py
-(src/ingest/__main__.py REGISTRIES). Compare a run's hash only with another run's over the same `code_paths`, never
-with its version's `code_sha256`. Two runs with the same hash ran the same code; the golden check of a run proves its
-decisions whatever the code.
+src/layer1/{engine,models,run,golden,recall,reference_courts_4c246a8}.py (`src.layer1.run.CODE_PATHS`), its version
+src/layer1/{engine,models}.py (src/ingest/__main__.py REGISTRIES). Compare a run's hash only with another run's over
+the same `code_paths`, never with its version's `code_sha256`. Two runs with the same hash ran the same code; the
+golden check of a run proves its decisions whatever the code.
 """
 
 from __future__ import annotations
@@ -87,12 +90,16 @@ def begin_run(
 
 
 def finish_run(cur: psycopg.Cursor, run: Run, status: str = "succeeded") -> None:
-    """Close the root span and the run, inside the step's transaction. `partial`: the run is usable, some items
-    failed and wait for the next run (they stay `potentially`, never a negative: D-063)."""
+    """Close the root span and the run, inside the step's transaction, as its last write (after the events and metrics,
+    so they lie within the run's time range). `partial`: the run is usable, some items failed and wait for the next run
+    (they stay `potentially`, never a negative: D-063)."""
     if status not in ("succeeded", "partial"):
         raise ValueError(f"finish_run closes a usable run only (succeeded or partial), not {status!r}")
-    cur.execute("UPDATE ops.span SET status = 'ok', ended_at = now() WHERE span_id = %s", (run.span_id,))
-    cur.execute("UPDATE ops.pipeline_run SET status = %s, finished_at = now() WHERE run_id = %s", (status, run.run_id))
+    cur.execute("UPDATE ops.span SET status = 'ok', ended_at = clock_timestamp() WHERE span_id = %s", (run.span_id,))
+    cur.execute(
+        "UPDATE ops.pipeline_run SET status = %s, finished_at = clock_timestamp() WHERE run_id = %s",
+        (status, run.run_id),
+    )
 
 
 def fail_run(conn: psycopg.Connection, run: Run, error: BaseException, status: str = "failed") -> None:
@@ -101,11 +108,12 @@ def fail_run(conn: psycopg.Connection, run: Run, error: BaseException, status: s
     message = f"{type(error).__name__}: {error}"[:500]
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE ops.span SET status = 'error', ended_at = now(), error_message = %s WHERE span_id = %s",
+            "UPDATE ops.span SET status = 'error', ended_at = clock_timestamp(), error_message = %s WHERE span_id = %s",
             (message, run.span_id),
         )
         cur.execute(
-            "UPDATE ops.pipeline_run SET status = %s, finished_at = now(), error_summary = %s WHERE run_id = %s",
+            "UPDATE ops.pipeline_run SET status = %s, finished_at = clock_timestamp(), error_summary = %s "
+            "WHERE run_id = %s",
             (status if status in ("failed", "aborted") else "failed", message, run.run_id),
         )
     conn.commit()
