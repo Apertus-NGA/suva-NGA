@@ -378,9 +378,10 @@ def test_fingerprint_changes_with_any_input():
 def test_make_run_s2_says_when_the_recall_check_is_skipped(monkeypatch, capsys):
     """F-14: with no Suva label loaded, S2 of `make run` says the blocking recall check did not run.
 
-    Mocks (declared, G9): `src.db.pg.connect` returns a fake connection whose counts are 5 rulings and 0 labels, and
-    `src.layer1.run.run_layer1` returns a fixed summary. No database is touched; the DB path is tested in
-    tests/test_layer1_db.py (recall exits 1 when a labelled ruling is dropped).
+    Mocks (declared, G9): `src.db.pg.connect` returns a fake connection whose counts are 5 rulings and 0 labels,
+    `src.layer1.run.run_layer1` returns a fixed summary and `src.layer1.run.verify_run` reports 5 records and no
+    difference. No database is touched; the DB path is tested in tests/test_layer1_db.py (recall exits 1 when a
+    labelled ruling is dropped) and in the cluster (docs/DEPLOY.md).
     """
     import src.db.pg as pg
     import src.layer1.run as layer1_run
@@ -414,11 +415,19 @@ def test_make_run_s2_says_when_the_recall_check_is_skipped(monkeypatch, capsys):
     summary = {"kept": 3, "rulings": 5, "profile": "default V0.2.0", "version": "V1.1.0", "golden": "not_comparable"}
     monkeypatch.setenv("DATABASE_URL", "postgresql://unused.invalid/none")
     monkeypatch.setattr(pg, "connect", lambda **kw: FakeConnection())
-    monkeypatch.setattr(layer1_run, "run_layer1", lambda conn, **kw: summary | {"files": "data/runs/x"})
+    monkeypatch.setattr(layer1_run, "run_layer1", lambda conn, **kw: summary | {"files": "data/runs/x", "run_id": "r1"})
+    monkeypatch.setattr(layer1_run, "verify_run", lambda conn, run_id: (5, []))
     assert cli.run_layer1_stage() == 0
     out = capsys.readouterr().out
     assert "run S2 layer 1: 3 of 5 kept (default V0.2.0, layer1_filter V1.1.0, golden not_comparable)" in out
     assert "SKIPPED run S2 recall: gold.label is empty, so the blocking recall check did not run" in out
+    assert "run S2 verify: files equal the database (5 records)" in out
+
+    # A run whose files differ from its rows fails S2 (declared mock: verify_run reports one difference).
+    FakeCursor.counts = iter([(5,), (0,)])
+    monkeypatch.setattr(layer1_run, "verify_run", lambda conn, run_id: (5, ["decisions.jsonl line 1: differs"]))
+    assert cli.run_layer1_stage() == 1
+    assert "run S2 verify FAILED: 1 differences, first: decisions.jsonl line 1: differs" in capsys.readouterr().err
 
 
 def test_golden_status_of_a_database_run():

@@ -91,18 +91,43 @@ WHERE rel.is_current AND p.is_default AND p.retired_at IS NULL;
 COMMENT ON VIEW triage.v_current_release IS 'The current release of the default pipeline (at most one row).';
 
 CREATE OR REPLACE VIEW triage.v_scope_pipeline AS
-WITH candidates AS (
+WITH usable AS (
+  -- the default pipeline's assessments from runs that finished usable (DDL-2): a running, failed or aborted run, and an
+  -- eval run, never form the label. Each carries its layer-1 root: the triage steps are four and an upstream is always
+  -- an earlier step (triage.check_assessment), so the root is at most three hops up (no recursion, one indexed join per
+  -- hop: a recursive walk took 22 s on 14,000 assessments)
+  SELECT a.*,
+         CASE WHEN a.step = 'layer1_filter' THEN a.assessment_id
+              WHEN u1.step = 'layer1_filter' THEN u1.assessment_id
+              WHEN u2.step = 'layer1_filter' THEN u2.assessment_id
+              WHEN u3.step = 'layer1_filter' THEN u3.assessment_id END AS layer1_root
+  FROM triage.assessment a
+  JOIN ops.pipeline_run pr ON pr.run_id = a.run_id
+  JOIN ops.pipeline_profile_version pv ON pv.profile_version_id = pr.profile_version_id
+  JOIN ops.pipeline_profile p ON p.profile_code = pv.profile_code AND p.is_default AND p.retired_at IS NULL
+  LEFT JOIN triage.assessment u1 ON u1.assessment_id = a.upstream_assessment_id
+  LEFT JOIN triage.assessment u2 ON u2.assessment_id = u1.upstream_assessment_id
+  LEFT JOIN triage.assessment u3 ON u3.assessment_id = u2.upstream_assessment_id
+  WHERE a.repetition_idx = 0 AND pr.kind <> 'eval' AND pr.status IN ('succeeded', 'partial')
+), ranked AS (
+  -- each ruling's current layer-1 decision (its latest usable one), on every row of the ruling, in one window pass (a
+  -- self-join on the CTE was re-sorted once per row: 8 s on 14,000 assessments)
+  SELECT u.*,
+         first_value(CASE WHEN u.step = 'layer1_filter' THEN u.assessment_id END) OVER (
+           PARTITION BY u.ruling_id ORDER BY (u.step = 'layer1_filter') DESC, u.created_at DESC, u.assessment_id DESC
+         ) AS current_layer1
+  FROM usable u
+), candidates AS (
   SELECT a.*, 1 AS prio, 'release'::text AS label_origin
   FROM triage.assessment a
   JOIN triage.v_current_release cur ON a.run_id = cur.ranking_run_id
   WHERE a.step = 'ranking' AND a.repetition_idx = 0
   UNION ALL
-  SELECT a.*, 2 AS prio, 'latest_run'::text AS label_origin
-  FROM triage.assessment a
-  JOIN ops.pipeline_run pr ON pr.run_id = a.run_id
-  JOIN ops.pipeline_profile_version pv ON pv.profile_version_id = pr.profile_version_id
-  JOIN ops.pipeline_profile p ON p.profile_code = pv.profile_code AND p.is_default AND p.retired_at IS NULL
-  WHERE a.repetition_idx = 0 AND pr.kind <> 'eval'
+  -- a usable assessment counts only if it descends from its ruling's current layer-1 decision (DDL-2): a judgement made
+  -- on an older layer-1 decision, or with no layer-1 root, never forms the label
+  SELECT u.assessment_id, u.run_id, u.ruling_id, u.step, u.repetition_idx, u.component_version_id, u.span_id, u.upstream_assessment_id, u.input_text_id, u.input_segmentation_id, u.input_fingerprint, u.in_suva_scope, u.outcome, u.score_raw, u.score_0_100, u.score_source, u.reason_code, u.explanation_de, u.mode, u.started_at, u.finished_at, u.created_at, 2 AS prio, 'latest_run'::text AS label_origin
+  FROM ranked u
+  WHERE u.layer1_root = u.current_layer1
 )
 SELECT DISTINCT ON (c.ruling_id)
   c.ruling_id,
@@ -122,9 +147,9 @@ SELECT DISTINCT ON (c.ruling_id)
   c.created_at
 FROM candidates c
 LEFT JOIN ops.reason_code rc ON rc.code = c.reason_code
-ORDER BY c.ruling_id, c.prio, c.step DESC, c.created_at DESC;
+ORDER BY c.ruling_id, c.prio, c.step DESC, c.created_at DESC, c.assessment_id DESC;
 COMMENT ON VIEW triage.v_scope_pipeline IS
-  'THE label (D-063): the default pipeline''s furthest-step assessment per ruling, from its current release, else from its latest non-eval run. not_assessed = no row.';
+  'THE label (D-063): the default pipeline''s furthest-step assessment per ruling, from its current release, else from its usable runs (succeeded or partial, not eval) and only along the lineage of its current layer-1 decision (DDL-2). not_assessed = no row.';
 
 CREATE OR REPLACE VIEW triage.v_scope_current AS
 SELECT

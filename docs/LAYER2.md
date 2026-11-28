@@ -1,6 +1,6 @@
 # LAYER2: the Apertus relevance judge on the database
 
-> **Status: V1 implemented, 28 Nov 2026 (branch `triage/layer2-db`).** Decisions D-075 to D-080 in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Owner: the layer-2 owner (`docs/agents/finetune.md`).
+> **Status: V1 in `main` since 28 Nov 2026 (PR #45, branch `triage/layer2-db`); DDL-1, DDL-2 and the replay policy from branch `triage/layer2-ddl` (§4, §7).** Decisions D-075 to D-080 in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Owner: the layer-2 owner (`docs/agents/finetune.md`).
 
 ## 1. What it does
 
@@ -49,7 +49,9 @@ Files (`data/runs/<run_id>/`, git-ignored): `layer2_judgements.jsonl` (one recor
 
 Database, in one transaction: `ops.span` (`layer2.run`, `layer2.judge` per ruling, `llm.call` per attempt), `ops.blob` (messages), `ops.llm_call` (per attempt: cache key, cache hit, mode, requested and served model, header, parameters, raw output, finish reason, HTTP status, error code, tokens, latency), `triage.assessment` (`potentially`, score, explanation, upstream layer-1 assessment, input text, fingerprint), `triage.llm_judgement` (log-probabilities, P(Ja), raw top 20, truncation, characters sent), `ops.log_event` (`layer2.prompt.built`, `layer2.score`, `llm.cache.hit`, `llm.retry`, `layer2.yesno.missing`, `layer2.run.summary`…), `ops.run_metric`.
 
-Outcomes: `ok` (judged); `failed` with `L2_FAILED_CALL` (gateway, served model, replay miss) or `L2_FAIL_NO_YESNO_TOKEN` (the answer is kept as evidence); `skipped` with `ING_TEXT_MISSING` (no text, no call). All stay `potentially`, never a negative.
+Outcomes: `ok` (judged); `failed` with `L2_FAILED_CALL` (gateway, served model rejected) or `L2_FAIL_NO_YESNO_TOKEN` (the answer is kept as evidence); `skipped` with `ING_TEXT_MISSING` (no text, no call). All stay `potentially`, never a negative.
+
+**Replay without a recorded answer** (D-085, refines D-078): in replay mode, a candidate whose request was never answered in the store is **not judged in that run**. No row is written, so an earlier judgement keeps its place in the label. It is listed in `replay_misses.jsonl`, counted in the metric `replay_misses`, reported by the event `layer2.replay.missing`, and the run is `partial`; it is never a failure. A replay where no candidate has an answer fails with a clear message. So `make run` in replay with a partial local cache is green: on 28 Nov, 383 of 935 judged, 552 without a recorded answer, `partial`.
 
 Why a ruling scored as it did: `SELECT * FROM triage.v_scope_trace WHERE ruling_id = …` (run, versions, served model, call, latency, tokens, cache flag, P(Ja), input text and its HF snapshot).
 
@@ -84,7 +86,5 @@ Why a ruling scored as it did: `SELECT * FROM triage.v_scope_trace WHERE ruling_
 1. The 8B is the judge of V1.0.0; zero-shot Apertus does not beat a three-signal rule (D-074). Layer 2 alone must not decide in/out: ranking combines it with signals (D-021, D-022).
 2. 1,683 of 3,936 texts (and most of Suva's listed rulings) are judged on the first 12,000 and last 2,000 characters: recorded per ruling, a candidate for V1.1.0 (`docs/LAYER2_IMPLEMENTATION_PLANNING.md` FC-2).
 3. No delimiter around the ruling text: kept for parity with D-074; control-like tags are neutralised.
-4. The label view `triage.v_scope_pipeline` still reads failed runs and older profile versions (plan DDL-2): no release from it before that DDL change.
-5. No database check yet ties a judgement row to its call (plan DDL-1); the code and `tests/test_layer2_db.py` do.
-6. Reloading a run's files writes its log events again: `ops.log_event`'s key holds the insertion time (shared helper `src/db/runs.py:events`, layer 1 alike).
-7. Ranking on these scores needs raw-score columns (D-077).
+4. Done on 28 Nov: the label view reads only usable runs, along the current layer-1 decision (DDL-2), and the trigger `t31_call` ties every judgement to its own call (DDL-1); both tested in `tests/sql/32_layer2_test.sql`, red when removed. The duplicate log events on reload (L2-F20) were fixed by the layer-1 merge (`events()` idempotent by `(run_id, seq)`).
+5. Ranking on these scores needs raw-score columns (D-077).

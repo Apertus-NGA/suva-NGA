@@ -42,8 +42,9 @@ RUN apt-get update \
 COPY --from=deps /opt/venv /opt/venv
 WORKDIR /app
 COPY . .
-# /srv/hf: mount point of the base-dataset volume, owned by suva so that a new named volume is writable by fetch.
-RUN mkdir -p /app/data /app/results /srv/hf && chown -R suva:suva /app/data /app/results /srv/hf
+# Mount points owned by suva, so that a new named volume is writable by the jobs: /srv/hf (base dataset, fetch),
+# /app/data/derived (replay caches and Suva-derived artefacts, D-031).
+RUN mkdir -p /app/data/derived /app/results /srv/hf && chown -R suva:suva /app/data /app/results /srv/hf
 USER suva:suva
 EXPOSE 8000
 CMD ["make", "run"]

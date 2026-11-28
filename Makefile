@@ -97,24 +97,41 @@ layer1-validate: ## run two profiles, recall, compare; fails on a removal: make 
 
 # --- Cluster (docs/DEPLOY.md). The compose jobs call the first four targets inside the app image; the cluster-*
 # targets wrap docker compose on the host. Never `docker compose down -v` (G12): volumes hold the database.
-.PHONY: db-logins fetch-base bootstrap load cluster-env cluster-config cluster-build cluster-up cluster-down cluster-ps cluster-logs cluster-backup
+.PHONY: db-logins db-schema-guard ingest-closure fetch-base bootstrap load validate cluster-env cluster-config cluster-build cluster-up cluster-down cluster-ps cluster-logs cluster-backup cluster-validate
 CLUSTER_PROFILES = --profile sovereign --profile ui --profile ops
 CLUSTER_BUILD_ENV = GIT_COMMIT=$$(git rev-parse HEAD 2>/dev/null) GIT_DIRTY=$$(test -z "$$(git status --porcelain 2>/dev/null)" && echo 0 || echo 1)
 
 db-logins: ## set the passwords of the login roles from SUVA_*_PASSWORD (owner, after db-deploy)
 	$(PY) -m src.db.logins
 
+db-schema-guard: ## fingerprint of the deployed schema: stored vs shipped (CMD=check|record|show, owner)
+	$(PY) -m src.db.schema_guard $(or $(CMD),show)
+
+ingest-closure: ## every source row loaded or excluded with its reason; exit 1 if a snapshot does not close (F-04)
+	$(PY) -m src.ingest closure
+
 fetch-base: ## download the pinned HF base file into HF_BASE_DIR (default data/hf), checked by SHA-256
 	$(PY) -m src.ingest.fetch --dest $(or $(HF_BASE_DIR),data/hf)
 
-bootstrap: ## the cluster's migrate job: schema (idempotent), then the login passwords (owner)
+bootstrap: ## the cluster's migrate job: schema guard, schema (idempotent), fingerprint, login passwords (owner)
+	@$(MAKE) --no-print-directory db-schema-guard CMD=check
 	@$(MAKE) --no-print-directory db-deploy
+	@$(MAKE) --no-print-directory db-schema-guard CMD=record
 	@$(MAKE) --no-print-directory db-logins
 
-load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's labels (pipeline login)
+load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's labels, closure (pipeline login)
 	@$(MAKE) --no-print-directory db-registry
 	@$(MAKE) --no-print-directory ingest-base PARQUET=$(PARQUET)
 	@$(MAKE) --no-print-directory ingest-gold
+	@$(MAKE) --no-print-directory ingest-closure
+
+validate: ## the cluster's release gate: layer 1 on two profiles, recall, compare; layer-2 certification when its data is there
+	@$(MAKE) --no-print-directory layer1-validate
+	@if [ -d data/derived/finetune/suva-ft-v3 ]; then \
+		$(MAKE) --no-print-directory layer2-validate; \
+	else \
+		echo "SKIPPED layer2-validate: no data/derived/finetune/suva-ft-v3 (Suva-derived, D-031; mount it with SUVA_DERIVED_SOURCE)"; \
+	fi
 
 cluster-env: ## generate the cluster's missing secrets into .env (never overwrites, never prints; mode 600)
 	python3 -m src.db.logins --init-env .env
@@ -140,3 +157,6 @@ cluster-logs: ## follow the logs of every service
 
 cluster-backup: ## pg_dump of the database into the backups volume (profile ops)
 	docker compose --profile ops run --rm backup
+
+cluster-validate: ## release gate in the cluster: make validate as the pipeline login (profile ops)
+	docker compose --profile ops run --rm validate

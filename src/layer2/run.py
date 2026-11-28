@@ -50,6 +50,9 @@ STEP = "layer2_judge"
 CODE_PATHS = ("src/layer2/engine.py", "src/layer2/models.py", "src/layer2/run.py")
 PURPOSE = "relevance_judgement"
 RUNS_DIR = ROOT / "data" / "runs"
+# Replay mode, no recorded answer: the candidate is not judged in this run (no row, so an earlier judgement keeps its
+# place in the label), listed in replay_misses.jsonl and counted; never a failure (D-085, docs/LAYER2.md §4).
+REPLAY_MISS = "L2_REPLAY_MISS"
 BREAKER_CONSECUTIVE = 5  # live call failures in a row that stop a run: the gateway is down, not one ruling
 PROGRESS_EVERY_S = 10.0
 # error kind of the client (src/llm/client.py) -> work reason code (src/db/sql/95_seed_reference.sql)
@@ -288,7 +291,9 @@ def judge_one(
         reading = read_first_token(result.logprobs, cfg.answer_tokens)
     except NoYesNoAnswer as exc:
         reason, error = "L2_FAIL_NO_YESNO_TOKEN", str(exc)
-    except (LLMError, ServedModelError, ReplayMiss, InputRejected) as exc:
+    except ReplayMiss as exc:
+        reason, error = REPLAY_MISS, f"ReplayMiss: {exc}"[:500]
+    except (LLMError, ServedModelError, InputRejected) as exc:
         reason, error = "L2_FAILED_CALL", f"{type(exc).__name__}: {exc}"[:500]
     attempts = collector.pop(c.ruling_id, repetition)
     final = next((a for a in reversed(attempts) if not a.get("error")), None)
@@ -298,9 +303,9 @@ def judge_one(
     ok = reading is not None
     rec = Layer2JudgementRecord(
         **base,
-        outcome="ok" if ok else "failed",
+        outcome="ok" if ok else ("skipped" if reason == REPLAY_MISS else "failed"),
         reason_code=None if ok else reason,
-        score_source="judged" if ok else "failed",
+        score_source="judged" if ok else (None if reason == REPLAY_MISS else "failed"),
         score_raw=reading.logit if ok else None,
         score_0_100=score_0_100(reading) if ok else None,
         reading=reading,
@@ -314,7 +319,7 @@ def judge_one(
         latency_ms=round(latency * 1000) if latency is not None else None,
         error=error,
         explanation_de=explanation_de(
-            outcome="ok" if ok else "failed",
+            outcome="ok" if ok else ("skipped" if reason == REPLAY_MISS else "failed"),
             version=v.label,
             model=served,
             reading=reading,
@@ -339,11 +344,18 @@ def _raw_top(logprobs: Any) -> list:
 
 
 def _write(
-    run_dir: Path, records: list[Layer2JudgementRecord], attempts: list[dict], blobs: dict[str, str], manifest: dict
+    run_dir: Path,
+    records: list[Layer2JudgementRecord],
+    attempts: list[dict],
+    blobs: dict[str, str],
+    manifest: dict,
+    misses: list[Layer2JudgementRecord] | None = None,
 ) -> dict:
     run_dir.mkdir(parents=True, exist_ok=True)
+    keep = ("ruling_id", "docket", "decision_date", "upstream_assessment_id", "messages_sha256", "error")
     files = {
         "layer2_judgements.jsonl": [rec.model_dump_json() for rec in records],
+        "replay_misses.jsonl": [json.dumps({k: getattr(m, k) for k in keep}, ensure_ascii=False) for m in misses or []],
         "llm_attempts.jsonl": [json.dumps(a, ensure_ascii=False, sort_keys=True) for a in attempts],
         "messages.jsonl": [json.dumps({"sha256": k, "content": blobs[k]}, ensure_ascii=False) for k in sorted(blobs)],
     }
@@ -776,6 +788,8 @@ def run_layer2(
             workers=n,
             breaker=breaker,
         )
+        misses = [o[0] for o in out if o[0].reason_code == REPLAY_MISS]
+        out = [o for o in out if o[0].reason_code != REPLAY_MISS]  # not judged in this run: no row (REPLAY_MISS)
         records = [o[0] for o in out]
         attempts = [a | {"index": i} for o in out for i, a in enumerate(o[1], start=1)]
         blobs = {o[0].messages_sha256: o[2] for o in out if o[2] is not None and o[0].messages_sha256}
@@ -784,13 +798,14 @@ def run_layer2(
                 raise RuntimeError(f"messages hash mismatch for blob {sha[:12]}")
         outcomes = Counter(r.outcome for r in records)
         judged, failed = outcomes["ok"], outcomes["failed"]
-        status = "succeeded" if failed == 0 else "partial"
+        status = "succeeded" if failed == 0 and not misses else "partial"
         latencies = [r.latency_ms for r in records if r.latency_ms is not None and not r.cache_hit]
         values = {
-            "rulings_in": len(records),
+            "rulings_in": len(records) + len(misses),
             "judged": judged,
             "failed": failed,
             "skipped": outcomes["skipped"],
+            "replay_misses": len(misses),
             "llm_attempts": len(attempts),
             "llm_errors": sum(1 for a in attempts if a.get("error")),
             "cache_hits": sum(1 for a in attempts if a.get("cache_hit")),
@@ -827,10 +842,16 @@ def run_layer2(
                 "status": status,
                 "metrics": values,
             },
+            misses,
         )
         if stopped:
             raise Layer2RunFailed(
                 f"stopped after {len(records)} of {len(todo)} candidates, {stopped}; files in {runs_dir / run.run_id}"
+            )
+        if misses and not records:
+            raise Layer2RunFailed(
+                f"replay: none of the {len(misses)} candidates has a recorded answer in this store; run live or use "
+                f"the store that holds them (--store); files in {runs_dir / run.run_id}"
             )
         if judged == 0 or failed > share * len(records):
             raise Layer2RunFailed(
@@ -867,12 +888,27 @@ def run_layer2(
                         3,
                         "info",
                         "layer2.files.written",
-                        "layer2_judgements.jsonl, llm_attempts.jsonl, messages.jsonl",
+                        "layer2_judgements.jsonl, llm_attempts.jsonl, messages.jsonl, replay_misses.jsonl",
                         manifest["files"],
                         None,
                         None,
                     ),
-                ],
+                ]
+                + (
+                    [
+                        (
+                            4,
+                            "warning",
+                            "layer2.replay.missing",
+                            f"{len(misses)} candidates have no recorded answer in this store: not judged in this run",
+                            {"count": len(misses), "store": store_label, "first": [m.docket for m in misses[:10]]},
+                            None,
+                            None,
+                        )
+                    ]
+                    if misses
+                    else []
+                ),
             )
             finish_run(cur, run, status)
     except BaseException as exc:  # Ctrl-C included: the run row never stays `running`
