@@ -201,6 +201,17 @@ def revise_summary(ruling_id: int, language: str, revision: Revision, conn=Depen
     return _workspace(lambda: workspace.revise(conn, ruling_id, language, revision.reason, revision.note))
 
 
+@app.get("/api/scoring")
+def get_scoring(conn=Depends(get_conn)) -> dict:
+    """How the relevance score is computed: the rule table of the current triage run and what it measured."""
+    from . import relevance
+
+    table = relevance.scoring(conn)
+    if table is None:
+        raise HTTPException(404, "no triage run yet")
+    return table
+
+
 @app.get("/api/learning")
 def get_learning(conn=Depends(get_conn)) -> dict:
     return queries.learning(conn)

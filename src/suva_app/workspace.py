@@ -112,7 +112,7 @@ def _language(language: str) -> str:
 
 def ruling_page(conn, ruling_id: int) -> dict:
     """Everything the ruling page shows: facts, status, full text, both summaries, Suva's own summary if any."""
-    from . import queries
+    from . import queries, relevance
 
     with conn.cursor() as cur:
         cur.execute(queries._BASE + "SELECT * FROM list WHERE id = %s", (ruling_id,))
@@ -144,15 +144,12 @@ def ruling_page(conn, ruling_id: int) -> dict:
             "SELECT language, body FROM gold_summaries WHERE ruling_id = %s AND is_current", (ruling_id,)
         ).fetchall()
     )
-    prediction = conn.execute(
-        "SELECT explanation FROM predictions WHERE ruling_id = %s AND is_current", (ruling_id,)
-    ).fetchone()
     return {
         "ruling": ruling,
-        "explanation": prediction[0] if prediction else None,  # why the current score; built by code (G1)
         "text": queries.display_text(text[0]) if text else None,  # tidied for reading; the stored text is untouched
         "text_source": text[1] if text else None,
         "prompt_category": pipeline.route(ruling["area"]),
+        "relevance": relevance.explain(conn, ruling_id),  # why this score, built by code from the stored run
         "summaries": summaries,
         "reference": {language: reference.get(language) for language in LANGUAGES},
         "revisions": list(REVISIONS),

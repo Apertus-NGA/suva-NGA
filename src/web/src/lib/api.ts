@@ -147,9 +147,49 @@ export type Summary = {
   problems: string[]; // what the code-side checker found
 };
 
+/** One rule of the score for one ruling. `effect`: its push on the score (0 when the rule does not apply). */
+export type RuleRow = {
+  rule: string;
+  source: "code" | "apertus";
+  direction: 1 | -1;
+  applies: boolean;
+  value: number;
+  effect: number;
+};
+
+/** Why a ruling has its score, or why it has none. Built by code from the stored triage run. */
+export type Relevance =
+  | { state: "not_assessed"; reason: string; criterion: string | null }
+  | {
+      state: "scored";
+      score: number;
+      suspected: boolean;
+      sentence_de: string | null;
+      rules: RuleRow[];
+      read_by_apertus: boolean;
+      readings: Array<{ reading: string; level: number | null }>; // each between 0 and 1
+      facts: { appeal_upheld: boolean | null; core_topics: string[]; bench_size: number | null; suva_appellant: boolean | null };
+    };
+
+/** The rule table of the current triage run and what it measured. */
+export type Scoring = {
+  run_id: number;
+  created_at: string;
+  pipeline: string | null;
+  scorer: string | null;
+  rules: Array<{ rule: string; source: "code" | "apertus"; direction: 1 | -1; weight: number; effect: number; share: number | null }>;
+  intercept: number | null;
+  readings: string[];
+  share_promoted: number;
+  scored: number;
+  suspected: number;
+};
+
+export const fetchScoring = (signal?: AbortSignal) => get<Scoring>("/api/scoring", signal);
+
 export type RulingDetail = {
   ruling: Ruling;
-  explanation: string | null; // why the current score, built by code from the rules that apply; German
+  relevance: Relevance | null;
   text: string | null;
   text_source: string | null;
   prompt_category: string;

@@ -1,11 +1,11 @@
-// The five places of work in the sidebar. A list view is the ruling table with a fixed scope:
+// The six places of work in the sidebar. A list view is the ruling table with a fixed scope:
 // the scope is always applied on top of whatever filters the user sets, and its filter chips are hidden.
 
-import { BookCheck, FileText, GraduationCap, Inbox, Library, type LucideIcon } from "lucide-react";
+import { BookCheck, FileText, GraduationCap, Inbox, Library, Scale, type LucideIcon } from "lucide-react";
 import type { Filters, Order, SortKey } from "./filters";
 import type { Key } from "./i18n";
 
-export type ViewKey = "inbox" | "rulings" | "summaries" | "confirmed" | "learning";
+export type ViewKey = "inbox" | "rulings" | "summaries" | "confirmed" | "learning" | "scoring";
 
 export type View = {
   key: ViewKey;
@@ -51,6 +51,7 @@ export const VIEWS: View[] = [
     hiddenFilters: ["status"],
   },
   { key: "learning", icon: GraduationCap, name: "nav.learning", title: "nav.learning", hint: "view.learning.hint" },
+  { key: "scoring", icon: Scale, name: "nav.scoring", title: "nav.scoring", hint: "view.scoring.hint" },
 ];
 
 export const DEFAULT_VIEW: ViewKey = "rulings";

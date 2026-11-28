@@ -4,6 +4,7 @@ import { LearningPage } from "./components/LearningPage";
 import { Pagination } from "./components/Pagination";
 import { RulingPage } from "./components/RulingPage";
 import { RulingsTable } from "./components/RulingsTable";
+import { ScoringPage } from "./components/ScoringPage";
 import { SearchInput } from "./components/SearchInput";
 import { Sidebar } from "./components/Sidebar";
 import { UpdateControl } from "./components/UpdateControl";
@@ -98,6 +99,7 @@ export default function App() {
             rulingId={place.ruling}
             onBack={() => setPlace((p) => ({ ...p, ruling: null }))}
             onChanged={() => setAttempt((n) => n + 1)}
+            onShowScoring={() => open("scoring")}
           />
         ) : (
           <>
@@ -132,7 +134,7 @@ export default function App() {
 
         {!isList ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <LearningPage version={attempt} />
+            {view.key === "scoring" ? <ScoringPage /> : <LearningPage version={attempt} />}
           </div>
         ) : (
           <section className="mx-6 mb-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-surface">

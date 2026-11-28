@@ -6,7 +6,6 @@ prompts it is sent. No network; the database is the real test database.
 
 import pytest
 from psycopg import errors
-from psycopg.types.json import Jsonb
 
 from suva_app import queries, workspace
 from suva_data import config
@@ -52,22 +51,6 @@ def test_page_holds_the_ruling_its_text_and_no_summary_yet(db_conn):
     assert page["text"].startswith("Bundesgericht") and page["text_source"] == "swiss_caselaw"
     assert page["summaries"] == {"de": None, "fr": None} and page["reference"] == {"de": None, "fr": None}
     assert page["prompt_category"] == "uv" and "key_point" in page["revisions"]
-
-
-def test_page_gives_the_reason_of_the_current_prediction_only(db_conn):
-    rid = _ruling(db_conn)
-    assert workspace.ruling_page(db_conn, rid)["explanation"] is None  # no prediction: no reason, not an empty string
-    for text, current in (("Alte Begründung.", False), ("Vermutlich relevant. Dafür: Leitentscheid.", True)):
-        run = db_conn.execute(  # one prediction per ruling and run: the older run's is no longer current
-            "INSERT INTO model_runs (kind, models) VALUES ('triage', %s) RETURNING id",
-            (Jsonb([{"name": "m", "role": "r"}]),),
-        ).fetchone()[0]
-        db_conn.execute(
-            "INSERT INTO predictions (ruling_id, run_id, score, relevant, explanation, is_current) "
-            "VALUES (%s, %s, 0.9, true, %s, %s)",
-            (rid, run, text, current),
-        )
-    assert workspace.ruling_page(db_conn, rid)["explanation"] == "Vermutlich relevant. Dafür: Leitentscheid."
 
 
 def test_page_shows_suvas_text_but_never_its_author(db_conn):

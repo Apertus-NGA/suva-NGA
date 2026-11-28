@@ -5,10 +5,11 @@ import {
   type RelevanceAction, type RulingDetail, type Status, type SummaryLanguage,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { RelevanceCard } from "./RelevanceCard";
 import { Button, SummaryCard } from "./SummaryCard";
 import { cn } from "./ui/cn";
 
-type Props = { rulingId: number; onBack: () => void; onChanged: () => void };
+type Props = { rulingId: number; onBack: () => void; onChanged: () => void; onShowScoring: () => void };
 
 const LANGUAGES: SummaryLanguage[] = ["de", "fr"];
 const STATUS_STYLE: Record<Status, string> = {
@@ -19,8 +20,8 @@ const STATUS_STYLE: Record<Status, string> = {
   not_assessed: "border border-line text-faint",
 };
 
-/** One ruling: its facts and full text on the left, its two summaries on the right. Nothing here needs bger.ch. */
-export function RulingPage({ rulingId, onBack, onChanged }: Props) {
+/** One ruling: its facts and full text on the left; on the right why it has its score, then its two summaries. Nothing here needs bger.ch. */
+export function RulingPage({ rulingId, onBack, onChanged, onShowScoring }: Props) {
   const { t, tx, formatDate } = useI18n();
   const [detail, setDetail] = useState<RulingDetail | null>(null);
   const [failed, setFailed] = useState(false);
@@ -142,12 +143,7 @@ export function RulingPage({ rulingId, onBack, onChanged }: Props) {
 
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
           {actionFailed && <p className="rounded-md bg-surface px-4 py-2.5 text-[13px] text-ink">{t("page.actionError")}</p>}
-          {detail.explanation && (
-            <section className="rounded-xl bg-surface px-5 py-4">
-              <h2 className="text-[13px] font-medium text-ink">{t("page.why")}</h2>
-              <p lang="de" className="mt-1.5 text-[13px] leading-5 text-muted">{detail.explanation}</p>
-            </section>
-          )}
+          <RelevanceCard relevance={detail.relevance} onShowScoring={onShowScoring} />
           {!hasSummary && (
             <section className="rounded-xl bg-surface px-5 py-5">
               <h2 className="text-[13px] font-medium text-ink">{t("page.summaries")}</h2>
