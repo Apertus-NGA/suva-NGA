@@ -3,9 +3,13 @@
     layer 1 (src/courts.py)  ->  structural signals  ->  six Apertus readings  ->  score  ->  tier
     -> one current row per kept ruling in the `predictions` table, which the UI reads.
 
-Run:
-    python -m src.triage.pipeline --mode replay            # dry run from cached Apertus answers
+Run (`make run` calls `run_and_store`; `make triage` calls `main`):
+    python -m src.triage.pipeline --mode replay            # from cached Apertus answers only; nothing written
     python -m src.triage.pipeline --mode live --write      # real calls where no answer is cached, then write
+    python -m src.triage.pipeline --mode live --limit 3    # a smoke run: neither the database nor results/
+
+A full run (no --limit) writes results/triage_pipeline.json, labelled LIVE or REPLAY. In replay mode a missing
+cached answer stops the run before anything is written (a missing answer would otherwise read as "no reading").
 
 Tiers as the UI shows them: in each decision quarter the highest-scored kept rulings, as many as 40% of the
 quarter's accident, military and disability rulings, are "suspected relevant" (`predictions.relevant = true`);
@@ -17,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -32,7 +35,6 @@ from src.triage import scorer as sc
 from src.triage.reading_prompts import sections
 
 VERSION = "triage_pipeline@1"
-DEFAULT_DSN = "postgresql://postgres:suva@localhost:54329/suva"
 CORE_AREAS = ("UV", "MV", "IV")
 LISTED = ("2025 Q4", "2026 Q1")  # the quarters for which Suva's list is complete
 RESULTS = Path(__file__).resolve().parents[2] / "results" / "triage_pipeline.json"
@@ -237,6 +239,53 @@ def write(conn: Any, result: dict[str, Any], model_names: list[dict[str, str]]) 
     return run_id
 
 
+class TriageIncomplete(RuntimeError):
+    """Some Apertus answers are missing (in replay mode: not in the cache); nothing was written."""
+
+
+def failures(result: dict[str, Any]) -> tuple[int, int]:
+    """(failed relevance readings, failed layer-1 matter readings) of one run."""
+    gate = sum(1 for r in result["kept"] if (r.get("layer1") or {}).get("apertus") == "failed")
+    return int(result["summary"].get("apertus_readings_failed", 0)), gate
+
+
+def model_names(client: Any) -> list[dict[str, str]]:
+    return [
+        {
+            "name": client.cfg.name or "apertus (replayed)",
+            "role": "six relevance readings and the layer-1 matter reading",
+        },
+        {
+            "name": "logistic regression (scikit-learn)",
+            "role": "combines code-read facts and the Apertus consensus into the score",
+        },
+    ]
+
+
+def run_and_store(
+    conn: Any, client: Any, *, mode: str, write_db: bool, limit: int | None = None, workers: int = 5
+) -> dict[str, Any]:
+    """Run the pipeline, then store it. A --limit run is a smoke run: it writes neither the database nor
+    results/. In replay mode any missing answer raises TriageIncomplete before anything is written."""
+    result = run(conn, client, workers=workers, limit=limit)
+    summary = result["summary"]
+    summary["mode"] = mode.upper()
+    readings_failed, gate_failed = failures(result)
+    summary["layer1_apertus_failed"] = gate_failed
+    if mode == "replay" and (readings_failed or gate_failed):
+        raise TriageIncomplete(
+            f"replay cache incomplete: {readings_failed} of the readings and {gate_failed} layer-1 matter readings "
+            f"have no cached answer (cache: data/derived/llm); nothing written. Run live, or restore the cache"
+        )
+    if limit:
+        return summary
+    if write_db:
+        summary["run_id"] = write(conn, result, model_names(client))
+    RESULTS.parent.mkdir(parents=True, exist_ok=True)
+    RESULTS.write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
@@ -247,28 +296,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=5)
     args = parser.parse_args(argv)
 
-    import psycopg
-
     from src.llm.client import client_from_env
+    from suva_data import db
 
     client = client_from_env(args.mode)
-    with psycopg.connect(os.environ.get("DATABASE_URL", DEFAULT_DSN)) as conn:
-        result = run(conn, client, workers=args.workers, limit=args.limit)
-        summary = result["summary"]
-        if args.write and not args.limit:
-            names = [
-                {
-                    "name": client.cfg.name or "apertus (replayed)",
-                    "role": "six relevance readings and the layer-1 matter reading",
-                },
-                {
-                    "name": "logistic regression (scikit-learn)",
-                    "role": "combines code-read facts and the Apertus consensus into the score",
-                },
-            ]
-            summary["run_id"] = write(conn, result, names)
-    RESULTS.parent.mkdir(parents=True, exist_ok=True)
-    RESULTS.write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    with db.connect() as conn:
+        try:
+            summary = run_and_store(
+                conn, client, mode=args.mode, write_db=args.write, limit=args.limit, workers=args.workers
+            )
+        except TriageIncomplete as exc:
+            print(f"triage [{args.mode.upper()}]: FAILED: {exc}")
+            return 1
     print(json.dumps(summary, indent=1, ensure_ascii=False))
     return 0
 
