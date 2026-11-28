@@ -304,8 +304,8 @@ def test_the_seed_labels_every_verify_rule_and_layer3_reason_in_german_and_frenc
 def test_the_default_profile_pins_the_layer3_steps():
     profiles = json.loads((ROOT / "src" / "db" / "seed" / "profiles.json").read_text())
     latest = profiles["profiles"][0]["versions"][-1]
-    # V0.5.0 = main's V0.4.0 (the scorer as layer 2 V2.0.0, ranking V1.0.0) + the three layer-3 steps (D-095)
-    assert latest["version"] == [0, 5, 0] and latest["previous"] == [0, 4, 0]
+    # V0.6.0 = main's V0.5.0 (the 8B judge as layer 2, D-099) + the three layer-3 steps (D-095)
+    assert latest["version"] == [0, 6, 0] and latest["previous"] == [0, 5, 0]
     assert {k: tuple(v) for k, v in latest["steps"].items() if k in ("segment", "summarise", "verify")} == {
         "segment": (0, 1, 0),
         "summarise": (1, 0, 0),

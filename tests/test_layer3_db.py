@@ -148,9 +148,8 @@ class BrokenEngine:
 
 
 DEPLOYED: dict[str, bool] = {}
-# The default profile pins the scorer as layer2_judge V2.0.0, which src/layer2 cannot run yet (docs/LAYER3.md G-14):
-# layer 2 and layer 3 run on summaries_8b (src/db/seed/profiles.json).
-PROFILE = "summaries_8b"
+# The default profile (V0.6.0): the 8B judge as layer 2 (D-099) and the three layer-3 steps (D-095).
+PROFILE = "default"
 
 
 def _version_trigger_runs_as_owner(url) -> bool:
@@ -228,7 +227,7 @@ def db(tmp_path_factory):
         with pipeline(url) as conn:
             loaded = load_registries(conn)
             assert any("summarise.json: V1.0.0" in line for line in loaded) and "suva_house V1.0.0" in loaded
-            assert "default V0.5.0" in loaded and "summaries_8b V0.1.0" in loaded
+            assert "default V0.6.0" in loaded
             with conn.cursor() as cur:
                 cur.execute("SELECT config FROM ops.component_version WHERE step = 'ingest'")
                 cfg = IngestConfig.model_validate(cur.fetchone()[0])

@@ -169,14 +169,6 @@ The record's propositions (slot, speaker, ruling sentence, label, accepted or re
 
 `make run` S6 is **skipped with its reason, never faked**: without `DATABASE_URL`; in replay without `data/derived/llm/cache`; in live without `LLM_*`; without a usable layer-2 run of the pinned `layer2_judge` version; when the profile does not pin the layer-3 steps (`make db-registry` not run); when nothing is selected; when no selected ruling has a recorded answer in replay. It fails (exit 1) on any other failed run.
 
-
-**While G-14 is open** (the default profile's layer 2 is the scorer, which `src/layer2` cannot run): run layer 2 and layer 3 on profile `summaries_8b`, which pins the 8B judge:
-
-```
-make layer2 MODE=live PROFILE=summaries_8b ARGS="--population 2026Q2_union --all"
-make layer3 MODE=live PROFILE=summaries_8b ARGS="--limit 10"
-```
-
 ## 8. Modes and failures
 
 **Modes.** `live` calls the gateway through the client (G3: no default for `LLM_*`, served model checked against `MODELS.md`). `replay` answers from the client's cache only; a miss raises `ReplayMiss`, the engine lets it through (also one v3 had caught as a sentence problem), and the ruling is `skipped` with `L3_REPLAY_MISS`: no version, no fallback; the cache hits before the miss and the missed call are stored. Each `ops.llm_call` row says `LIVE` or `REPLAY` (a cache hit in a live run is `REPLAY`); each version carries the run's mode.
@@ -223,7 +215,7 @@ The ten check codes, the same list in the engine (`Sentence.checks`) and in the 
 | SQL tests on the new DDL | 11 of 11 | `python -m src.db.deploy test`, same database |
 | Layer-3 database tests | 9 of 9 on a fresh PostgreSQL 17, after the review fixes (a run with no ruling stored commits its calls; a rerun after an expert edit adds no version) | `pytest -m db tests/test_layer3_db.py` (fake engine and fake layer-2 gateway, declared) |
 | Every database test (layers 1 to 3), before the merge with the frontend developer's merge | 59 of 59 | `pytest -m db`, same server, 28 Nov |
-| Every database test after merging `main` @ `42a7b043` | layer 1 and layer 3 green; **10 layer-2 tests fail, identically on a clean `main` @ `42a7b043`** (the scorer pinned as `layer2_judge` V2.0.0 in the default profile does not fit `src/layer2/run.py`'s config: `max_failed_share`); not caused by layer 3 (gap G-14) | `pytest -m db`, 28 Nov 13:11 |
+| Every database test after merging `main` @ `6a51f9c1` (PR #58) | see the PR's test plan (rerun after the merge) | `pytest -m db`, 28 Nov |
 | Tests without a database | ruff clean; 593 passed, 60 skipped | 28 Nov, after the review fixes |
 | Engine tests | 34 of 34; 3 deliberate breaks (language slot, fallback, check mapping) turned them red, then green; the replay miss v3 caught and the engine bug that hands its calls back added after review | `tests/test_engine.py` (fake gateway behind a real client, declared) |
 | Engine on 3 real rulings (DE, FR, IT) | no crash, every problem mapped to a check code, fallbacks as expected; **fake gateway, no Apertus call** | engine port session, 28 Nov; files deleted |
@@ -251,7 +243,7 @@ Each gap: what is missing, the evidence, what it costs (the graded outputs, trac
 | G-11 | **Italian rulings**: both fiches are written from the Italian text; no matter in the title of an Italian ruling. | Summary owner's report (weakest fiche on their one Italian ruling); `src/layer3/render.py` | Lower quality expected for Italian rulings | Measure Italian separately in G-1 |
 | G-12 | **The trial script is gone** (`python3 src/summarize/summarize.py <docket>`, `data/trial`); `docs/SUMMARY_MEASUREMENT.md` and `docs/SUMMARY_V2.md` describe it. | `src/summarize/summarize.py` (branch version, trial `main()` removed) | Those two docs' numbers are the probes', not layer 3's | Mark both docs as historical, pointing here |
 | G-13 | **The frontend V1 is not wired to `main`'s API.** It was built on PR #42's API (`/api/rulings/{id}/workspace`, confirm, revise) over its own `public` schema. | `docs/API.md` (PR #53) vs PR #42's `src/suva_app/` | The summaries stored here reach the UI only once the frontend reads `main`'s API | The consolidation phase: map each screen to `docs/API.md` and `summ.v_summary_current` |
-| G-14 | **Layer 2's database tests fail on `main`** since the scorer became `layer2_judge` V2.0.0 in the default profile (V0.4.0, kept in V0.5.0). | 10 failures in `tests/test_layer2_db.py` and errors in `tests/test_api_db.py` (`Layer2Config`: `max_failed_share` and 12 more fields, `src/layer2/run.py:147`), identical on a clean `main` @ `42a7b043`; also `tests/test_triage_features.py::test_xgboost_variant_runs_weighted` fails on `main` | `make run` S3 and layer 3's selection depend on a layer-2 run of the default profile; a profile whose layer 2 does not run leaves layer 3 nothing to select | Meanwhile: profile `summaries_8b` V0.1.0 (the default's steps with the 8B judge as layer 2, plus layer 3): `make layer2 PROFILE=summaries_8b`, then `make layer3 PROFILE=summaries_8b`. Closing it: the consolidation conversation and the layer-2 owner make `src/layer2` (or `make run` S3) run the scorer |
+| G-14 | **Closed by PR #58 (D-099).** The frontend developer's merge had made the scorer `layer2_judge` V2.0.0 of the default profile, which `src/layer2` could not run (10 layer-2 and some API database tests failed on `main` @ `42a7b043`). D-099 puts the default back on the 8B judge (V0.5.0) and moves the scorer to profile `scout`; layer 3 is pinned in default V0.6.0 on top. | PR #58; `src/db/seed/profiles.json` | none left for layer 3 | none |
 
 Detail of the engine-side limits, as written when the step was built:
 
@@ -282,7 +274,7 @@ What exists, works and is measured, each with its source. Read with §11 (gaps):
 | A-6 | **Code decides, Apertus reads** (thesis): title line, outcome sentence, consideration labels, splitter, 10 checks per sentence and the version's quality are code; Apertus picks propositions by sentence id (G1) and writes | §1; `src/layer3/render.py`, `segment.py` |
 | A-7 | **Expert work is never overwritten**: a pipeline rerun stores its version without making it current while an expert edit is current; unchanged texts add no version | `src/layer3/store.py` (`keep_expert_current`, `skip_unchanged`); `tests/test_layer3_db.py` |
 | A-8 | **The API's summary requests are processed**: `ops.user_request` of kind `summary` moves pending → accepted → done or failed, with the run and the version | `src/layer3/run.py`; `make layer3-requests` |
-| A-9 | **Versioned and immutable**: `segment` V0.1.0, `summarise` V1.0.0, `verify` V1.0.0, preset `suva_house` V1.0.0, profile `default` V0.5.0 (D-064); the run records the engine's code hash | `src/layer3/registry/`; `src/db/seed/profiles.json` |
+| A-9 | **Versioned and immutable**: `segment` V0.1.0, `summarise` V1.0.0, `verify` V1.0.0, preset `suva_house` V1.0.0, profile `default` V0.6.0 (D-064); the run records the engine's code hash | `src/layer3/registry/`; `src/db/seed/profiles.json` |
 | A-10 | **Tests**: engine 34, ported v3/extract/refine tests, layer-3 unit tests, 9 layer-3 database tests on PostgreSQL 17; deliberate breaks turned them red | §10 |
 | A-11 | **DDL fix for every summary writer**: `summ.before_insert_version()` runs as its owner, so the pipeline group can insert versions (function change, no reset) | `80_triggers.sql`; `docs/DDL_CHANGES.md` |
 | A-12 | **Runs in the cluster with no compose change**: `make run` S6 in the `pipeline` job (D-090) | `src/cli.py`; `docs/DEPLOY.md` §10 |

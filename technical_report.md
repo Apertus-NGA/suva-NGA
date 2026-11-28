@@ -1,4 +1,4 @@
-# Technical report — `Suva Scout`, `<to fill: team name>`
+# Technical report — Suva Scout, NGA - Need GPUs for Apertus
 
 A deeper write-up than the README: what you built, how it works, and what the
 numbers say.
@@ -6,7 +6,7 @@ numbers say.
 - **Challenge partner:** Suva
 - **Challenge:** Identification of relevant Federal Court judgements and preparation of a legal summary
 - **Event:** On-site Zurich
-- **Team:** `<to fill: team name — members>`
+- **Team:** NGA - Need GPUs for Apertus — TheDiRocco, RabahSend, bananagoo
 - **Demo:** `<to fill: link to video>`
 
 ## 1. Summary
@@ -89,7 +89,7 @@ Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weig
 **Relevance.**
 - With 59 relevant rulings, one ruling moves recall by 0.017 (1 of 59).
 - Both labelled quarters shaped the features, the prompts and the list size. The test fits the weights on one quarter and tests on the other, but the design saw both, so the numbers are optimistic. Only the Q2/2026 list is a true prediction.
-- Apertus's share is modest: its consensus weighs 0.32 per standard deviation against 2.27 for the strongest code-read rule <!-- RES:results/triage_pipeline.json rule_weights.consensus.weight 0.3245, rule_weights.area_iv.weight 2.2695 -->.
+- Apertus's share is modest: its consensus weighs 0.28 per standard deviation against 2.25 for the strongest code-read rule <!-- RES:results/triage_pipeline.json rule_weights.consensus.weight 0.2763, rule_weights.area_iv.weight 2.2536 -->.
 - Of 23 rulings Suva summarised in an earlier quarter, never used as labels, 16 score above the cut and 2 score very low <!-- RES:results/triage_pipeline.json summarised_by_suva_not_in_training -->.
 - A ruling the filter drops gets no score. Only accident, military and disability rulings decided by more than one judge are read by Apertus; other kept rulings are scored from the facts.
 
@@ -103,7 +103,7 @@ Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weig
 
 ## 6. Reproducibility
 
-- **Commit:** `<to fill: submission commit>`.
+- **Commit:** the commit tagged `submission` on `main`.
 - **Hardware:** a laptop with Docker; no GPU. The model runs behind `LLM_BASE_URL`.
 - **Determinism:** every Apertus call at temperature 0; the committed answers under `replay/llm/` reproduce the run without the gateway.
 
@@ -113,10 +113,10 @@ Recall first, then F2 = 5·TP / (4·N + submitted), N being the number of truly 
 
 | Measure | Result |
 |---|---|
-| Candidate filter: Suva's listed rulings kept | 59 of 59, keeping 1,201 of 6,464 rulings <!-- RES:results/triage_pipeline.json relevant_not_kept_by_layer1 0, kept_by_layer1 1201, rulings 6464 --> |
+| Candidate filter: Suva's listed rulings kept | 59 of 59, keeping 1,090 of 6,055 rulings <!-- RES:results/triage_pipeline.json relevant_not_kept_by_layer1 0, kept_by_layer1 1090, rulings 6055 --> |
 | Relevance, out of quarter (fit on one labelled quarter, list the other, pooled) | recall **0.932** (55 of 59), F2 **0.772**, 120 listed, precision 0.458 <!-- RES:results/triage_pipeline.json out_of_quarter --> |
 | — per quarter | 29 of 31 in a list of 66; 26 of 28 in a list of 54 <!-- same, per_quarter --> |
-| Apertus readings | 422 rulings read six times, 0 failed <!-- RES:results/triage_pipeline.json core_rulings_read_by_apertus 422, apertus_readings_failed 0 --> |
+| Apertus readings | 377 rulings read six times, 0 failed <!-- RES:results/triage_pipeline.json core_rulings_read_by_apertus 377, apertus_readings_failed 0 --> |
 | Q2/2026 list, by decision date | 76 flagged of 421 kept <!-- RES:results/triage_pipeline.json by_quarter."2026 Q2" --> |
 | Audited first filter (data layer) | keeps 935 of 6,055; 82 of 82 rulings Suva listed or summarised <!-- API:results/layer1_validation.json run V1.1.0 totals, recall --> |
 
@@ -141,8 +141,28 @@ make run-live ARGS="--limit 5"   # real Apertus calls, a smoke run; ARGS="--all"
 
 `make run` starts the database, pulls the corpus from the team's public dataset when the database is empty, scores the rulings and writes the summaries from the committed answers, then serves the interface. Every output is labelled `LIVE` or `REPLAY`. <!-- CHECK: commands, port and the ARGS run-live needs (the Scout Makefile takes ARGS="--limit N" or "--all") -->
 
-**Expected duration:** `<to fill: measured duration of make run>`.
+**Expected duration:** about 2.5 minutes for `SERVE=0 make run` from a fresh clone (measured 149 s on 28 Nov on a laptop, Docker image and Python packages already cached; the run pulls the dataset), plus the first image and package downloads on a new machine.
 
+
+## 7. Model registry and declarations
+
+Every model used, in development and at runtime, with its version and role (event rule 6). At runtime only Apertus runs; no other model is called by `make run`.
+
+| Phase | Model and version | Role | Where / who |
+|---|---|---|---|
+| Runtime | Apertus v1.5 70B, instruct, thinking off: `swiss-ai/Apertus-v1.5-70B` (gateway `apertus-v1-5-70b`) | six readings per ruling for the score; matter of unclear rulings; DE and FR summaries, their check and repair | `LLM_BASE_URL` (Keera gateway during the event) |
+| Runtime, data layer | Apertus v1.5 8B: `swiss-ai/Apertus-v1.5-8B` (gateway `apertus-v1-5-8b`) | yes/no relevance judge of the audited data layer | same |
+| Runtime | logistic regression (ours, scikit-learn) | combines the code-read facts and the Apertus readings into the score | local, fitted on Suva's list at each run |
+| Evaluation, development only | gpt-oss 120B: `openai/gpt-oss-120b`, revision `b5c939de8f` | open-weights judge of summaries | OpenAI-compatible endpoint |
+| Evaluation, development only | DeepSeek V4 Pro: `deepseek-ai/DeepSeek-V4-Pro` | open-weights judge candidate, compared on 75 development cases | same |
+| Research, development only | Apertus v1.5 70B thinking: `apertus-v1-5-70b-thinking` | reasoning experiments in `research/` | Keera gateway |
+| Research, development only | `intfloat/multilingual-e5-large-instruct`, `BAAI/bge-m3` | embeddings for neighbour features in experiments | local |
+| Research, development only | XGBoost, logistic regression (ours) | classical baselines | local |
+| Coding assistants | Claude Opus 5.5 and Claude Fable 5.2 in Claude Code (VS Code extension); GitHub Copilot autocomplete in VS Code | code, review, docs, analysis, planning | TheDiRocco |
+| Coding assistants | Claude Opus 5.5 and Claude Fable 5.2 in Claude Code (terminal in VS Code); GitHub Copilot autocomplete in VS Code | code, review, docs, analysis, planning | bananagoo |
+| Coding assistants | Grok 4.7, and Cursor's Auto mode (model chosen by Cursor per request), in Cursor | code, review, docs, analysis, planning | RabahSend |
+| Chat assistant | GPT-6 Luna in ChatGPT (web) | questions during development | TheDiRocco |
+| Pre-event preparation | Claude Opus 5.5 in claude.ai | the project kit (docs and rules), declared as pre-existing material and committed unchanged as tag `kit-v0` | TheDiRocco |
 
 ## License
 

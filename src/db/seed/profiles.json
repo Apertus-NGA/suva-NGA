@@ -137,8 +137,91 @@
             4,
             0
           ],
+          "decision": "D-099",
+          "changelog": "layer2_judge V1.0.0 (the 8B Ja/Nein judge, D-076) forms the label again, because src/layer2 is the only executor of the step and cannot run V2.0.0: under V0.4.0 make pipeline S3 and the cluster pipeline job failed. The Suva Scout scorer (layer2_judge V2.0.0) and its ranking V1.0.0 move unchanged to the profile scout (D-099).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              1,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "version": [
+            0,
+            6,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            5,
+            0
+          ],
           "decision": "D-095",
-          "changelog": "Layer 3 added on top of V0.4.0 (layer2_judge V2.0.0, ranking V1.0.0): segment V0.1.0 (own splitter, never primary), summarise V1.0.0 (the v3 engine at a4a1504 with three fixes, v2 fallback) and verify V1.0.0 (one rule per check code) (D-095).",
+          "changelog": "Layer 3 added on top of V0.5.0 (layer2_judge V1.0.0, the 8B judge, D-099): segment V0.1.0 (own splitter, never primary), summarise V1.0.0 (the v3 engine at a4a1504 with three fixes, v2 fallback) and verify V1.0.0 (one rule per check code) (D-095).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              1,
+              0,
+              0
+            ],
+            "segment": [
+              0,
+              1,
+              0
+            ],
+            "summarise": [
+              1,
+              0,
+              0
+            ],
+            "verify": [
+              1,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "code": "scout",
+      "name": "Suva Scout scorer (D-094)",
+      "is_default": false,
+      "description": "The Suva Scout scorer as layer 2 and its promotion as the ranking step (D-094), loaded from a stored scorer run by make bridge or make scorer-load. Not the label shown by the API until the team makes it the default (D-099).",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "decision": "D-099",
+          "changelog": "layer1_filter V1.1.0, layer2_judge V2.0.0 (the Suva Scout scorer) and ranking V1.0.0, as the default profile V0.4.0 pinned them (D-094); moved here by D-099.",
           "steps": {
             "ingest": [
               1,
@@ -156,21 +239,6 @@
               0
             ],
             "ranking": [
-              1,
-              0,
-              0
-            ],
-            "segment": [
-              0,
-              1,
-              0
-            ],
-            "summarise": [
-              1,
-              0,
-              0
-            ],
-            "verify": [
               1,
               0,
               0
@@ -238,57 +306,6 @@
             ]
           },
           "decision": "D-083"
-        }
-      ]
-    },
-    {
-      "code": "summaries_8b",
-      "name": "Summaries on the 8B judge (layer 3 while G-14 is open)",
-      "is_default": false,
-      "description": "The default profile's steps with the 8B judge (layer2_judge V1.0.0, D-076) as layer 2, plus layer 3. The default profile pins the scorer as layer2_judge V2.0.0 (D-094), which src/layer2 cannot run yet (docs/LAYER3.md G-14): make layer2 PROFILE=summaries_8b, then make layer3 PROFILE=summaries_8b.",
-      "versions": [
-        {
-          "version": [
-            0,
-            1,
-            0
-          ],
-          "bump_kind": "initial",
-          "previous": null,
-          "changelog": "ingest V1.0.0, layer1_filter V1.1.0, layer2_judge V1.0.0 (the 8B judge), segment V0.1.0, summarise V1.0.0, verify V1.0.0 (D-095).",
-          "steps": {
-            "ingest": [
-              1,
-              0,
-              0
-            ],
-            "layer1_filter": [
-              1,
-              1,
-              0
-            ],
-            "layer2_judge": [
-              1,
-              0,
-              0
-            ],
-            "segment": [
-              0,
-              1,
-              0
-            ],
-            "summarise": [
-              1,
-              0,
-              0
-            ],
-            "verify": [
-              1,
-              0,
-              0
-            ]
-          },
-          "decision": "D-095"
         }
       ]
     }
