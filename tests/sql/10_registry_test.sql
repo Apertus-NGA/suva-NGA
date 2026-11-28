@@ -1,6 +1,7 @@
 -- Registry (D-064): deterministic ids, insert-only versions (only status changes), changelog and bump rules,
 -- schema subjects, rules bound to their step, profiles refusing draft steps, audit of status changes, the decision
--- and validation references of a step version and the decision of a profile version (F-12).
+-- and validation references of a step version and the decision of a profile version (F-12), the models and prompts
+-- of a step version (only on an LLM step, sealed once pinned or used).
 BEGIN;
 \ir _fixtures.sql
 
@@ -90,5 +91,39 @@ SELECT pg_temp.expect_error($q$UPDATE ops.pipeline_profile_version SET decision_
 
 -- one default profile only
 SELECT pg_temp.expect_error($q$INSERT INTO ops.pipeline_profile (profile_code, name, is_default) VALUES ('other', 'Other', true)$q$, 'duplicate key');
+
+-- models and prompts (integration review, 28 Nov): never on a step that runs code only, sealed once the version is
+-- pinned or used; an identical reload passes (the loader's ON CONFLICT DO NOTHING). Red before: every insert passed
+SELECT pg_temp.expect_error(format($q$
+  INSERT INTO ops.component_version_model (component_version_id, model_role, model_id)
+  SELECT pg_temp.cv(%L), 'judge', model_id FROM ops.model WHERE gateway_id = 'fixture-model-large'$q$, s), 'runs code only')
+FROM unnest(ARRAY['layer1_filter', 'segment', 'parse', 'ranking']) AS s;
+SELECT pg_temp.expect_error($q$
+  INSERT INTO ops.component_version_prompt (component_version_id, prompt_role, prompt_version_id)
+  SELECT pg_temp.cv('layer1_filter'), 'question', prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question'$q$,
+  'runs code only');
+INSERT INTO ops.model (gateway_id, family, size_label, allowed, source_snapshot_id)
+VALUES ('fixture-model-small', 'fixture', 'S', true, '00000000-0000-4000-8000-0000000000a1');
+SELECT pg_temp.expect_error($q$
+  INSERT INTO ops.component_version_model (component_version_id, model_role, model_id)
+  SELECT pg_temp.cv('layer2_judge'), 'repair', model_id FROM ops.model WHERE gateway_id = 'fixture-model-small'$q$,
+  'its models are sealed');  -- layer2_judge V1.0.0 is pinned by the default profile
+SELECT pg_temp.expect_error($q$
+  INSERT INTO ops.component_version_prompt (component_version_id, prompt_role, prompt_version_id)
+  SELECT pg_temp.cv('summarise'), 'other', prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question'$q$,
+  'its prompts are sealed');
+INSERT INTO ops.component_version_model (component_version_id, model_role, model_id)   -- the same binding again: passes
+SELECT pg_temp.cv('layer2_judge'), 'judge', model_id FROM ops.model WHERE gateway_id = 'fixture-model-large' ON CONFLICT DO NOTHING;
+-- a version nothing pins nor uses yet takes its bindings
+INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id, config, config_sha256, code_path, code_sha256, bump_kind,
+                                  previous_version_id, changelog)
+VALUES ('layer2_judge', 'next judge', 1, 1, 0, (SELECT json_schema_id FROM ops.json_schema WHERE schema_code = 'test.step_config'), '{}',
+        repeat('4', 64), 'x', repeat('5', 64), 'minor', pg_temp.cv('layer2_judge'), 'next judge');
+INSERT INTO ops.component_version_model (component_version_id, model_role, model_id)
+SELECT pg_temp.cv('layer2_judge', 1, 1), 'judge', model_id FROM ops.model WHERE gateway_id = 'fixture-model-small';
+DO $$ BEGIN
+  ASSERT (SELECT count(*) FROM ops.component_version_model WHERE component_version_id = pg_temp.cv('layer2_judge', 1, 1)) = 1,
+         'an unpinned, unused version takes its model';
+END $$;
 
 ROLLBACK;
