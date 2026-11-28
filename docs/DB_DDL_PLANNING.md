@@ -1038,7 +1038,7 @@ T-4  DB-14 writers (2 h) → DB-15 summaries (1.5 h) → DB-16 API (2 h)
 
 ## 21. Phase 1: D-lines to record in `docs/DECISIONS.md`
 
-**Recorded in `docs/DECISIONS.md` §1 on 28 Nov (branch `platform/db-ddl`).** D-058 is reserved (tool-calling) and D-060 belongs to the layer-2 baseline (another branch): if either lands with another number, renumber at merge. Each row points here; the plan stays the single home of the detail.
+**Recorded in `docs/DECISIONS.md` §1 on 28 Nov (branch `platform/db-ddl`).** D-058 is reserved (tool-calling). The layer-2 baseline, numbered D-060 on its branch, landed as D-074 (PR #38); D-060 is left to the layer-1 gate proposal (PR #36). Each row points here; the plan stays the single home of the detail.
 
 | ID | Date | Decision | Status | Basis | Revisit if |
 |---|---|---|---|---|---|
