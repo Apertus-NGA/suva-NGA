@@ -1,6 +1,6 @@
 # API: the HTTP interface for the legal-expert UI and the judges
 
-> **Status: PROPOSED (D-091, D-092), Sat 28 Nov 2026.** Code: `src/api/`. Tests: `tests/test_api_unit.py`, `tests/test_api_db.py` (`-m db`). Data behind every field: `docs/DATA_CATALOG.md`. The routes follow the frontend's brief of 28 Nov.
+> **Status: PROPOSED (D-092, D-093), Sat 28 Nov 2026.** Code: `src/api/`. Tests: `tests/test_api_unit.py`, `tests/test_api_db.py` (`-m db`). Data behind every field: `docs/DATA_CATALOG.md`. The routes follow the frontend's brief of 28 Nov.
 
 ## 1. Run it
 
@@ -93,7 +93,7 @@ curl -s -X POST localhost:8000/api/requests -H 'Content-Type: application/json' 
 |---|---|
 | `ai_relevant` / `ai_not_relevant` rulings | a ranking step with a measured cut (D-021) |
 | summaries, their sources, per-language validation | the v3 → `summ.*` writer, `summ.claim_source` (provenance option B), a language on summary reviews |
-| expert decision on a not-assessed ruling | a ruling-level review target (D-092, open part) |
+| expert decision on a not-assessed ruling | a ruling-level review target (D-093, open part) |
 | refresh (`/api/updates`), inbox content | incremental ingest with `created_by_run_id`, a refresh run that links its child runs |
 | processing of requests | a request runner (`ops.user_request`: pending → accepted → done or failed) |
 | UI served by the API, CORS for a separate dev server | the UI owner's choice (open) |

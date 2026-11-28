@@ -4,7 +4,7 @@
 -- Description: The reason-code vocabulary (German and French labels shown to lawyers; a layer-1 drop label
 --              states only its own condition, F-03), the perspective anchors (draft until the summarise
 --              owner writes their rubrics), the mandatory preset suva_house (anchor 5), and the review payload
---              schemas (V1.0.0 empty; scope_review.payload V1.1.0 records what the expert saw, D-092).
+--              schemas (V1.0.0 empty; scope_review.payload V1.1.0 records what the expert saw, D-093).
 --              Step versions, rules, prompts and profiles are NOT seeded here: the registry loader writes
 --              them from reviewed seed files, and models come from MODELS.md (D-064).
 -- SGBD: PostgreSQL 17
@@ -102,7 +102,7 @@ FROM (VALUES
 ) AS s(code, js, changelog)
 ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
 
--- scope_review.payload V1.1.0 (D-092): what the expert saw when deciding (the pipeline status and the score on screen),
+-- scope_review.payload V1.1.0 (D-093): what the expert saw when deciding (the pipeline status and the score on screen),
 -- so each (seen, given) pair is a training example. All optional. A minor bump of V1.0.0, which stays in place and
 -- active (versions are immutable; readers take the highest active version, as gold.submit_review does). The DB checks
 -- only that a payload is an object: the writer validates it against this schema (§7.4).
@@ -121,7 +121,7 @@ FROM (VALUES (
        "shown_score_0_100": {"type": ["number", "null"], "minimum": 0, "maximum": 100, "description": "the displayed score, 0-100"},
        "shown_score_raw":   {"type": ["number", "null"], "description": "the stored raw score (e.g. layer 2''s logit)"}}}'::jsonb,
    '{"shown_status": "potentially", "shown_score_0_100": 64, "shown_score_raw": 0.58}'::jsonb,
-   'V1.1 (D-092): optional shown_status, shown_score_0_100, shown_score_raw = what the expert saw when deciding. The verdict stays a column: relevant | not_relevant on any label, correct | incorrect on in_scope or out_of_scope, withdrawn.')
+   'V1.1 (D-093): optional shown_status, shown_score_0_100, shown_score_raw = what the expert saw when deciding. The verdict stays a column: relevant | not_relevant on any label, correct | incorrect on in_scope or out_of_scope, withdrawn.')
 ) AS s(js, template, changelog)
 ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
 

@@ -1,4 +1,4 @@
--- Expert scope verdicts on any label, and withdrawal (D-092). relevant | not_relevant give the expert's own label on
+-- Expert scope verdicts on any label, and withdrawal (D-093). relevant | not_relevant give the expert's own label on
 -- any pipeline label, potentially included; correct | incorrect stay on in_scope | out_of_scope; withdrawn takes back
 -- the review it supersedes (same target, never a withdrawal) and leaves no expert label. The payload records what the
 -- expert saw (scope_review.payload V1.1.0), so each (seen, given) pair is a training example.

@@ -159,7 +159,7 @@ SELECT
   rv.assessment_id                                 AS reviewed_assessment_id,
   (rv.assessment_id IS NOT NULL AND rv.assessment_id <> p.assessment_id) AS review_is_stale,
   -- the expert's label: relevant | not_relevant say it outright; correct keeps and incorrect flips the label the
-  -- expert saw (V1); withdrawn (the review taken back, D-092) leaves none
+  -- expert saw (V1); withdrawn (the review taken back, D-093) leaves none
   CASE WHEN rv.verdict = 'relevant' THEN 'in_scope'::ops.in_suva_scope
        WHEN rv.verdict = 'not_relevant' THEN 'out_of_scope'::ops.in_suva_scope
        WHEN rv.verdict = 'correct' THEN rv.reviewed_label
@@ -178,7 +178,7 @@ LEFT JOIN LATERAL (
   ORDER BY r.created_at DESC
   LIMIT 1) rv ON true;
 COMMENT ON VIEW triage.v_scope_current IS
-  'The pipeline label plus the latest expert scope review beside it (D-066, D-092): the latest review of any assessment of the ruling that no other review supersedes. expert_implied_label = in_scope for relevant, out_of_scope for not_relevant, the label the expert saw (reviewed_label) for correct, flipped for incorrect, NULL for withdrawn (the expert took the review back: expert_verdict = withdrawn, no expert label). review_is_stale = the review targets another assessment than the current pipeline label''s. The delivered list and the metrics never read expert_implied_label.';
+  'The pipeline label plus the latest expert scope review beside it (D-066, D-093): the latest review of any assessment of the ruling that no other review supersedes. expert_implied_label = in_scope for relevant, out_of_scope for not_relevant, the label the expert saw (reviewed_label) for correct, flipped for incorrect, NULL for withdrawn (the expert took the review back: expert_verdict = withdrawn, no expert label). review_is_stale = the review targets another assessment than the current pipeline label''s. The delivered list and the metrics never read expert_implied_label.';
 
 CREATE OR REPLACE VIEW triage.v_scope_trace AS
 WITH RECURSIVE chain AS (
@@ -287,7 +287,7 @@ SELECT DISTINCT ON (r.target_kind, coalesce(r.assessment_id, r.summary_version_i
 FROM gold.expert_review r
 WHERE NOT EXISTS (SELECT 1 FROM gold.expert_review s WHERE s.supersedes_review_id = r.review_id)
 ORDER BY r.target_kind, coalesce(r.assessment_id, r.summary_version_id), r.created_at DESC;
-COMMENT ON VIEW gold.v_expert_review_current IS 'The latest non-superseded review per target. A withdrawn row (D-092) means the expert took the review it supersedes back: the target has no expert opinion.';
+COMMENT ON VIEW gold.v_expert_review_current IS 'The latest non-superseded review per target. A withdrawn row (D-093) means the expert took the review it supersedes back: the target has no expert opinion.';
 
 -- --- summ --------------------------------------------------------------------
 

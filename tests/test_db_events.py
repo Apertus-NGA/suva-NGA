@@ -5,7 +5,8 @@ database, deploys src/db/sql and the SQL fixture (tests/sql/_fixtures.sql, for a
 `ts` is the real clock time of the insert. Before the fix, emitting a run's events again (a reload of its files)
 added a second row per seq, since `ON CONFLICT` never saw a conflict on a new timestamp. Now an event is inserted only
 when its run has no row with that seq, and a per-run transaction lock makes a concurrent emission wait for the first
-one instead of inserting a duplicate. No mock: every assertion reads the stored rows.
+one instead of inserting a duplicate. `finish_run` and `fail_run` close a run and its root span after its events, at
+the real clock time, so every event lies within its run's time range. No mock: every assertion reads the stored rows.
 """
 
 from __future__ import annotations
@@ -124,3 +125,37 @@ def test_a_concurrent_emission_of_the_same_run_waits_and_adds_nothing(database):
         stored = _rows(second, run.run_id)
         second.commit()
     assert [(seq, m) for seq, _, m in stored] == [(1, "first")]
+
+
+def test_every_event_of_a_closed_run_lies_within_its_run_and_root_span(database):
+    """The run and its root span close with the real clock time (`clock_timestamp()`), after the events the closing
+    transaction wrote: `now()` is the transaction start, so before the fix every event of a run was stamped after its
+    run's `finished_at` (review fix). A failed run (`fail_run`) also closes after its last committed event."""
+    from src.db.pg import connect
+    from src.db.runs import events, fail_run, finish_run
+
+    with connect(database, actor="test") as conn:
+        ok, failed = _run(conn), _run(conn)
+        with conn.transaction(), conn.cursor() as cur:  # a step's closing transaction: events, then the close
+            events(cur, ok, STEP, [_event(1, "decided"), _event(2, "files")])
+            finish_run(cur, ok)
+        with conn.transaction(), conn.cursor() as cur:  # a committed event, then a failure
+            events(cur, failed, STEP, [_event(1, "before the failure")])
+        fail_run(conn, failed, RuntimeError("synthetic failure"))
+        bounds = {
+            run_id: (started, finished, span_started, span_ended, status)
+            for run_id, started, finished, span_started, span_ended, status in conn.execute(
+                """SELECT pr.run_id::text, pr.started_at, pr.finished_at, s.started_at, s.ended_at, pr.status::text
+                   FROM ops.pipeline_run pr JOIN ops.span s ON s.run_id = pr.run_id AND s.parent_span_id IS NULL
+                   WHERE pr.run_id IN (%s, %s)""",
+                (ok.run_id, failed.run_id),
+            ).fetchall()
+        }
+        stored = {run.run_id: [ts for _, ts, _ in _rows(conn, run.run_id)] for run in (ok, failed)}
+        conn.commit()
+
+    assert {run_id: b[4] for run_id, b in bounds.items()} == {ok.run_id: "succeeded", failed.run_id: "failed"}
+    for run_id, stamps in stored.items():
+        started, finished, span_started, span_ended, _ = bounds[run_id]
+        assert stamps and all(started <= ts <= finished for ts in stamps), (run_id, started, finished, stamps)
+        assert all(span_started <= ts <= span_ended for ts in stamps), (run_id, span_started, span_ended, stamps)

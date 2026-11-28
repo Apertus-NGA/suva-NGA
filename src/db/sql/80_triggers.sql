@@ -428,8 +428,8 @@ CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.assessment
 -- why (layer 1: one of five preconditions; text_absent only without a text). Only a keep is blocked, by another
 -- enabled flag of the version (t50_ledger checks that it fired; layer 1 also names the closed rubric). full_text
 -- evidence: on a text, a fired or blocked row carries the offsets of its match, which is the exact slice of the
--- stored text; without a text, nothing was searched, so only not_applicable, or a rule that fires on the missing text
--- itself (no offsets, no match).
+-- stored text; without a text, nothing was searched, so only not_applicable, or a rule whose check fires on the missing
+-- text itself (definition.check text_unavailable, V1.2.0's L1_KEEP_TEXT_UNAVAILABLE: fired, no offsets, no match).
 CREATE OR REPLACE FUNCTION triage.check_assessment_reason() RETURNS trigger
   LANGUAGE plpgsql AS $$
 DECLARE
@@ -446,7 +446,7 @@ BEGIN
     RAISE EXCEPTION 'assessment_reason: assessment % is already committed: its ledger was certified at that commit and is sealed (a ledger is written in the transaction of its assessment)',
       NEW.assessment_id;
   END IF;
-  SELECT cvr.ordinal, cvr.enabled, rl.rule_code, rl.kind, rl.reason_code INTO vr
+  SELECT cvr.ordinal, cvr.enabled, rl.rule_code, rl.kind, rl.reason_code, rl.definition ->> 'check' AS check_name INTO vr
   FROM ops.component_version_rule cvr JOIN ops.rule rl ON rl.rule_id = cvr.rule_id
   WHERE cvr.component_version_id = a.component_version_id AND cvr.rule_id = NEW.rule_id;
   IF NOT FOUND THEN
@@ -502,6 +502,11 @@ BEGIN
       IF NEW.outcome IN ('not_fired', 'blocked') OR NEW.char_start IS NOT NULL OR NEW.matched_text IS NOT NULL THEN
         RAISE EXCEPTION 'assessment_reason: rule %: the assessment has no input text, so no text was searched: a text rule is not_applicable (why text_absent), and only a rule that fires on the missing text names full_text, without offsets or match',
           vr.rule_code;
+      END IF;
+      -- a fired row without offsets is evidence of the missing text only: no other rule can claim a keep on it
+      IF NEW.outcome = 'fired' AND vr.check_name IS DISTINCT FROM 'text_unavailable' THEN
+        RAISE EXCEPTION 'assessment_reason: rule %: the assessment has no input text, so only a rule whose check is text_unavailable can fire on full_text (check %)',
+          vr.rule_code, coalesce(vr.check_name, 'none');
       END IF;
     ELSE
       IF NEW.outcome IN ('fired', 'blocked') AND NEW.char_start IS NULL THEN
@@ -732,7 +737,7 @@ CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.ranking_entry
 -- gold -----------------------------------------------------------------------
 
 -- A scope review copies the label of its assessment; a review supersedes only a review of the same target; a
--- withdrawal (D-092) takes back a review, never another withdrawal. That a withdrawal supersedes something at all is
+-- withdrawal (D-093) takes back a review, never another withdrawal. That a withdrawal supersedes something at all is
 -- expert_review_target_chk's rule (40_gold.sql).
 CREATE OR REPLACE FUNCTION gold.check_expert_review() RETURNS trigger
   LANGUAGE plpgsql AS $$
@@ -757,7 +762,7 @@ BEGIN
   RETURN NEW;
 END $$;
 COMMENT ON FUNCTION gold.check_expert_review() IS
-  'BEFORE INSERT on gold.expert_review: reviewed_label = the label of the reviewed assessment; a review supersedes only a review of the same target; a withdrawn review supersedes a review that is not itself withdrawn (D-066, D-092).';
+  'BEFORE INSERT on gold.expert_review: reviewed_label = the label of the reviewed assessment; a review supersedes only a review of the same target; a withdrawn review supersedes a review that is not itself withdrawn (D-066, D-093).';
 CREATE OR REPLACE TRIGGER t31_check BEFORE INSERT ON gold.expert_review
   FOR EACH ROW EXECUTE FUNCTION gold.check_expert_review();
 

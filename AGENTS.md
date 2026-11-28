@@ -29,6 +29,7 @@ Thesis: **Apertus reads, the code verifies, the lawyer decides.**
 | what Suva's data in `judgements/` contains: the relevance list, the 55 summaries, quarters, styles, fields never to copy | `docs/SUVA_DATA.md` |
 | data, sources, licences; the datasets to build, with expected counts (DS1-DS8) | `docs/DATA.md` (datasets: §10) |
 | every table, view, column and value the database holds today, for the UI and the API (layer 3: preview only) | `docs/DATA_CATALOG.md` |
+| what changed in the database since that catalog, and what it changes for an API contract; how to deploy, upgrade and reset | `docs/DDL_CHANGES.md`, `docs/RUNBOOK_DB.md` |
 | pipeline, contracts, stack | `docs/ARCHITECTURE.md` |
 | tests and metrics | `docs/EVAL.md` |
 | project terms (Neuheiten, net, signal, A0-A4, HF, Keera…) and legal vocabulary DE/FR/IT | `docs/GLOSSARY.md` |

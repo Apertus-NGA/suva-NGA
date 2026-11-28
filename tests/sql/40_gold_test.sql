@@ -1,6 +1,6 @@
 -- Gold (D-066): expert reviews only through gold.submit_review (actor required), verdicts paired with their
 -- target, correct | incorrect never on potentially, the implied label beside the pipeline label, supersession, Suva
--- labels with closed-world negatives. The absolute verdicts and withdrawal (D-092): 41_expert_review_test.sql.
+-- labels with closed-world negatives. The absolute verdicts and withdrawal (D-093): 41_expert_review_test.sql.
 BEGIN;
 \ir _fixtures.sql
 
