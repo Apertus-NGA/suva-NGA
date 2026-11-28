@@ -261,3 +261,21 @@ def test_replay_misses_stop_triage_before_anything_is_written(monkeypatch, triag
         tp.run_and_store(FakeConn(), FakeClient("replay"), mode="replay", write_db=True)
     assert triage_fakes.written == []
     assert not triage_fakes.results.exists()
+
+
+def test_a_limit_smoke_run_reads_the_rulings_without_fitting_the_scorer(monkeypatch):
+    """With --limit the first N rulings rarely include both labelled quarters, so the scorer cannot be fitted;
+    the smoke run reads them (layer 1 and the Apertus readings) and stops there."""
+    import src.area_judge as aj
+
+    rows = [{"id": 1, "docket": "8C_1/2026", "quarter": "2026 Q2", "basis": None, "text": "t", "area": "UV"}]
+    monkeypatch.setattr(tp, "load_rulings", lambda conn: rows)
+    monkeypatch.setattr(aj, "gate_judge", lambda client: None)
+    monkeypatch.setattr(
+        tp, "prepare", lambda r, judge: {**r, "kept": True, "core": True, "layer1": {}, "signals": {"area": "UV"}}
+    )
+    monkeypatch.setattr(tp, "read", lambda client, r: {"verdict": 0.7, "yes_strict": None})
+    summary = tp.run(FakeConn(), FakeClient(), limit=1)["summary"]
+    assert summary["rulings"] == 1 and summary["core_rulings_read_by_apertus"] == 1
+    assert summary["apertus_readings_failed"] == 1
+    assert "not fitted" in summary["scorer"]

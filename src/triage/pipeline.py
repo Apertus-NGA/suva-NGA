@@ -135,6 +135,16 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
     with ThreadPoolExecutor(workers) as pool:
         for ruling, reading in zip(core, pool.map(lambda r: read(client, r), core), strict=True):
             ruling["readings"] = reading
+    if limit:  # a smoke run: the first N rulings cannot train the scorer (it needs both labelled quarters)
+        summary = {
+            "version": VERSION,
+            "rulings": len(prepared),
+            "kept_by_layer1": len(kept),
+            "core_rulings_read_by_apertus": len(core),
+            "apertus_readings_failed": sum(1 for r in core for v in r["readings"].values() if v is None),
+            "scorer": f"not fitted: a smoke run of the first {limit} rulings",
+        }
+        return {"summary": summary, "kept": kept, "model": None, "consensus": None}
     consensus = sc.Consensus.fit([r["readings"] for r in core])
     for ruling in kept:
         ruling["consensus"] = consensus.value(ruling.get("readings"))
