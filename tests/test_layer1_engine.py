@@ -1,4 +1,4 @@
-"""Layer-1 engine (src/layer1/engine.py): parity with src/courts.py, evidence offsets, normalisation, reasons."""
+"""Layer-1 engine (src/layer1/engine.py): V1.0.0 parity with courts.py at 4c246a8, evidence, normalisation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from src import courts
 from src.layer1.engine import Layer1Engine, RuleSpec, fingerprint
 from src.layer1.models import Layer1Config
 from src.layer1.run import explain
@@ -58,21 +57,102 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("docket,area,title,text", CASES)
-def test_v100_reproduces_courts(docket, area, title, text):
-    ref = courts.gate_record(docket, area, title, text)
+# src/courts.py at 4c246a8, the snapshot V1.0.0 reproduces. This branch's courts.py has moved since
+# (area codes, subject_unknown, wider accident terms). The wider terms are already V1.1.0. V1.0.0 stays frozen.
+_SOCIAL = {
+    "assicurazione contro gli infortuni",
+    "assicurazione malattie",
+    "assicurazione militare",
+    "assicurazione per l'invalidità",
+    "assurance militaire",
+    "assurance-accidents",
+    "assurance-invalidité",
+    "assurance-maladie",
+    "berufliche vorsorge",
+    "invalidenversicherung",
+    "krankenversicherung",
+    "militärversicherung",
+    "previdenza professionale",
+    "previdenza professionnale",
+    "prévoyance professionnelle",
+    "unfallversicherung",
+}
+_FROZEN_AREAS = {
+    "8": _SOCIAL,
+    "9": _SOCIAL,
+    "4": {
+        "assurance responsabilité civile",
+        "diritto contrattuale",
+        "droit des contrats",
+        "haftpflichtrecht",
+        "vertragsrecht",
+    },
+}
+_FROZEN_LETTERS = {"8": set("CDFG"), "9": set("CDFG"), "4": set("ADFG")}
+_FROZEN_ACCIDENT = (
+    r"\b(?:suva|cna|insai|uvg|laa|lainf|mvg|unfallversicherung|militärversicherung|assurance-accidents|"
+    r"assurance militaire|assicurazione contro gli infortuni|assicurazione militare)\b"
+)
+_FROZEN_CONTRACT = (
+    r"(?:taggeldversicherung|\bvvg\b|\blca\b|versicherungsvertragsgesetz|"
+    r"loi sur le contrat d['’]assurance|legge (?:federale )?sul contratto d['’]assicurazione)"
+)
+_FROZEN_CLOSED = (
+    r"arbeitslos|chômage|chomage|disoccupaz|alters- und hinterlassenen|vieillesse|vecchiaia|"
+    r"ergänzungsleistung|prestations complémentaires|prestazion\w* complementar|sozialhilfe|aide sociale|"
+    r"assistenza sociale|familienzulag|allocations familiales|assegni familiari|erwerbsersatz|erwerbersatz|"
+    r"perte de gain|perdita di guadagno|finanzen & abgabe|finances publiques|finanze pubbliche|impôt|imposta|"
+    r"umsatzabgabe|droit fiscal|diritto tributario"
+)
+# (kept, subject, text) for each entry of CASES, from courts.gate_record at 4c246a8.
+_FROZEN_V100 = [
+    (True, "kept_subject", "text_absent"),
+    (True, "kept_subject", "text_absent"),
+    (True, "kept_subject", "text_absent"),
+    (True, "subject_out", "kept_text"),
+    (False, "subject_out", "text_clear"),
+    (True, "wrong_court", "kept_text"),
+    (True, "subject_out", "kept_contract"),
+    (True, "subject_out", "kept_contract"),
+    (True, "wrong_court", "kept_contract"),
+    (False, "subject_out", "text_clear"),
+    (False, "subject_out", "text_clear"),
+    (False, "subject_out", "text_clear"),
+    (True, "subject_out", "kept_text"),
+    (True, "subject_missing", "text_absent"),
+    (True, "subject_missing", "text_absent"),
+    (False, "wrong_court", "text_absent"),
+    (False, "wrong_letter", "text_absent"),
+    (True, "kept_subject", "text_absent"),
+    (False, "subject_out", "text_absent"),
+    (True, "subject_missing", "text_absent"),
+    (True, "kept_subject", "text_absent"),
+    (True, "kept_subject", "text_absent"),
+    (False, "subject_out", "text_absent"),
+    (False, "wrong_court", "text_absent"),
+    (False, "subject_out", "text_clear"),
+    (True, "wrong_court", "kept_text"),
+]
+
+
+@pytest.mark.parametrize(
+    "docket,area,title,text,expected",
+    [(*case, expected) for case, expected in zip(CASES, _FROZEN_V100, strict=True)],
+)
+def test_v100_reproduces_courts(docket, area, title, text, expected):
+    """V1.0.0 reproduces src/courts.py at 4c246a8. A later courts.py is a new version, not an edit of V1.0.0."""
     got = V100.decide(docket, {"hf_legal_area": area}, title, text)
-    assert (got.kept, got.subject, got.text) == (ref["kept"], ref["subject"], ref["text"])
+    assert (got.kept, got.subject, got.text) == expected
 
 
 def test_v100_configuration_is_courts_constants():
     """Drift guard: V1.0.0 is src/courts.py at 4c246a8. If courts.py changes, add a version, do not edit V1.0.0."""
     cfg = V100.config
-    assert cfg.accident_terms == courts._TEXT_TERMS.pattern
-    assert cfg.contract_terms == courts._CONTRACT_TERMS.pattern
-    assert cfg.closed_rubrics == courts._CLOSED_RUBRIC.pattern
-    assert {d: set(c.rubrics) for d, c in cfg.courts.items()} == {d: set(r) for d, r in courts.AREAS.items()}
-    assert {d: set(c.letters) for d, c in cfg.courts.items()} == {d: set(r) for d, r in courts.LETTERS.items()}
+    assert cfg.accident_terms == _FROZEN_ACCIDENT
+    assert cfg.contract_terms == _FROZEN_CONTRACT
+    assert cfg.closed_rubrics == _FROZEN_CLOSED
+    assert {d: set(c.rubrics) for d, c in cfg.courts.items()} == _FROZEN_AREAS
+    assert {d: set(c.letters) for d, c in cfg.courts.items()} == _FROZEN_LETTERS
 
 
 def test_every_decision_has_one_subject_rule_and_a_reason():
