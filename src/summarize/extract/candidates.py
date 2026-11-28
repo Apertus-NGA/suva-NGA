@@ -17,7 +17,10 @@ restates, by legal category, never by a word list learnt from Suva's texts:
 | fragment         | under MIN_WORDS words                                                                  |
 
 Every candidate gets an id `S1…Sn` (in reading order) and keeps the label of its passage, so a model can only
-choose ids and code copies the sentence.
+choose ids and code copies the sentence. A candidate also carries its voice: `lower_court` when the court reports
+the lower court's reasoning (a consideration that opens with it, up to the court's own assessment), else `court`.
+Such a sentence is kept, since Suva sometimes restates reasoning the court confirms (8C_311/2025 on the iterate
+set), but who says it is made explicit when it is written, and it is never taken as the court's answer.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from src.summarize import finish
 from src.summarize.refine import evidence
 from src.summarize.refine.draft import split_sentences
 
-VERSION = "candidates@3"
+VERSION = "candidates@4"
 MIN_WORDS = 6
 
 # A court sentence quoting a party: "Der Beschwerdeführer rügt …", "La recourante soutient que …". The verbs are
@@ -42,7 +45,8 @@ _PARTY = (
 _ARGUES = (
     r"(?:macht|machen)\s+geltend|rügt|rügen|bringt\s+vor|wendet\s+ein|beanstandet|argumentiert|vertritt\s+die\s+"
     r"Auffassung|hält\s+dafür|bestreitet|soutient|fait\s+valoir|reproche|invoque|conteste|allègue|se\s+plaint"
-    r"|objecte|estime\s+que|fa\s+valere|sostiene|censura|lamenta"
+    r"|objecte|estime\s+que|considère\s+(?:pour\s+sa\s+part|que)|est\s+d'avis|ist\s+der\s+(?:Auffassung|Ansicht)"
+    r"|vertritt\s+(?:demgegenüber\s+)?die\s+Auffassung|fa\s+valere|sostiene|censura|lamenta|ritiene"
 )
 _PARTY_ARGUMENT = re.compile(rf"^\s*(?:{_PARTY})\b[^.;:]{{0,80}}?\b(?:{_ARGUES})\b", re.IGNORECASE)
 
@@ -78,9 +82,10 @@ _PARTY_NAMED = re.compile(
 )
 
 
-def tags(sentence: str) -> list[str]:
-    """Hints for the chooser: whether the sentence cites law, states it in the court's formula, names a party."""
-    out = []
+def tags(sentence: str, voice: str = "court") -> list[str]:
+    """Hints for the chooser: who speaks, whether the sentence cites law, states it in the court's formula, names a
+    party."""
+    out = ["lower court"] if voice == "lower_court" else []
     if evidence.articles(sentence):
         out.append("article")
     if _CASE_LAW.search(sentence):
@@ -90,6 +95,36 @@ def tags(sentence: str) -> list[str]:
     if _PARTY_NAMED.search(sentence):
         out.append("names a party")
     return out
+
+
+# A party's complaint opened by a participle: "Se plaignant d'une violation …, la recourante observe".
+_COMPLAINT_OPENS = re.compile(
+    r"^(?:Se plaignant|Invoquant|Reprochant|Contestant|Faisant valoir|Lamentando|Facendo valere)\b"
+)
+
+# The court reporting the lower court's reasoning: a consideration that opens with it is the lower court's until
+# the court gives its own assessment. Run x9 (28 Nov): "En conclusion, aucun acte illicite … n'était imputable"
+# was the cantonal judge's conclusion, which the fiche presented as the court's.
+_LOWER_COURT = (
+    r"(?:Die Vorinstanz|Das kantonale Gericht|Das Versicherungsgericht|Das Sozialversicherungsgericht"
+    r"|Die kantonalen Richter|La cour cantonale|La juridiction cantonale|Le tribunal cantonal|Le premier juge"
+    r"|Les premiers juges|Les juges cantonaux|L'autorité précédente|L'instance précédente|La Corte cantonale"
+    r"|Il Tribunale cantonale|I giudici cantonali|La Corte delle assicurazioni)"
+)
+_REASONED = (
+    r"(?:erwog|hat erwogen|hielt fest|hat festgehalten|stellte fest|hat festgestellt|kam zum Schluss|gelangte|"
+    r"begründete|verneinte|bejahte|a retenu|a considéré|a jugé|a estimé|a constaté|a admis|a nié|a exposé|a relevé|"
+    r"ha ritenuto|ha considerato|ha accertato|ha stabilito|ha negato)"
+)
+_LOWER_OPENS = re.compile(rf"^(?:[^,.]{{0,40}},\s*)?{_LOWER_COURT}\b[^.]{{0,60}}?\b{_REASONED}\b", re.IGNORECASE)
+# The court's own voice again: it assesses what it reported.
+_COURT_OWN = re.compile(
+    r"^(?:Dem ist|Dies ist|Diese (?:Beurteilung|Auffassung|Würdigung|Argumentation)|Das ist|Dies trifft|Es trifft"
+    r"|Inwiefern|Entgegen|Was die|Das Bundesgericht|Cette (?:appréciation|argumentation|motivation|opinion|conclusion)"
+    r"|Ce raisonnement|On ne (?:saurait|voit)|Il n'y a pas|Tel n'est|Contrairement|Le Tribunal fédéral|Or,|Quoi qu'"
+    r"|Il Tribunale federale|Questa (?:valutazione|conclusione)|Non si|Orbene)",
+    re.IGNORECASE,
+)
 
 
 # References to other rulings and literature: removed before counting what the sentence says itself.
@@ -109,6 +144,7 @@ class Candidate:
     id: str
     label: str
     text: str
+    voice: str = "court"  # "court" | "lower_court"
 
 
 @dataclass(frozen=True)
@@ -161,7 +197,7 @@ def reason(label: str, sentence: str, excluded: dict[str, str]) -> str | None:
         return "fragment"
     if _CITATION.search(sentence) and _own_words(sentence) < MIN_WORDS:  # a short fact without a reference stays
         return "citation"
-    if _PARTY_ARGUMENT.search(sentence):
+    if _PARTY_ARGUMENT.search(sentence) or _COMPLAINT_OPENS.search(sentence):
         return "party_argument"
     if label == "facts" and _PROCEEDINGS.search(sentence):
         return "proceedings"
@@ -177,10 +213,18 @@ def candidates(text: str) -> Candidates:
     _, excluded = evidence.rule_candidates(parts, merits)
     kept: list[Candidate] = []
     dropped: list[tuple[str, str, str]] = []
+    current, opened, reporting = None, False, False
     for label, sentence in sentences(parts):
+        if label != current:
+            current, opened, reporting = label, False, False
+        if not opened and len(sentence.split()) >= MIN_WORDS:  # the first real sentence, not the number "4."
+            opened = True
+            reporting = label.startswith("E.") and bool(_LOWER_OPENS.search(sentence))
+        elif reporting and _COURT_OWN.search(sentence):
+            reporting = False
         why = reason(label, sentence, excluded)
         if why:
             dropped.append((label, why, sentence))
         else:
-            kept.append(Candidate(f"S{len(kept) + 1}", label, sentence))
+            kept.append(Candidate(f"S{len(kept) + 1}", label, sentence, "lower_court" if reporting else "court"))
     return Candidates(tuple(kept), tuple(dropped))

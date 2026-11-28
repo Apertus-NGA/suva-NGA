@@ -175,7 +175,7 @@ def choose_all(name_set: str, name: str, passages: str = "rank", use_profiles: b
     print(f"{len(rows)} rulings -> {OUT / f'chosen_{name_set}_{name}.jsonl'}")
 
 
-def write_all(name_set: str, name: str, choice_name: str) -> None:
+def write_all(name_set: str, name: str, choice_name: str, frame: str = "none") -> None:
     """Write both fiches of each ruling from a stored choice; rows in refine_eval's format, so its `judge` and
     `report` compare them with the current pipeline's drafts (`--name` there is this run's name)."""
     from concurrent.futures import ThreadPoolExecutor
@@ -213,8 +213,9 @@ def write_all(name_set: str, name: str, choice_name: str) -> None:
         out = []
         for lang in ("de", "fr"):
             model = Model(transport, budget=60, labeler=labeler)
+            draft = drafts.get((ruling["docket"], lang), {}).get("text", "")
             try:
-                fiche = write.write_fiche(picked, lang, ruling, model)
+                fiche = write.write_fiche(picked, lang, ruling, model, frame, draft)
             except Exception as exc:  # noqa: BLE001 -- one fiche's failure is reported, the others go on
                 print(f"{ruling['docket']} {lang}: FAILED {type(exc).__name__}: {exc}", flush=True)
                 continue
@@ -227,6 +228,7 @@ def write_all(name_set: str, name: str, choice_name: str) -> None:
                                                      "accepted": w.status == "written"} for w in fiche.sentences]},
                 {"step": "flow", "status": "passed", "calls": 0,
                  "findings": [{**f, "reason": f["id"]} for f in fiche.flow]},
+                *[{**o, "step": "polish:" + o["step"]} for o in fiche.polish],
             ]  # fmt: skip
             out.append({
                 "docket": ruling["docket"], "language": lang, "text": fiche.text, "draft": draft,
@@ -307,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--set", default="iterate", choices=("iterate", "holdout"))
     parser.add_argument("--name", default="c1")
     parser.add_argument("--passages", default="rank", choices=("rank", "list"))
+    parser.add_argument("--frame", default="none", choices=("none", "question", "v2"), help="how a fiche opens")
     parser.add_argument("--no-profiles", action="store_true", help="choose without the profiles (profiles.py)")
     parser.add_argument("--choice", default="c6", help="the stored choice a `write` run starts from")
     args = parser.parse_args(argv)
@@ -321,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
         choose_all(args.set, args.name, args.passages, not args.no_profiles)
         return 0
     elif args.command == "write":
-        write_all(args.set, args.name, args.choice)
+        write_all(args.set, args.name, args.choice, args.frame)
         return 0
     else:
         summary = report(args.set, args.name)

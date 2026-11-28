@@ -161,7 +161,8 @@ def hint(profile: Profile | None, remand: bool) -> str:
 
 
 def _best(found: cand.Candidates, item: Item, scores: dict[str, float], taken: set[str]) -> cand.Candidate | None:
-    pool = [c for c in _considerations(found) if c.id not in taken and item.pattern.search(c.text)]
+    pool = [c for c in _considerations(found) if c.id not in taken and item.pattern.search(c.text)
+            and not (item is ANSWER and c.voice == "lower_court")]  # the court's answer is its own  # fmt: skip
     if not pool:
         return None
     if item is ANSWER:  # the court's last conclusion in its best-read consideration

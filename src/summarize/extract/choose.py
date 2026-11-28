@@ -19,7 +19,7 @@ from src.summarize.extract import profiles
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 
-VERSION = "choose@9"
+VERSION = "choose@10"
 MIN, MAX = 5, 12  # what the prompt asks for
 MIN_VALID = 3  # what code accepts ("fewer for a simple ruling")
 MAX_PASSAGES = 4
@@ -68,8 +68,9 @@ Sentences of the considerations that state and decide it, and of the facts:
 
 Choose {min} to {max} sentences, fewer for a simple ruling. A sentence stays whole: choose it, or leave it.
 Prefer the court's general statement of the law to its application to one party's argument. Code marks what a
-sentence holds: [article], [case law], [rule formula] (the court's own wording for a rule), [names a party]. A
-rule usually carries one of the first three; a sentence that names a party is usually application or facts.
+sentence holds: [lower court] (the court reports the lower court's reasoning), [article], [case law], [rule
+formula] (the court's own wording for a rule), [names a party]. A rule usually carries one of [article], [case
+law], [rule formula]; a sentence that names a party is usually application or facts.
 {profile}
 - a_chosen: the ids, in the ruling's order, each with its role."""
 
@@ -104,7 +105,7 @@ def lines(found: cand.Candidates, labels: set[str] | None = None) -> str:
         if c.label != current:
             out.append(f"\n[{c.label}]")
             current = c.label
-        hint = "".join(f"[{tag}]" for tag in cand.tags(c.text)) if labels is not None else ""
+        hint = "".join(f"[{tag}]" for tag in cand.tags(c.text, c.voice)) if labels is not None else ""
         out.append(f"{c.id}{' ' + hint if hint else ''}: {evidence.as_data(c.text)}")
     return "<ruling>" + "\n".join(out) + "\n</ruling>"
 

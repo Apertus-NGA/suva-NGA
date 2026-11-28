@@ -3,13 +3,14 @@
   "rulings": 12,
   "rulings_with_matched_fiche": 11,
   "sentences_median": 142.5,
-  "candidates_median": 76.0,
+  "candidates_median": 75.5,
   "suva_sentences_matched": 77,
-  "suva_sentences_kept_by_filter": 74,
-  "filter_keeps": 0.961,
+  "suva_sentences_kept_by_filter": 73,
+  "filter_keeps": 0.948,
   "lost_by_reason": {
     "operative": 1,
-    "reported": 2
+    "reported": 2,
+    "party_argument": 1
   },
   "match_rate": 0.733
 }

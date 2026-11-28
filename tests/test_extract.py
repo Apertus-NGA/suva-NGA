@@ -390,3 +390,66 @@ def test_a_rule_made_stronger_or_weaker_is_refused_by_code():
 def test_the_admissibility_qualifier_has_its_variants():
     source = RULING.replace("1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf eingetreten werden kann.")
     assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith("soweit darauf einzutreten ist.")
+
+
+# --- editorial rules ----------------------------------------------------------------------------------------------
+
+LOWER = """Urteil vom 3. Juni 2025
+
+Sachverhalt:
+A. Die Versicherte verletzte sich am Knie.
+
+Erwägungen:
+1. Die Beschwerde ist zulässig.
+
+2. Die Vorinstanz erwog, die Versicherte habe die Leistungen zu Recht verloren, da kein Kausalzusammenhang mehr bestehe. Sie stellte auf das Gutachten von Dr. B. ab, das sie für überzeugend hielt.
+Dem ist zuzustimmen, denn das Gutachten ist schlüssig und beruht auf allseitigen Untersuchungen der Versicherten.
+
+3. Somit hat die Vorinstanz die Leistungseinstellung zu Recht bestätigt, weil der Status quo sine erreicht war.
+
+Demnach erkennt das Bundesgericht:
+1. Die Beschwerde wird abgewiesen.
+"""
+
+
+def test_the_lower_courts_reasoning_is_kept_with_its_voice_until_the_court_speaks_again():
+    found = cand.candidates(LOWER)
+    voices = {c.text[:25]: c.voice for c in found.kept}
+    assert voices["Sie stellte auf das Gutac"] == "lower_court"
+    assert voices["Dem ist zuzustimmen, denn"] == "court"  # the court's own assessment ends the report
+    assert voices["Somit hat die Vorinstanz "] == "court"  # a new consideration in the court's voice
+    assert cand.tags("Sie stellte auf das Gutachten ab.", "lower_court") == ["lower court"]
+
+
+def test_the_writer_is_told_who_speaks_and_the_answer_is_never_the_lower_courts():
+    from src.summarize.extract import profiles
+
+    found = cand.candidates(LOWER)
+    reported = next(c for c in found.kept if c.voice == "lower_court")
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": "Die Vorinstanz stellte auf das Gutachten ab, das sie für überzeugend hielt."}]})
+    write.write_sentence(reported, "application", "de", {"text": LOWER, "language": "de", "category": "uv"}, model_for(fake))
+    assert "reports the lower court's reasoning" in fake.sent[0][1][-1]["content"]
+    _, notes = profiles.check(found, [], LOWER, {"E.2": 0.9, "E.3": 0.5})
+    assert notes and notes[0].split()[0] == next(c.id for c in found.kept if c.text.startswith("Somit hat"))
+
+
+def test_a_sentence_that_repeats_an_earlier_one_is_left_out():
+    a = write.Written("S1", "E.3", "rule", "x", "Damit der Unfallversicherer Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.", "written")
+    b = write.Written("S2", "E.3", "rule", "x", "Damit die Suva Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.", "written")
+    c = write.Written("S3", "E.4", "holding", "x", "Die Sache geht zur psychiatrischen Begutachtung an die Vorinstanz zurück.", "written")
+    kept, notes = write.without_repeats([a, b, c])
+    assert [w.source_id for w in kept] == ["S1", "S3"] and b.status == "repeat"
+    assert notes == ["S2 left out: it repeats S1"]
+
+
+def test_the_question_is_the_courts_own_sentence_and_the_v2_frame_must_be_entailed_by_the_facts():
+    asked = write.question(RULING)
+    assert asked is not None and asked.text.startswith("Streitig ist, ob die Suva ihre Leistungen")
+    draft = ("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter. Er verlor dabei drei Finger. "
+             "Das Bundesgericht bestätigt die Einstellung der Leistungen.\n\nDie Beschwerde wird abgewiesen.")  # fmt: skip
+    fake = Fake(**{"entail@1/frame": [0.95, 0.1]})
+    frame = write.frame_from_draft(draft, "de", {"text": RULING}, model_for(fake))
+    assert [w.status for w in frame] == ["written", "dropped"]  # the invented fact is refused
+    assert frame[0].text.startswith("Der Versicherte stürzte")  # and the frame stops before the court's holding
+    premise = next(m for v, m in fake.sent if v.startswith("entail@1/frame"))[-1]["content"]
+    assert "Streitig ist, ob die Suva" in premise
