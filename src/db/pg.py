@@ -60,10 +60,14 @@ def sha256_text(text: str) -> str:
 
 
 def git_state() -> tuple[str | None, bool]:
-    """(commit, dirty) of the working tree, or (None, True) outside git."""
+    """(commit, dirty) of the working tree. Outside git (the container image holds no .git), the commit the image
+    was built from (SUVA_GIT_COMMIT, SUVA_GIT_DIRTY: Dockerfile build args); (None, True) when unknown."""
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True)
         status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        return None, True
+        built = os.environ.get("SUVA_GIT_COMMIT", "").strip()
+        if not built:
+            return None, True
+        return built, os.environ.get("SUVA_GIT_DIRTY", "1").strip() != "0"
     return commit.stdout.strip(), bool(status.stdout.strip())

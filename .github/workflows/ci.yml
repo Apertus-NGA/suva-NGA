@@ -60,3 +60,25 @@ jobs:
         run: make db-test
       - name: Python tests against PostgreSQL (layer 1 end to end, throwaway database)
         run: uv run --frozen pytest -m db
+
+  # The cluster (docs/DEPLOY.md): compose valid under every profile, app image built for linux/amd64, then the
+  # schema and the login passwords deployed inside the cluster, and the pipeline login proven least-privileged.
+  # Secrets are generated for this run only (src/db/logins.py --init-env), never printed, gone with the runner.
+  # The base dataset (925 MB) and the GPU profile are not exercised here.
+  cluster:
+    runs-on: ubuntu-latest  # linux/amd64
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Secrets for this run
+        run: python3 -m src.db.logins --init-env .env
+      - name: Compose file valid, every profile
+        run: make cluster-config
+      - name: Build the app image
+        run: make cluster-build
+      - name: Schema and logins inside the cluster (db, then migrate)
+        run: docker compose run --rm migrate
+      - name: Pipeline login connects and cannot change the schema
+        run: docker compose run --rm --no-deps --entrypoint python pipeline -m src.db.logins --verify suva_pipeline
+      - name: Stop the cluster
+        if: always()
+        run: make cluster-down
