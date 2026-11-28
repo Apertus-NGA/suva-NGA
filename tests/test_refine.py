@@ -1,0 +1,319 @@
+# ruff: noqa: E501  (test data: whole sentences of rulings and summaries, kept on one line to stay readable)
+"""Tests of the refine loop (src/summarize/refine). The model is a declared fake transport: no gateway call (G9)."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from src.summarize.refine import checks, evidence
+from src.summarize.refine.draft import Draft, Patch, PatchRefused
+from src.summarize.refine.model import Model, ModelFailed, enum, obj
+from src.summarize.refine.record import validate
+from src.summarize.refine.runner import refine, run_step
+from src.summarize.refine.step import Candidate, Context, Step
+from src.summarize.refine.steps.facts import Facts
+from src.summarize.refine.steps.form import Form
+from src.summarize.refine.steps.holding import Holding
+from src.summarize.refine.steps.length import Length
+from src.summarize.refine.steps.terms import Terms
+
+RULING = """Urteil vom 3. Juni 2025
+Besetzung
+Bundesrichterin Heine, Präsidentin,
+Bundesrichter Métral, Bundesrichterin Viscione,
+Gerichtsschreiber Grünenfelder.
+
+Sachverhalt:
+A. Der Versicherte stürzte am 7. Mai 2023 von einer Leiter. Die Suva verneinte mit Einspracheentscheid vom
+12. Oktober 2023 einen Anspruch auf Leistungen über den 30. Juni 2023 hinaus.
+
+Erwägungen:
+1. Die Beschwerde ist zulässig (Art. 82 BGG).
+
+2. Streitig ist, ob die Suva ihre Leistungen zu Recht per 30. Juni 2023 eingestellt hat.
+
+2.1 Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus (Art. 6 Abs. 1 UVG).
+Fällt dieser dahin, endet die Leistungspflicht.
+
+3. Gemäss den Berichten war der Status quo sine am 30. Juni 2023 erreicht. Die Vorinstanz hat die
+Leistungseinstellung daher zu Recht bestätigt.
+
+Demnach erkennt das Bundesgericht:
+1. Die Beschwerde wird abgewiesen.
+2. Die Gerichtskosten von Fr. 800.- werden dem Beschwerdeführer auferlegt.
+"""
+
+DRAFT = (
+    "Der Versicherte stürzte von einer Leiter. Die Suva stellte ihre Leistungen per 30. Juni 2023 ein.\n\n"
+    "Das Bundesgericht hielt fest, dass die Leistungspflicht immer auch ohne Kausalzusammenhang besteht.\n\n"
+    "Die Beschwerde wird abgewiesen."
+)
+
+
+class Fake:
+    """A declared fake of the gateway: answers by prompt-version prefix, in order, and records what was sent."""
+
+    def __init__(self, **answers: list[dict]) -> None:
+        self.answers = {k: list(v) for k, v in answers.items()}
+        self.sent: list[tuple[str, list[dict]]] = []
+
+    def __call__(self, messages, response_format, prompt_version, max_tokens):
+        self.sent.append((prompt_version, messages))
+        for prefix, queue in self.answers.items():
+            if prompt_version.startswith(prefix.replace("__", "/")) and queue:
+                return json.dumps(queue.pop(0))
+        raise AssertionError(f"unexpected call {prompt_version}")
+
+
+def ctx_for(fake: Fake, record: dict | None = None, language: str = "de", lexicon: str = "") -> Context:
+    return Context(language, RULING, evidence.passages(RULING), "uv", Model(fake, budget=10), record, lexicon, "de")
+
+
+# --- evidence -----------------------------------------------------------------------------------------------------
+
+
+def test_passages_follow_the_numbering_and_keep_dates_as_text():
+    parts = evidence.passages(RULING)
+    assert list(parts) == ["facts", "E.1", "E.2", "E.2.1", "E.3", "operative"]
+    assert "7. Mai 2023" in parts["facts"]
+    assert parts["operative"].startswith("Demnach erkennt")
+
+
+def test_a_quote_matches_despite_spacing_quotes_and_line_breaks_but_an_invented_one_does_not():
+    parts = evidence.passages(RULING)
+    assert evidence.quote_in("Die Vorinstanz hat die  Leistungseinstellung daher zu Recht bestätigt", parts["E.3"])
+    assert evidence.quote_in(
+        "Leistungspflicht des Unfallversicherers ... natürlichen Kausalzusammenhang", parts["E.2.1"]
+    )
+    assert not evidence.quote_in("Die Vorinstanz hat die Leistungseinstellung zu Unrecht bestätigt", parts["E.3"])
+    assert evidence.locate("Die Vorinstanz hat die Leistungseinstellung daher zu Recht", parts, "E.2") == "E.3"
+    assert evidence.locate("zu kurz", parts) is None
+
+
+def test_rule_candidates_leave_out_admissibility_when_the_merits_are_decided():
+    candidates, excluded = evidence.rule_candidates(evidence.passages(RULING), merits=True)
+    assert "E.1" not in candidates and excluded["E.1"] == "admissibility"
+    assert "E.2.1" in candidates
+
+
+# --- draft --------------------------------------------------------------------------------------------------------
+
+
+def test_sentences_do_not_split_after_abbreviations_or_ordinals():
+    draft = Draft.from_text("Nach Art. 6 Abs. 1 UVG gilt dies (E. 4.2). Am 1. Januar 2024 trat es in Kraft. Gut.")
+    assert [s.text for s in draft.sentences] == [
+        "Nach Art. 6 Abs. 1 UVG gilt dies (E. 4.2).",
+        "Am 1. Januar 2024 trat es in Kraft.",
+        "Gut.",
+    ]
+
+
+def test_the_outcome_sentence_is_locked_and_a_patch_on_it_is_refused():
+    draft = Draft.from_text(DRAFT)
+    assert draft.sentences[-1].locked
+    with pytest.raises(PatchRefused):
+        draft.apply(Patch("replace", draft.sentences[-1].id, "Die Beschwerde wird gutgeheissen."))
+    edited = draft.apply(Patch("delete", "s2"))
+    assert [s.id for s in edited.sentences] == ["s1", "s2", "s3"]
+    assert "Leistungen per" not in edited.render()
+    assert edited.render().count("\n\n") == 2
+
+
+def test_a_span_patch_changes_only_the_span():
+    draft = Draft.from_text("Die Rente wird verneint. Ende.")
+    after = draft.apply(Patch("replace", "s1", "Invalidenrente", span="Rente"))
+    assert after.sentences[0].text == "Die Invalidenrente wird verneint."
+    with pytest.raises(PatchRefused):
+        draft.apply(Patch("replace", "s1", "x", span="nicht da"))
+
+
+# --- model seam ---------------------------------------------------------------------------------------------------
+
+
+def test_an_id_outside_the_enum_is_rejected_and_the_budget_is_enforced():
+    shape = obj({"a_sentence": enum(["s1", "s2"])})
+    model = Model(lambda *a: json.dumps({"a_sentence": "s9"}), budget=2)
+    with pytest.raises(ModelFailed, match="allowed ids"):
+        model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
+    model = Model(lambda *a: "not json", budget=1)
+    with pytest.raises(ModelFailed, match="JSON"):
+        model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
+    with pytest.raises(ModelFailed, match="budget"):
+        model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
+
+
+# --- the acceptance rule ----------------------------------------------------------------------------------------
+
+
+class _OneShot(Step):
+    id = "probe"
+
+    def __init__(self, candidate: Candidate) -> None:
+        self.candidate = candidate
+
+    def propose(self, draft, ctx):
+        return [self.candidate]
+
+
+def test_a_patch_that_breaks_a_code_check_is_reverted():
+    ctx = ctx_for(Fake())
+    draft = Draft.from_text(DRAFT)
+    sentence = draft.sentences[0].text
+    bad = Candidate("probe", sentence, patch=Patch("replace", "s0", "Le recours de l'assuré selon la LAA."))
+    after, outcome = run_step(_OneShot(bad), draft, ctx)
+    assert after.render() == draft.render()
+    assert outcome.status == "needs_review"
+    assert "would break" in outcome.findings[0]["why_not"]
+
+
+def test_a_failed_model_call_is_needs_review_and_the_loop_goes_on():
+    ctx = ctx_for(Fake())  # no answers: every call raises
+    result = refine(DRAFT, ctx, [Facts(), Form("form_final")])
+    assert [o.status for o in result.trace] == ["needs_review", "passed"]
+    assert result.text == Draft.from_text(DRAFT).render()
+
+
+# --- steps ----------------------------------------------------------------------------------------------------------
+
+
+def test_form_puts_references_in_the_fiche_language_and_drops_invented_ones():
+    ctx = ctx_for(Fake(), language="fr")
+    text = "Le Tribunal fédéral rappelle la règle (E. 2.1). Il cite aussi un considérant absent (consid. 9.4).\n\nLe recours est rejeté."
+    result = refine(text, ctx, [Form()])
+    assert "(consid. 2.1)" in result.text
+    assert "9.4" not in result.text
+
+
+def test_facts_rewrites_an_unsupported_sentence_from_a_verified_quote():
+    detect = {"items": [
+        {"a_sentence": "s1", "b_label": "facts", "c_quote": "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter", "d_verdict": "same"},
+        {"a_sentence": "s2", "b_label": "facts", "c_quote": "verneinte mit Einspracheentscheid vom 12. Oktober 2023", "d_verdict": "same"},
+        {"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "setzt einen natürlichen Kausalzusammenhang voraus", "d_verdict": "different"},
+    ]}  # fmt: skip
+    repair = {"a_quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus",
+              "b_action": "rewrite",
+              "c_sentence": "Das Bundesgericht hielt fest, dass die Leistungspflicht einen natürlichen Kausalzusammenhang voraussetzt."}  # fmt: skip
+    recheck = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "setzt einen natürlichen Kausalzusammenhang voraus", "d_verdict": "same"}]}  # fmt: skip
+    fake = Fake(**{"facts@1__detect": [detect], "facts@1__repair": [repair], "facts@1__recheck": [recheck]})
+    result = refine(DRAFT, ctx_for(fake), [Facts()])
+    assert "ohne Kausalzusammenhang" not in result.text
+    assert "natürlichen Kausalzusammenhang voraussetzt" in result.text
+    assert result.trace[0].status == "corrected"
+    # the ruling went to the model as labelled data
+    assert "[E.2.1]" in fake.sent[0][1][1]["content"] and "<ruling>" in fake.sent[0][1][1]["content"]
+
+
+def test_facts_refuses_a_repair_whose_quote_is_invented():
+    detect = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "x" * 30, "d_verdict": "not_in_ruling"}]}
+    repair = {"a_quote": "Das Bundesgericht hat dies nie gesagt, aber es klingt gut",
+              "b_action": "rewrite", "c_sentence": "Die Leistungspflicht besteht nach Art. 99 UVG immer."}  # fmt: skip
+    fake = Fake(**{"facts@1__detect": [detect], "facts@1__repair": [repair]})
+    result = refine(DRAFT, ctx_for(fake), [Facts()])
+    assert result.text == Draft.from_text(DRAFT).render()
+    why = result.trace[0].findings[0]["why_not"]
+    assert "quote is not in the ruling" in why and "99" in why
+
+
+RECORD = {
+    "rules": [{"label": "E.2.1", "quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus"}],
+    "answer": {"label": "E.3", "quote": "Die Vorinstanz hat die Leistungseinstellung daher zu Recht bestätigt"},
+    "status": "ok",
+}  # fmt: skip
+
+
+def test_holding_inserts_the_rule_with_the_reference_added_by_code():
+    detect = {"a_rule_sentence": "none", "b_answer_sentence": "none"}
+    repair = {"a_after": "s2", "b_text": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen "
+              "Kausalzusammenhang voraus. Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen."}  # fmt: skip
+    recheck = {"a_rule_sentence": "s3", "b_answer_sentence": "s3"}
+    fake = Fake(**{"holding@1__detect": [detect], "holding@1__repair": [repair], "holding@1__recheck": [recheck]})
+    result = refine(DRAFT, ctx_for(fake, RECORD), [Holding()])
+    assert "einstellen (E. 2.1)." in result.text
+    assert result.trace[0].status == "corrected"
+
+
+def test_holding_is_skipped_without_a_checked_record():
+    result = refine(DRAFT, ctx_for(Fake(), {"rules": [], "status": "needs_review"}), [Holding()])
+    assert result.trace[0].status == "passed" and result.calls == 0
+
+
+def test_terms_swaps_a_glossary_term_and_refuses_an_unattested_replacement():
+    text = "Die Suva erliess eine décision sur opposition. Der Versicherte erhielt ein Taggeldchen.\n\nDie Beschwerde wird abgewiesen."
+    answer = {
+        "items": [
+            {"a_sentence": "s2", "b_span": "Taggeldchen", "c_replacement": "Zauberwort", "d_reason": "not_swiss_usage"}
+        ]
+    }
+    result = refine(text, ctx_for(Fake(**{"terms@1": [answer]}), lexicon="Taggeld"), [Terms()])
+    assert "Einspracheentscheid" in result.text
+    assert "Zauberwort" not in result.text
+    assert any("not attested" in f.get("why_not", "") for f in result.trace[0].findings)
+
+
+def test_length_drops_the_least_important_sentences_only_until_inside_the_band():
+    filler = " ".join(["Die Vorinstanz prüfte die Akten sorgfältig und ausführlich."] * 1)
+    long = " ".join(f"Satz {n} {filler * 6}" for n in range(8)) + "\n\nDie Beschwerde wird abgewiesen."
+    draft = Draft.from_text(long)
+    assert draft.words() > checks.LENGTH_BAND["de"][1]
+    order = {"a_least_important": [s.id for s in draft.sentences if not s.locked]}
+    result = refine(long, ctx_for(Fake(**{"length@1": [order]})), [Length()])
+    words = len(result.text.split())
+    assert checks.LENGTH_BAND["de"][0] <= words <= checks.LENGTH_BAND["de"][1]
+    assert result.text.endswith("Die Beschwerde wird abgewiesen.")
+
+
+def test_new_identifiers_catch_an_invented_article_or_number():
+    assert checks.new_identifiers("Nach Art. 6 UVG endet die Pflicht am 30. Juni 2023.", "", RULING) == []
+    found = checks.new_identifiers("Nach Art. 19 UVG gilt eine Frist von 245 Tagen.", "", RULING)
+    assert any("19" in p for p in found) and any("245" in p for p in found)
+
+
+def test_record_moves_a_quote_to_its_real_passage_and_drops_an_invented_one():
+    parts = evidence.passages(RULING)
+    candidates, _ = evidence.rule_candidates(parts, merits=True)
+    answer = {
+        "a_question": {"a_label": "E.2", "b_quote": "Streitig ist, ob die Suva ihre Leistungen zu Recht"},
+        "b_rules": [{"a_label": "E.3", "b_quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen"},
+                    {"a_label": "E.2.1", "b_quote": "Ein erfundener Grundsatz, den es nicht gibt"}],
+        "c_answer": {"a_label": "E.3", "b_quote": "Die Vorinstanz hat die Leistungseinstellung daher zu Recht"},
+        "d_facts": [],
+    }  # fmt: skip
+    record = validate(answer, parts, candidates)
+    assert record["rules"] == [{"label": "E.2.1", "quote": answer["b_rules"][0]["b_quote"], "moved_from": "E.3"}]
+    assert record["status"] == "ok"
+    assert any("rule 1" in issue for issue in record["issues"])
+
+
+# --- three real rulings (German, French, Italian), from the project database ---------------------------------------
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    """The project database, read only (DATABASE_URL); skipped when it is not reachable or not built."""
+    from suva_data import db
+
+    try:
+        conn = db.connect()
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"project database not reachable: {exc}")
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("docket", ["8C_676/2024", "8C_178/2025", "8C_135/2025"])
+def test_real_rulings_split_into_considerations_and_an_operative_part(corpus, docket):
+    row = corpus.execute(
+        "SELECT t.text FROM rulings r JOIN ruling_texts t ON t.ruling_id = r.id AND t.is_canonical WHERE r.docket = %s",
+        (docket,),
+    ).fetchone()
+    if row is None:
+        pytest.skip(f"{docket} is not in the test database")
+    parts = evidence.passages(row[0])
+    assert "operative" in parts and "facts" in parts
+    assert sum(label.startswith("E.") for label in parts) >= 3
+    # a real sentence of a consideration, with its spacing changed, is found and attributed to that consideration
+    label = [lab for lab in parts if lab.startswith("E.")][2]
+    sentence = next(s for s in parts[label].split(". ") if len(s) > 60)
+    assert evidence.locate("  ".join(sentence.split()), parts) == label
