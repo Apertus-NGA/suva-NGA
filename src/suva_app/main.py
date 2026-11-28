@@ -154,6 +154,10 @@ def _workspace(call):
         return call()
     except workspace.NotFound as e:
         raise HTTPException(404, str(e)) from e
+    except workspace.ConfigError as e:  # no LLM_* settings: the server can run, the model cannot be called
+        raise HTTPException(503, f"the model is not configured: {e}") from e
+    except workspace.ReplayMiss as e:  # replay mode and this request was never answered live
+        raise HTTPException(503, f"no replayed answer for this request: {e}") from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     except SystemExit as e:  # the summariser reports a gateway failure this way
