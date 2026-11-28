@@ -55,6 +55,38 @@
             ]
           },
           "decision": "D-073"
+        },
+        {
+          "version": [
+            0,
+            3,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            2,
+            0
+          ],
+          "decision": "D-080",
+          "changelog": "layer2_judge V1.0.0 added (D-075, D-076): the D-074 scoring chain with the 8B judge, after layer1_filter V1.1.0. Draft (V0.x) until justification and ranking have versions.",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              1,
+              0,
+              0
+            ]
+          }
         }
       ]
     },

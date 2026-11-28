@@ -11,7 +11,8 @@ code hash a version records is the code that created it: when today's code diffe
 certified decision, proven by the golden check), the loader prints a notice instead of refusing the version; each
 run records the hash of its own run paths (params.code_sha256, F-09; a path set that can differ from the version's
 code_path, src/db/runs.py). The rules bound to a version are compared too: a file that drops, reorders or
-re-versions one is refused.
+re-versions one is refused. A step version may also declare the models and prompts it uses (`models`, `prompts`:
+layer2_judge); src/db/llm_registry.py binds them and compares them strictly; any other extra key is refused.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import psycopg
 from pydantic import BaseModel, ConfigDict, Field
@@ -31,6 +32,7 @@ from src.db.pg import ROOT, uuid5
 Version = tuple[int, int, int]
 DECISION_REF = r"^D-[0-9]{3}$"  # = ops.component_version.decision_ref CHECK
 VALIDATION_REF = r"^expected/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # = ops.component_version.validation_ref CHECK
+PROMPT_PATH = r"^prompts/[a-z0-9_]+/[A-Za-z0-9_.-]+\.json$"  # a versioned prompt file (src/db/llm_registry.py)
 
 
 class RegistryConflict(RuntimeError):
@@ -52,6 +54,12 @@ class StepVersionEntry(BaseModel):
     decision: str = Field(pattern=DECISION_REF, description="the docs/DECISIONS.md line that approved the version")
     validation: str | None = Field(
         pattern=VALIDATION_REF, description="the certified expected file of the version; null while it has none"
+    )
+    models: dict[str, str] = Field(
+        default_factory=dict, description="model role -> gateway id (MODELS.md); bound by src/db/llm_registry.py"
+    )
+    prompts: dict[str, Annotated[str, Field(pattern=PROMPT_PATH)]] = Field(
+        default_factory=dict, description="prompt role -> prompt file under prompts/; bound by src/db/llm_registry.py"
     )
 
 

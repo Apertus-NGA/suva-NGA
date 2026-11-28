@@ -83,6 +83,11 @@ class LLMConfig:
                     f"live mode needs {', '.join(missing)} (AGENTS.md G3). Set them in .env "
                     "(see .env.example) or in the environment, or run in replay mode."
                 )
+        if base_url is not None and not base_url.lower().startswith(("https://", "http://")):
+            raise ConfigError(
+                "LLM_BASE_URL must start with https:// or http:// (G3): fix .env or the environment, "
+                "a placeholder left in an exported variable overrides .env"
+            )
         name_small = _get(env, "LLM_NAME_SMALL") or name
         for key, value in (("LLM_NAME", name), ("LLM_NAME_SMALL", name_small)):
             if value is not None and not names_apertus(value):

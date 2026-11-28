@@ -1,5 +1,6 @@
 # Layer 2 — Apertus relevance benchmark and (later) fine-tuning
 
+> **Production (28 Nov, D-076):** `layer2_judge` V1.0.0 runs this benchmark's chain with the 8B, certified identical on `suva-ft-v3` (`docs/LAYER2.md`). A change to it follows §7's decision rule.
 > **Status: EXPERIMENTAL, 27 Nov 2026. Baseline settled 28 Nov (D-074):** the §6 benchmark of standard Apertus is the reference for every later layer-2 change. Owner: `<handle>` (layer 2). This work does not change the delivered pipeline until a measured gain is shown (see §7, decision rule). `docs/ARCHITECTURE.md` currently lists fine-tuning under "Not doing" (PROPOSED); this document is the evidence base for revisiting that line, not a decision.
 > Read `AGENTS.md`, `docs/CHALLENGE.md`, `docs/DATA.md` §6 and `docs/agents/finetune.md` first.
 

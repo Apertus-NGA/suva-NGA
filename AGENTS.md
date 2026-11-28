@@ -28,6 +28,7 @@ Thesis: **Apertus reads, the code verifies, the lawyer decides.**
 | the challenge itself (Suva's two texts: the template's `challenge_description.md` and the deck) | `docs/CHALLENGE.md` |
 | what Suva's data in `judgements/` contains: the relevance list, the 55 summaries, quarters, styles, fields never to copy | `docs/SUVA_DATA.md` |
 | data, sources, licences; the datasets to build, with expected counts (DS1-DS8) | `docs/DATA.md` (datasets: §10) |
+| every table, view, column and value the database holds today, for the UI and the API (layer 3: preview only) | `docs/DATA_CATALOG.md` |
 | pipeline, contracts, stack | `docs/ARCHITECTURE.md` |
 | tests and metrics | `docs/EVAL.md` |
 | project terms (Neuheiten, net, signal, A0-A4, HF, Keera…) and legal vocabulary DE/FR/IT | `docs/GLOSSARY.md` |
@@ -92,6 +93,7 @@ Files of the official template are marked `[T]`: never renamed or moved (D-039);
     src/triage/      net, Apertus judgement, score and threshold (design OPEN, D-021)
     src/summarise/   DE and FR summaries
     src/verify/      reference and number verifier (canonical ids, D-037)
+    src/layer2/      layer 2 on the database: the Apertus relevance judge, every call traced (D-075 to D-080)
     src/llm/         the single Apertus client (limiter, cache, replay, JSON cascade) and the gateway probe
     src/api/ src/ui/ FastAPI and the legal-expert UI
     eval/            gold manifests, runners, graders

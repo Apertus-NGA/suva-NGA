@@ -76,6 +76,13 @@ layer1: ## run layer 1 on the default profile (PROFILE=..., POPULATION=...): fil
 layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 	$(PY) -m src.layer1 recall --profile $(or $(PROFILE),default)
 
+.PHONY: layer2 layer2-validate
+layer2: ## layer 2 on layer 1's candidates (MODE=replay|live; ARGS="--limit N|--all --population CODE --store DIR")
+	$(PY) -m src.layer2 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
+layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune)
+	$(PY) -m src.layer2 validate --data-root data/derived/finetune/suva-ft-v3 --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json --bench data/derived/finetune/bench_v3/8b_all $(ARGS)
+
 layer1-golden: ## certified layer-1 and ingest decisions, in memory, no DB: make layer1-golden PARQUET=path [WRITE=1]
 	$(PY) -m src.layer1 golden --parquet $(PARQUET) $(if $(WRITE),--write)
 
@@ -115,8 +122,13 @@ load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's la
 	@$(MAKE) --no-print-directory ingest-gold
 	@$(MAKE) --no-print-directory ingest-closure
 
-validate: ## the cluster's release gate: layer 1 on two profiles, recall, compare (later: layer-2 certification)
+validate: ## the cluster's release gate: layer 1 on two profiles, recall, compare; layer-2 certification when its data is there
 	@$(MAKE) --no-print-directory layer1-validate
+	@if [ -d data/derived/finetune/suva-ft-v3 ]; then \
+		$(MAKE) --no-print-directory layer2-validate; \
+	else \
+		echo "SKIPPED layer2-validate: no data/derived/finetune/suva-ft-v3 (Suva-derived, D-031; mount it with SUVA_DERIVED_SOURCE)"; \
+	fi
 
 cluster-env: ## generate the cluster's missing secrets into .env (never overwrites, never prints; mode 600)
 	python3 -m src.db.logins --init-env .env

@@ -22,7 +22,7 @@ STAGES = [
     ("S0 ingest", "read the committed snapshot (data/public/) and judgements/ (D-051 fields dropped)"),
     ("S1 signals", "compute the example rules and their neighbours, each with its evidence span"),
     ("S2 layer 1", "keep or drop every ruling with its rules, reasons and evidence; recall on Suva's labels (D-073)"),
-    ("S3 judgement", "ask Apertus for a judgement per candidate (live slice or replay, D-032)"),
+    ("S3 judgement", "layer 2: Apertus scores every layer-1 candidate, every call traced (D-075, D-076; D-032)"),
     ("S4 score", "compute the 0-100 score, the F2 threshold, the rank and the top-30 cut (D-021, D-046)"),
     ("S5 explain", "write a German explanation for every ruling, selected or not (G5)"),
     ("S6 summarise", "write the German and French summaries of the rulings named by D-047"),
@@ -101,6 +101,35 @@ def run_layer1_stage() -> int:
     return 0
 
 
+def run_layer2_stage(mode: str, limit: int | None) -> int:
+    """S3: layer 2 on layer 1's candidates (docs/LAYER2.md). Skipped with its reason, never faked: without
+    DATABASE_URL, without a succeeded layer-1 run, or in replay mode without a replay cache."""
+    if not os.environ.get("DATABASE_URL"):
+        print("SKIPPED run S3 judgement: no DATABASE_URL")
+        return 0
+    from src.db.pg import connect
+    from src.layer2.run import Layer2RunFailed, run_layer2
+    from src.llm.client import DEFAULT_STORE
+
+    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir():
+        print(f"SKIPPED run S3 judgement: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)}")
+        return 0
+    with connect(actor="make-run") as conn:
+        try:
+            out = run_layer2(conn, mode=mode, limit=limit, actor="make-run")
+        except LookupError as exc:
+            print(f"SKIPPED run S3 judgement: {exc}")
+            return 0
+        except (Layer2RunFailed, ConfigError) as exc:
+            print(f"run S3 judgement FAILED: {exc}", file=sys.stderr)
+            return 1
+    print(
+        f"run S3 judgement: {out['judged']} of {out['rulings_in']} judged ({out['status']}, layer2_judge "
+        f"{out['version']}, judge {out['judge']}, {out['mode']}), files in {out['files']}"
+    )
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     mode = args.mode
     if mode == "live":
@@ -122,9 +151,13 @@ def cmd_run(args: argparse.Namespace) -> int:
             status = run_layer1_stage()
             if status:
                 return status
+        elif name == "S3 judgement":
+            status = run_layer2_stage(mode, None if args.all else args.limit)
+            if status:
+                return status
         else:
             stub(f"run {name}", what)
-    print("run: S2 implemented; the other stages are stubs (docs/STATE.md lists them)")
+    print("run: S2 and S3 implemented; the other stages are stubs (docs/STATE.md lists them)")
     return 0
 
 

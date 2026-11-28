@@ -4,7 +4,9 @@ Done here: configuration from the environment (G3), a timeout on every call, one
 off, input hygiene before the call (empty or placeholder text, input budget, G4), the served-model check on
 every response (G3), `finish_reason == "length"` as a failure, one function that classifies errors and
 decides retries, the `llm_calls` log of every raw output, and the replay cache (D-032). A per-process cap
-on concurrent calls (`LLM_CONCURRENCY`).
+on concurrent calls (`LLM_CONCURRENCY`). Every attempt and every cache hit is logged, with the caller's trace
+context (run, ruling, step), and handed to an optional observer: that is how a step writes one `ops.llm_call`
+row per attempt (docs/LAYER2_IMPLEMENTATION_PLANNING.md L2-D09). The trace never enters the cache key.
 
 Next (not yet here): the AIMD limiter shared across processes and the circuit breaker (§4.5), streaming
 for long generations (§4.6), the JSON cascade and tolerant parser with one repair call (§4.7).
@@ -33,6 +35,7 @@ from src.llm.config import LLMConfig
 from src.llm.served_model import REPO_ROOT, ServedModelError, canonical, check_served, load_allow_list
 
 DEFAULT_STORE = REPO_ROOT / "data" / "derived" / "llm"
+ENDPOINT = "/chat/completions"  # the only Keera endpoint that returns log-probabilities (docs/LESSONS.md K5)
 MAX_ATTEMPTS = 4
 BACKOFF_CAP_S = 30.0
 ErrorKind = Literal[
@@ -121,9 +124,11 @@ class LLMClient:
     store_dir: Path = DEFAULT_STORE
     transport: httpx.BaseTransport | None = None  # tests inject a declared mock here (G9)
     sleep: Any = time.sleep
+    observer: Any = None  # called with each `llm_calls` record (attempt or cache hit); must not raise
     _http: httpx.Client | None = field(default=None, init=False, repr=False)
     _slots: threading.BoundedSemaphore = field(init=False, repr=False)
     _log_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _local: threading.local = field(default_factory=threading.local, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._slots = threading.BoundedSemaphore(self.cfg.concurrency)
@@ -144,10 +149,13 @@ class LLMClient:
         seed: int | None = None,
         repetition: int = 0,
         first_token_only: bool = False,
+        trace: dict[str, Any] | None = None,
     ) -> LLMResult:
         """One chat call. `first_token_only`: a label call read from the first token's log-probabilities
         (S3: max_tokens 1, top_logprobs 20). It ends with finish_reason "length" by design; its content is
-        never parsed, so that cut is accepted. Every other "length" is a failure (G3)."""
+        never parsed, so that cut is accepted. Every other "length" is a failure (G3). `trace`: identifiers
+        of the caller (run, ruling, step), copied into every log record of this call, never into the cache key."""
+        self._local.trace = dict(trace or {})
         if first_token_only and (not logprobs or max_tokens > 2):
             raise InputRejected("first_token_only needs logprobs and max_tokens <= 2")
         model = (self.cfg.name if size == "large" else self.cfg.name_small) or self._replay_model(size)
@@ -176,6 +184,7 @@ class LLMClient:
         )
         cached = self._cache_get(key)
         if cached is not None:
+            self._log_cache_hit(cached, prompt_version, model, messages, params)
             return cached
         if self.cfg.mode == "replay":
             raise ReplayMiss(f"no cached answer for {key[:12]} (prompt {prompt_version}); run in live mode")
@@ -223,7 +232,7 @@ class LLMClient:
             t0 = time.perf_counter()
             with self._slots:
                 try:
-                    r = self._client().post("/chat/completions", json=payload)
+                    r = self._client().post(ENDPOINT, json=payload)
                 except httpx.HTTPError as exc:
                     r, kind = None, classify_error(None, exc=exc)
                     last = LLMError(kind, f"{type(exc).__name__}: {exc}")
@@ -342,18 +351,53 @@ class LLMClient:
             "at": _now(),
             "cache_key": key,
             "prompt_version": prompt_version,
+            "endpoint": ENDPOINT,
             "requested": payload["model"],
             "messages_sha256": _sha(payload["messages"]),
             "params": {k: v for k, v in payload.items() if k not in ("model", "messages")},
             "attempt": attempt,
             "latency_s": latency,
             "mode": "LIVE",
+            "cache_hit": False,
+            "trace": getattr(self._local, "trace", {}),
             **fields,
         }
+        self._write_log(record)
+
+    def _log_cache_hit(
+        self, cached: LLMResult, prompt_version: str, model: str | None, messages: list, params: dict
+    ) -> None:
+        """A cache hit is logged too (mode REPLAY, no latency), so every answer a step uses has a record."""
+        self._write_log(
+            {
+                "at": _now(),
+                "cache_key": cached.cache_key,
+                "prompt_version": prompt_version,
+                "endpoint": ENDPOINT,
+                "requested": model,
+                "messages_sha256": _sha(messages),
+                "params": params,
+                "attempt": 1,
+                "latency_s": None,
+                "mode": "REPLAY",
+                "cache_hit": True,
+                "trace": getattr(self._local, "trace", {}),
+                "status": None,
+                "served": {"served": cached.served_model, "header": None, "accepted": True},
+                "finish_reason": cached.finish_reason,
+                "usage": cached.usage,
+                "content": cached.content,
+                "error": None,
+            }
+        )
+
+    def _write_log(self, record: dict) -> None:
         path = self.store_dir / "llm_calls.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._log_lock, path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        if self.observer is not None:
+            self.observer(record)
 
 
 def client_from_env(mode: Literal["live", "replay"], store_dir: Path = DEFAULT_STORE) -> LLMClient:

@@ -2,7 +2,7 @@
 
 > **Status: PROPOSED (D-090), Sat 28 Nov 2026.** Owner: platform (the lead, while D-024 is open). Files: `docker-compose.yml`, `Dockerfile`, `.dockerignore`, the `cluster-*` targets of the `Makefile`, `src/db/logins.py`, `src/ingest/fetch.py`, `src/db/schema_guard.py`, `tests/test_cluster.py`, `tests/test_schema_guard.py`, the CI job `cluster`.
 > **Increment 2** (Sat 28 Nov, after the layer-1 traceability merge, PR #44): schema guard on every deploy, ingest closure in `load`, golden certification and self-verification in `make run` S2, release gate `validate`, a `data/derived` slot for replayed layer 2, and CI running the whole chain on the base dataset.
-> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), and the release gate. Layer 2 (S3) and the next stages run inside it as soon as `make run` calls them (§10): the cluster calls make targets, so a new stage needs no change here. The API and UI service is ready but off (profile `ui`): `make serve` is a stub until the FastAPI app lands, after layer 3 (summaries).
+> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), layer 2 (S3, §10), and the release gate. The next stages run inside it as soon as `make run` calls them: the cluster calls make targets, so a new stage needs no change here. The API and UI service is ready but off (profile `ui`): `make serve` is a stub until the FastAPI app lands, after layer 3 (summaries).
 
 ## 1. What runs where
 
@@ -122,12 +122,13 @@ Region: Switzerland North, for data residency.
 ## 9. Limits
 
 - The `app` service waits for `make serve` (FastAPI, after layer 3).
-- Layer 2 and the next stages run in the cluster once `make run` calls them (§10).
+- Layer 2 runs in the cluster (§10); a complete replay needs the 23 reference rulings' answers. Layer 3 and the app: §10.
 - CI (job `cluster`) runs the whole chain on the base dataset, cached between runs, and the release gate; the GPU profile is tested by hand only.
 - `make db-up` (the developer database) now needs `POSTGRES_PASSWORD` in `.env`: `make cluster-env` sets it. A database volume created before this change keeps its old authentication until it is recreated.
 
-## 10. Slots for layer 2 and layer 3 (prepared, not implemented)
+## 10. Layer 2 in the cluster, and the slot for layer 3
 
-- **Layer 2 (S3, Apertus judge):** runs in the `pipeline` job once `make run` calls it. Live: `MODE=live` and the three `LLM_*` variables (`LLM_NAME_SMALL` for the 8B judge) in `.env`; the sovereign profile serves the same model locally. Replay: the recorded answers live under `data/derived/` (Suva-derived, D-031: never in the image or in git); put them in a host directory and set `SUVA_DERIVED_SOURCE` to it, the jobs mount it at `/app/data/derived` (writable by uid 10001). Its certification joins `make validate` when it lands.
+- **Layer 2 (S3, Apertus judge, merged in PR #45)** runs in the `pipeline` job after S2, on every layer-1 candidate. Live: `MODE=live` and the three `LLM_*` variables (`LLM_NAME_SMALL` for the 8B judge) in `.env`; the sovereign profile serves the same model locally. Replay: the recorded answers in `data/derived/llm/` (Suva-derived, D-031: never in the image or in git); put `data/derived` in a host directory and set `SUVA_DERIVED_SOURCE` to it, the jobs mount it at `/app/data/derived` (writable by uid 10001). Without a cache, S3 says `SKIPPED` with the reason. A replay fails, by design, when more than 2 % of the candidates have no recorded answer: nothing is loaded, and the next run replays what was answered.
+- **Measured in the cluster, Sat 28 Nov, replay:** S2 green, then S3 judged 912 of 935 candidates; the 23 left are the Q3/2025 reference rulings, which neither the benchmark nor the live Q2 run ever judged (23 of 935 is above 2 %, so S3 failed and loaded nothing). One live pass over those 23 makes the replay complete; until then run S3 live.
+- **Release gate:** `make validate` adds the layer-2 certification (`make layer2-validate`, against the D-074 benchmark) when `data/derived/finetune/suva-ft-v3` is mounted, and says `SKIPPED` otherwise. It needs a succeeded layer-2 run of the pinned version in the database: without one it fails with `no layer-2 run of this version`, so no release goes out with an uncertified layer 2. The image ships the benchmark manifests it reads (`experiments/finetune/manifests/`).
 - **Layer 3 (summaries, S6) and the app:** the summaries run in the `pipeline` job like any stage; `make serve` becomes the FastAPI app, the `app` service (profile `ui`, login `suva_api` with its own rights, `DB_PIPELINE_ROLE` empty) serves it on port 8000 behind a TLS proxy, and the image gains a build stage for the UI.
-

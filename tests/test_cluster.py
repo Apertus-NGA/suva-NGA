@@ -153,3 +153,11 @@ def test_the_api_login_never_takes_the_pipeline_role():
 def test_every_job_that_reads_replay_caches_mounts_data_derived():
     for name in ("load", "pipeline", "app", "validate"):
         assert "${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived" in _service(name), name
+
+
+def test_the_release_gate_certifies_layer_2_when_its_data_is_mounted():
+    steps = " ".join(_recipe("validate"))
+    assert "layer1-validate" in steps and "layer2-validate" in steps
+    assert "data/derived/finetune/suva-ft-v3" in steps and "SKIPPED layer2-validate" in steps
+    ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert "!experiments/finetune/manifests/**" in ignored  # the certification reads the frozen manifest
