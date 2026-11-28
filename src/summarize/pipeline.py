@@ -147,16 +147,25 @@ def _extract(ruling: dict, category: str, make_model, lexicons: dict[str, str] |
         return {"_error": f"choice failed: {exc}"}
     source = {"text": ruling["text"], "language": ruling.get("language"), "category": category,
               "starred": ruling.get("starred")}  # fmt: skip
-    for language in LANGUAGES:
+
+    def one(language: str):
         model = make_model(_fiche_budget(choice))
+        known = {**source, "lexicon": (lexicons or {}).get(language, "")}
         try:
-            known = {**source, "lexicon": (lexicons or {}).get(language, "")}
-            fiche = extract.write.write_fiche(choice, language, known, model, frame="question")
+            return extract.write.write_fiche(choice, language, known, model, frame="question")
         except ModelFailed as exc:
-            _replay_miss(exc)
-            out[f"_error_{language}"] = str(exc)
+            return exc
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(len(LANGUAGES)) as pool:  # DE and FR at once; the client caps concurrent calls (G2)
+        fiches = dict(zip(LANGUAGES, pool.map(one, LANGUAGES), strict=True))
+    for language, fiche in fiches.items():
+        if isinstance(fiche, ModelFailed):
+            _replay_miss(fiche)
+            out[f"_error_{language}"] = str(fiche)
             continue
-        kept = [w for w in fiche.sentences if w.status in ("written", "cleaned") and not w.source_id.startswith("Q")]
+        kept = [w for w in fiche.sentences if w.status in extract.KEPT and not w.source_id.startswith("Q")]
         if len(kept) < min(EXTRACT_MIN_SENTENCES, len(choice.chosen)):
             out[f"_error_{language}"] = f"only {len(kept)} of the chosen sentences kept"
             continue

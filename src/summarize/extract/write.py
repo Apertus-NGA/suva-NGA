@@ -36,6 +36,7 @@ TRIM_SHARE = 0.9  # of the upper end of Suva's band (checks.LENGTH_BAND)
 _KEEP_ORDER = {"lower_court": -1, "fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
 FLOW_VERSION = "flow@2"
 FRAME_VERSION = "frame@4"
+SENTENCE_WORKERS = 4  # sentences of one fiche written at once (the client's LLM_CONCURRENCY caps the total)
 POLISH_MAX_FIX = 6  # sentences refine's language step may rewrite in one fiche (refine itself: 3)
 
 SYSTEM = (
@@ -242,6 +243,18 @@ def _problems(new: str, sentence: str, language: str, source: str, terms: list[t
     return problems
 
 
+def nothing_to_adapt(sentence: str) -> bool:
+    """A sentence in the fiche's language that an adapt call would give back unchanged: no anonymised name, no
+    reference to take out, no party named by its role in the proceedings, nothing pointing back."""
+    return not (
+        _PLACEHOLDER.search(sentence)
+        or _REF_PARENTHESIS.search(sentence)
+        or _REFERENCE.search(sentence)
+        or cand._PARTY_NAMED.search(sentence)
+        or needs_context(sentence)
+    )
+
+
 def ruling_language(text: str) -> str | None:
     """The ruling's language read from its considerations, for a ruling whose language the database lacks."""
     from collections import Counter
@@ -267,6 +280,10 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
         else ""
     )
     voice = VOICE[language] if candidate.voice == "lower_court" else HOLDING[language] if role == "holding" else ""
+    if same and not voice and not before and nothing_to_adapt(candidate.text):  # code's copy, no call (speed)
+        copy = cleaned(candidate.text, language, ruling["text"])
+        if checks.language_of(copy) in (None, language):
+            return Written(candidate.id, candidate.label, role, candidate.text, copy, "copied", voice=candidate.voice)
     if same:
         prompt = ADAPT.format(voice=voice, lang=lang, sentence=evidence.as_data(candidate.text), roles=ROLES[language],
                               context=context, parties=who)  # fmt: skip
@@ -608,8 +625,14 @@ def write_fiche(choice: Choice, language: str, ruling: dict, model: Model, frame
     start = model.calls
     previous = _previous(ruling["text"])
     who = parties.read(ruling["text"]).describe(language)
-    written = [write_sentence(c, role, language, ruling, model, previous.get((c.label, c.text), ""), who)
-               for c, role in choice.chosen]  # fmt: skip
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(item):
+        c, role = item
+        return write_sentence(c, role, language, ruling, model, previous.get((c.label, c.text), ""), who)
+
+    with ThreadPoolExecutor(SENTENCE_WORKERS) as pool:  # in the court's order; the client caps calls (G2)
+        written = list(pool.map(one, choice.chosen))
     opening: list[Written] = []
     if frame == "question":
         chosen_texts = {c.text for c, _ in choice.chosen}

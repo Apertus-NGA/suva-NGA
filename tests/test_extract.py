@@ -195,16 +195,21 @@ def test_the_fiche_ends_with_codes_outcome_sentence():
     found = cand.candidates(RULING)
     chosen = tuple((c, "rule") for c in found.kept if c.label in ("E.2.1", "E.3"))
     choice = choose.Choice("Ende der Leistungspflicht", chosen, len(found.kept), found.reasons())
-    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": c.text} for c, _ in chosen],
-                   write.FLOW_VERSION: [{"a_sentences": [{"a_id": f"s{n}", "b_text": c.text} for n, (c, _) in enumerate(chosen, 1)]}]})  # fmt: skip
+    fake = Echo()  # answers by content: sentences are written in parallel, so an answer queue would mix them up
     fiche = write.write_fiche(
-        choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False}, model_for(fake)
+        choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False},
+        Model(fake, budget=60, labeler=fake.label),
     )
     assert fiche.text.startswith(
         "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus"
     )
     assert fiche.text.endswith("Die Beschwerde wird abgewiesen.")
-    assert [w.status for w in fiche.sentences] == ["written"] * len(chosen)
+    statuses = [w.status for w in fiche.sentences]
+    assert set(statuses) <= {"written", "copied"} and len(statuses) == len(chosen)
+    for w in fiche.sentences:  # a copied sentence had nothing to adapt, and no call was made for it
+        assert (w.status == "copied") == write.nothing_to_adapt(w.source)
+    writes = sum(v.startswith(f"{write.VERSION}/") for v in fake.sent)
+    assert writes == statuses.count("written")
 
 
 # --- real rulings -------------------------------------------------------------------------------------------------

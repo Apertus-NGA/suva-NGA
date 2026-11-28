@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from src.summarize.extract import choose, write
 
+KEPT = ("written", "copied", "cleaned")  # a sentence in the fiche: Apertus wrote it, or code copied or cleaned it
+
 VERSION = "extract@1"
 
 
@@ -21,9 +23,9 @@ def as_steps(choice: choose.Choice, fiche: write.Fiche) -> list[dict]:
     """The fiche's trace in the step format the interface reads: per sentence the consideration and the ruling
     sentence it comes from (evidence, quote), whether it was kept, and why not."""
     sentences = [
-        {"reason": f"{w.label} ({w.role})", "accepted": w.status in ("written", "cleaned"), "evidence": w.label,
+        {"reason": f"{w.label} ({w.role})", "accepted": w.status in KEPT, "evidence": w.label,
          "quote": w.source, "text": w.text, "status": w.status,
-         **({"why_not": "; ".join(w.problems)} if w.status not in ("written", "cleaned") and w.problems else {})}
+         **({"why_not": "; ".join(w.problems)} if w.status not in KEPT and w.problems else {})}
         for w in fiche.sentences
     ]  # fmt: skip
     return [
