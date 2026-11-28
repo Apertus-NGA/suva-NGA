@@ -16,10 +16,31 @@ Material in this repository that is not ours and not covered by our licences
   not ours to license, and they are kept unchanged where the template put them.
 - challenge_description.md is the organisers' text, kept unchanged.
 
-Third-party code
-----------------
+Third-party code and content
+----------------------------
 
-None copied so far. Every third-party file copied into this repository is
-listed here with its source, its licence and its copyright notice (D-036).
-Dependencies installed from package registries are declared in pyproject.toml
-and uv.lock, not copied.
+Every third-party file copied into this repository is listed here with its
+source, its licence and its copyright notice (D-036). Dependencies installed
+from package registries are declared in pyproject.toml and uv.lock, not copied.
+
+- src/certs/digicert_global_g2_tls_rsa_sha256_2020_ca1.pem
+  The public intermediate CA certificate "DigiCert Global G2 TLS RSA SHA256
+  2020 CA1" (subject C=US, O=DigiCert Inc; issued by DigiCert Global Root G2;
+  valid 30 Mar 2021 to 29 Mar 2031; SHA-256 fingerprint
+  C8:02:5F:9F:C6:5F:DF:C9:5B:3C:A8:CC:78:67:B9:A5:87:B5:27:79:73:95:79:17:46:3F:C8:13:D0:B6:25:A9).
+  Issued and published by DigiCert, Inc. (one PEM certificate). The file carries
+  no licence statement and the repository does not record the URL it was
+  downloaded from. It is shipped because www.bger.ch omits it from its TLS
+  chain (docs/DATA_LAYER.md); it is used only to verify that chain
+  (src/suva_data/sources/bger_lists.py). It is not covered by our licences.
+
+- tests/fixtures/bger_lists/*.html
+  Test fixtures saved from the Swiss Federal Supreme Court's website
+  (search.bger.ch): 20251212.html is the "Neue Entscheide" (AZA) list page of
+  12 Dec 2025, as saved; 20251213.html is the empty response for
+  13 Dec 2025; block_page.html is the bot-protection (Imperva Incapsula) page
+  the site served instead of a list (its incident id is all zeros). The pages
+  carry no licence statement. The rulings they list are official decisions,
+  which Swiss copyright law does not protect (Art. 5 para. 1 let. c URG); the
+  site's own terms of use apply to the pages themselves. They are not covered
+  by our licences.
