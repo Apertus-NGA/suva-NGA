@@ -25,8 +25,8 @@ STAGES = [
     ("S3 judgement", "layer 2: Apertus scores every layer-1 candidate, every call traced (D-075, D-076; D-032)"),
     ("S4 score", "compute the 0-100 score, the F2 threshold, the rank and the top-30 cut (D-021, D-046)"),
     ("S5 explain", "write a German explanation for every ruling, selected or not (G5)"),
-    ("S6 summarise", "write the German and French summaries of the rulings named by D-047"),
-    ("S7 verify", "check every reference, number and acting party against the source"),
+    ("S6 summarise", "layer 3: German and French summaries of the top 10 by layer-2 score and the requests (D-094)"),
+    ("S7 verify", "every kept sentence checked against the ruling: runs inside S6 (verify V1.0.0, V3_* rules)"),
     ("S10 export", "export the ranked list with both quarter flags, the plain docket list and the summaries"),
     ("compare", "fail on any divergence with expected/"),
 ]
@@ -196,6 +196,53 @@ def run_layer2_stage(mode: str, limit: int | None) -> int:
     return 0
 
 
+def run_layer3_stage(mode: str) -> int:
+    """S6: layer 3 on the top 10 rulings by layer-2 score of 2026Q2_union and the pending summary requests
+    (docs/LAYER3.md; the selection while Q-17 is open). Verification (S7) runs inside it. Skipped with its reason,
+    never faked: without DATABASE_URL, without a usable layer-2 run or pinned layer-3 versions, in replay mode
+    without a replay cache (or without a recorded answer for any selected ruling), in live mode without LLM_*."""
+    if not os.environ.get("DATABASE_URL"):
+        print("SKIPPED run S6 summarise: no DATABASE_URL")
+        return 0
+    import psycopg
+
+    from src.db.pg import connect
+    from src.layer3.run import DEFAULT_LIMIT, Layer3RunFailed, run_layer3
+    from src.llm.client import DEFAULT_STORE
+
+    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir():
+        print(f"SKIPPED run S6 summarise: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)}")
+        return 0
+    if mode == "live":
+        try:
+            LLMConfig.from_env("live")
+        except ConfigError as exc:
+            print(f"SKIPPED run S6 summarise: {exc}")
+            return 0
+    with connect(actor="make-run") as conn:
+        try:
+            out = run_layer3(conn, mode=mode, limit=DEFAULT_LIMIT, actor="make-run")
+        except LookupError as exc:
+            print(f"SKIPPED run S6 summarise: {exc}")
+            return 0
+        except Layer3RunFailed as exc:
+            if exc.replay_only:
+                print(f"SKIPPED run S6 summarise: no recorded answer for any selected ruling ({exc})")
+                return 0
+            print(f"run S6 summarise FAILED: {exc}", file=sys.stderr)
+            return 1
+        except (ConfigError, ImportError, psycopg.Error) as exc:  # the run row is closed failed (fail_run)
+            print(f"run S6 summarise FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+    print(
+        f"run S6 summarise: {out['stored']} stored ({out['verified_versions']} verified, {out['flagged_versions']} "
+        f"flagged), {out['unchanged']} unchanged, {out['failed']} failed, {out['replay_misses']} without a recorded "
+        f"answer of {out['rulings_in']} ({out['status']}, summarise {out['versions']['summarise']}, verify "
+        f"{out['versions']['verify']}, preset {out['preset']}, {out['mode']}), files in {out['files']}"
+    )
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     mode = args.mode
     if mode == "live":
@@ -225,9 +272,15 @@ def cmd_run(args: argparse.Namespace) -> int:
             status = run_layer2_stage(mode, None if args.all else args.limit) or run_scorer_stage()
             if status:
                 return status
+        elif name == "S6 summarise":
+            status = run_layer3_stage(mode)
+            if status:
+                return status
+        elif name == "S7 verify":
+            print("run S7 verify: runs inside S6 (verify V1.0.0: one V3_* check per kept sentence and code)")
         else:
             stub(f"run {name}", what)
-    print("run: S2 and S3 implemented; the other stages are stubs (docs/STATE.md lists them)")
+    print("run: S2, S3 and S6 (with S7) implemented; the other stages are stubs (docs/STATE.md lists them)")
     return 0
 
 

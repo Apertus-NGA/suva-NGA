@@ -11,7 +11,7 @@ every reading is stored in the trace, so the bar can be measured and moved.
 from __future__ import annotations
 
 from src.summarize.refine import evidence
-from src.summarize.refine.model import Model
+from src.summarize.refine.model import Model, ModelFailed
 
 VERSION = "entail@1"
 THRESHOLD = 0.9
@@ -28,10 +28,15 @@ QUESTION = (
 )
 
 
+MAX_PREMISE = 8000  # characters; a longer premise is not read (G4: never cut silently; a4a1504 cut it to 8000)
+
+
 def p_entails(premise: str, hypothesis: str, model: Model, tag: str) -> float:
+    if len(premise) > MAX_PREMISE:
+        raise ModelFailed(f"premise over {MAX_PREMISE} characters ({len(premise)}): not read, never cut")
     messages = [
         {"role": "system", "content": SYSTEM},
-        {"role": "user", "content": QUESTION.format(premise=evidence.as_data(premise[:8000]),
+        {"role": "user", "content": QUESTION.format(premise=evidence.as_data(premise),
                                                     hypothesis=evidence.as_data(hypothesis))},
     ]  # fmt: skip
     return model.p_yes(messages, f"{VERSION}/{tag}")

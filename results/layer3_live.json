@@ -1,0 +1,138 @@
+{
+  "source": "make layer3 live runs, PostgreSQL 17 integration database, 28 Nov 2026",
+  "runs": [
+    {
+      "run_id": "42cd8fa7-cefd-4b72-b482-b7589ca38f48",
+      "status": "succeeded",
+      "mode": "LIVE",
+      "git_commit": "42dbd1f92d54c1b8b4c015d543603bff576f4ca0",
+      "git_dirty": false,
+      "seconds": 117.4,
+      "metrics": {
+        "rulings_in": 3.0,
+        "stored": 3.0,
+        "unchanged": 0.0,
+        "failed": 0.0,
+        "replay_misses": 0.0,
+        "verified_versions": 0.0,
+        "flagged_versions": 3.0,
+        "v2_fallback_fiches": 0.0,
+        "llm_calls": 81.0,
+        "cache_hits": 0.0,
+        "live_calls": 81.0,
+        "llm_errors": 0.0,
+        "claims": 49.0,
+        "claims_flagged": 0.0,
+        "claims_cited": 39.0,
+        "checks_failed": 0.0,
+        "removed_sentences": 6.0,
+        "segmentations_ok": 3.0,
+        "segmentations_failed": 0.0,
+        "expert_current_kept": 0.0,
+        "requests_done": 0.0,
+        "requests_failed": 0.0,
+        "requests_rejected": 0.0,
+        "model_override": 0.0
+      },
+      "llm_calls": {
+        "rows": 81,
+        "without_error": 81
+      },
+      "versions_by_quality": {
+        "flagged": 3
+      },
+      "texts_linked_to_their_call": {
+        "texts": 6,
+        "linked": 6
+      },
+      "words_median": {
+        "de": 135,
+        "fr": 221
+      },
+      "claims": {
+        "total": 49,
+        "verified": 49,
+        "cited": 39
+      },
+      "checks": {
+        "fail": 6,
+        "not_applicable": 46,
+        "pass": 344
+      },
+      "fiche_confidence_bands": {
+        "high": 5,
+        "low": 1
+      },
+      "fiche_writers": {
+        "v3": 6
+      }
+    },
+    {
+      "run_id": "8711b14b-9c7d-45ac-9cd2-1ca645fdcec2",
+      "status": "succeeded",
+      "mode": "LIVE",
+      "git_commit": "42dbd1f92d54c1b8b4c015d543603bff576f4ca0",
+      "git_dirty": true,
+      "seconds": 302.7,
+      "metrics": {
+        "rulings_in": 10.0,
+        "stored": 9.0,
+        "unchanged": 1.0,
+        "failed": 0.0,
+        "replay_misses": 0.0,
+        "verified_versions": 4.0,
+        "flagged_versions": 5.0,
+        "v2_fallback_fiches": 0.0,
+        "llm_calls": 232.0,
+        "cache_hits": 26.0,
+        "live_calls": 206.0,
+        "llm_errors": 0.0,
+        "claims": 122.0,
+        "claims_flagged": 0.0,
+        "claims_cited": 103.0,
+        "checks_failed": 0.0,
+        "removed_sentences": 20.0,
+        "segmentations_ok": 10.0,
+        "segmentations_failed": 0.0,
+        "expert_current_kept": 0.0,
+        "requests_done": 0.0,
+        "requests_failed": 0.0,
+        "requests_rejected": 0.0,
+        "model_override": 0.0
+      },
+      "llm_calls": {
+        "rows": 232,
+        "without_error": 232
+      },
+      "versions_by_quality": {
+        "flagged": 5,
+        "verified": 4
+      },
+      "texts_linked_to_their_call": {
+        "texts": 18,
+        "linked": 18
+      },
+      "words_median": {
+        "de": 149,
+        "fr": 192
+      },
+      "claims": {
+        "total": 126,
+        "verified": 126,
+        "cited": 103
+      },
+      "checks": {
+        "fail": 20,
+        "not_applicable": 142,
+        "pass": 888
+      },
+      "fiche_confidence_bands": {
+        "high": 17,
+        "medium": 3
+      },
+      "fiche_writers": {
+        "v3": 20
+      }
+    }
+  ]
+}

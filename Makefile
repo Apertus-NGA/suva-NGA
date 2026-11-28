@@ -121,6 +121,13 @@ scorer-load: ## load that run as layer 2 (the scorer) and ranking (its promotion
 layer2: ## layer 2 on layer 1's candidates (MODE=replay|live; ARGS="--limit N|--all --population CODE --store DIR")
 	$(PY) -m src.layer2 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
 
+.PHONY: layer3 layer3-requests
+layer3: ## layer 3: summaries of the top 10 by layer-2 score + pending requests (MODE=replay|live; ARGS="--limit N --population CODE --dockets D ...")
+	$(PY) -m src.layer3 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
+layer3-requests: ## layer 3: the pending summary requests of the UI only (ops.user_request, MODE=replay|live)
+	$(PY) -m src.layer3 requests --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
 # Like layer1-validate, the report goes to data/runs/validation/ (git-ignored; writable in the cluster) unless OUT
 # names a file: OUT=results/layer2_validation.json regenerates the committed report, from a clean checkout.
 layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune) [OUT=path]

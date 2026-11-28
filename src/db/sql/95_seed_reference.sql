@@ -139,5 +139,26 @@ FROM (VALUES (
 ) AS s(js, template, changelog)
 ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
 
+-- layer 3 (D-095, docs/LAYER3.md): the verify rules V3_<CODE>, one per check code of the v3 engine
+-- (src/layer3/registry/verify.json), and why a ruling was not summarised. Appended: no existing row changes.
+INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
+  ('V3_LANGUAGE',          'verify',  'Satz in der Sprache der Fassung', 'Phrase dans la langue de la version'),
+  ('V3_PLACEHOLDER',       'verify',  'Kein Platzhalter im Satz', 'Aucun espace réservé dans la phrase'),
+  ('V3_NEW_IDENTIFIER',    'verify',  'Keine Kennung, die nicht im Urteil steht', 'Aucun identifiant absent de l''arrêt'),
+  ('V3_MODAL_STRENGTH',    'verify',  'Verbindlichkeit wie im Urteil', 'Force normative identique à l''arrêt'),
+  ('V3_GLOSSARY_TERM',     'verify',  'Fachbegriff gemäss Glossar', 'Terme technique conforme au glossaire'),
+  ('V3_SUVA_NAMED',        'verify',  'Suva nur genannt, wenn das Urteil sie nennt', 'Suva nommée seulement si l''arrêt la nomme'),
+  ('V3_OUTCOME_RESTATED',  'verify',  'Ausgang nicht doppelt wiedergegeben', 'Issue non répétée'),
+  ('V3_SPEAKER',           'verify',  'Aussage der richtigen Partei oder dem Gericht zugeschrieben', 'Propos attribué à la bonne partie ou au Tribunal'),
+  ('V3_ENTAILMENT',        'verify',  'Satz folgt aus der belegten Urteilsstelle', 'Phrase découlant du passage cité de l''arrêt'),
+  ('V3_DUPLICATE',         'verify',  'Satz wiederholt keinen anderen', 'Phrase sans doublon'),
+  ('L3_ENGINE_FAILED',     'summary', 'Zusammenfassung fehlgeschlagen, wird wiederholt', 'Résumé échoué, nouvel essai prévu'),
+  ('L3_REPLAY_MISS',       'summary', 'Keine aufgezeichnete Antwort: im Wiedergabemodus nicht zusammengefasst', 'Aucune réponse enregistrée : non résumé en mode relecture'),
+  ('L3_LANGUAGE_MISSING',  'summary', 'Deutsche oder französische Fassung fehlt: nicht gespeichert', 'Version allemande ou française manquante : non enregistrée'),
+  ('L3_FICHE_UNTRACED',    'summary', 'Fassung ohne nachgewiesenen Modellaufruf: nicht gespeichert', 'Version sans appel au modèle tracé : non enregistrée'),
+  ('L3_FEW_SHOT_EXAMPLE',  'summary', 'Urteil dient als Beispiel im Prompt: nicht zusammengefasst', 'Arrêt servant d''exemple dans le prompt : non résumé'),
+  ('L3_PRESET_UNAVAILABLE','summary', 'Voreinstellung ohne aktive Version', 'Préréglage sans version active')
+ON CONFLICT (code) DO NOTHING;
+
 RESET app.actor;
 RESET ROLE;

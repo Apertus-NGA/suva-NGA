@@ -56,7 +56,7 @@ def passages(text: str) -> dict[str, str]:
             if _follows(previous, number):
                 starts.append((match.start(), "E." + match.group(1)))
                 previous = number
-        if not starts:
+        if not starts:  # a heading but no numbered consideration (fixed here: a4a1504 raised in zip)
             parts["reasons"] = text[reasons.end() : end].strip()
         else:
             stops = [start for start, _ in starts[1:]] + [end]
@@ -169,9 +169,13 @@ def rule_candidates(parts: dict[str, str], merits: bool) -> tuple[list[str], dic
     return (kept, excluded) if kept else (labels, {})
 
 
+_CLOSING_TAG = re.compile(r"</\s*([A-Za-z_]+)\s*>")
+
+
 def as_data(text: str) -> str:
-    """Ruling text cannot close its delimiter or pass for a control tag (AGENTS.md G4)."""
-    return text.replace("</ruling>", "</ ruling>").replace("<|", "< |")
+    """Ruling or model text cannot close any delimiter (<ruling>, <ruling_sentence>, <sentence>, <a>, <b>) or pass
+    for a control tag (AGENTS.md G4). Text without a closing tag is unchanged (a4a1504 neutralised </ruling> only)."""
+    return _CLOSING_TAG.sub(r"</ \1>", text).replace("<|", "< |")
 
 
 def labelled(parts: dict[str, str], labels: list[str] | None = None) -> str:

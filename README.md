@@ -4,7 +4,7 @@
 
 ### Identification of relevant Federal Court judgements and preparation of a legal summary
 
-`Add your team name`
+NGA - Need GPUs for Apertus
 <br>
 <br>
 

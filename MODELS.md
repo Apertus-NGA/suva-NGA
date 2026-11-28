@@ -8,7 +8,7 @@
 
 | Role | Model | Exact id / revision | Endpoint or source | Licence | Status |
 |---|---|---|---|---|---|
-| Core: key statement, summaries DE/FR; relevance judgement only in a future `layer2_judge` V2.0.0 (D-076) | Apertus 1.5 70B (instruct, thinking off) | gateway `apertus-v1-5-70b`; Hugging Face `swiss-ai/Apertus-v1.5-70B` | Keera gateway (`LLM_BASE_URL`), or the endpoint the judges set in `LLM_BASE_URL` (CSCS possible) | check model card | DECIDED (Apertus mandatory); role split OPEN (D-021, D-022) |
+| Core: summaries DE/FR (layer 3, `summarise` V1.0.0 and `verify` V1.0.0, D-094: every call of the v3 engine and of its v2 fallback, see below); key statement; relevance judgement only in a future `layer2_judge` V2.0.0 (D-076) | Apertus 1.5 70B (instruct, thinking off) | gateway `apertus-v1-5-70b`; Hugging Face `swiss-ai/Apertus-v1.5-70B` | Keera gateway (`LLM_BASE_URL`), or the endpoint the judges set in `LLM_BASE_URL` (CSCS possible) | check model card | DECIDED (Apertus mandatory); role split OPEN (D-021, D-022); summary roles PROPOSED (D-094) |
 | Layer-2 relevance judge (`layer2_judge` V1.0.0, D-076: the D-074 chain; layer 2 never excludes, D-075); light tasks: query translation, quick prioritisation, demo fallback | Apertus 1.5 8B | gateway `apertus-v1-5-8b`; Hugging Face `swiss-ai/Apertus-v1.5-8B` | Keera gateway, or the endpoint the judges set | check model card | OPEN (D-022); never excludes a ruling alone whatever the answer |
 | Embeddings for search and similar rulings | pplx-embed-context-v1-0.6b | `<revision>`; query-side model to fix | local; weights downloaded at image build time and never committed (the template's `.gitignore` excludes weight files), so a **build-time** external dependency listed in the report's Target architecture | MIT | DECIDED if search uses embeddings (D-005); whether it does is OPEN (D-033) |
 | Embedding baseline | bge-m3 | `<revision>` | local (weights downloaded at build time, as above) | MIT | OPEN (D-020) |
@@ -23,6 +23,8 @@
 | Evaluation judge of the summaries (evaluation only, never called by `make run`) | gpt-oss 120B, reasoning effort high | Hugging Face `openai/gpt-oss-120b`, revision `b5c939de8f` | any OpenAI-compatible endpoint set in `JUDGE_BASE_URL` (Hugging Face router, or local) | Apache-2.0 | PROPOSED (`docs/JUDGE.md` §4); not measured yet; used in a headline number only with its validation and κ published |
 | Judge candidates for the comparison of `docs/JUDGE.md` §4 | DeepSeek V4 Pro; Qwen 3.5 397B | Hugging Face `deepseek-ai/DeepSeek-V4-Pro`; `Qwen/Qwen3.5-397B-A17B` | as above | MIT; Apache-2.0 | OPEN: kept only if measured better than the default |
 
+**Summary roles (layer 3, D-094, `docs/LAYER3.md` §3.1).** `summarise` V1.0.0 declares the 70B for its three roles: `generator` (the fiche of each language: `write`, `missing`, `v2_write`), `repair` (`repair`, `v2_repair`) and `judge` (the reading calls: the `record` of propositions, and under `verify` V1.0.0 the one-token entailment reading `entail`; `ops.model_role` has no labeller role). Every layer-3 call asks the client for the large model, so it runs on whatever `LLM_NAME` names: when that is not the 70B, the run still completes and records `pipeline_run.model_override` (D-064). The 8B is never asked for by layer 3. Each call's requested and served model is in `ops.llm_call`.
+
 `LLM_NAME` is "name and version of the model" (template `README.md`): the judges may set either size, in either form (gateway id or Hugging Face id). The client maps both forms, and the pipeline must complete when `LLM_NAME` is the 8B (`AGENTS.md` G3; D-032, Q-23).
 
 **Allow-list of served models** (PROPOSED, D-032, Q-23). This is the single home of these ids: `AGENTS.md` G3 states the rule, and other files point here instead of listing them.
@@ -36,19 +38,20 @@ Runtime checks:
 
 ## 2. Development tools (E2 and E6)
 
-Each member fills their own rows: tool, every model actually used, and what for. Members are named by handle, as in `docs/EVENT.md` §7, never by name (G13).
+Members are named by handle, as in `docs/EVENT.md` §7 (G13). Confirmed by each member on 28 Nov.
 
 | Member | Tool | Model(s) and version | Used for |
 |---|---|---|---|
-| to be confirmed by each member | Claude Code (coding agent; reads `CLAUDE.md`, which imports `AGENTS.md`) | Anthropic `claude-opus-5-5` (the session that wrote the compliance fixes of 28 Nov); other sessions' models to be confirmed | code, research, review |
-| to be confirmed by each member | Cursor (IDE agent; named as a reader of `AGENTS.md`) | to be confirmed by each member: the repo does not show whether or with which model it was used | to be confirmed |
-| to be confirmed by each member | any other chat or IDE assistant | to be confirmed by each member | to be confirmed |
-
-Only what the repository itself shows is filled in above. Each member confirms or completes their own rows (tool, every model and version actually used, purpose) before submission; nothing here is inferred.
+| TheDiRocco | Claude Code (VS Code extension) | Anthropic Claude Opus 5.5 and Claude Fable 5.2 | code, review, docs, analysis, planning |
+| TheDiRocco | GitHub Copilot (VS Code) | Copilot autocomplete | code completion |
+| TheDiRocco | ChatGPT (web) | OpenAI GPT-6 Luna | questions during development |
+| bananagoo | Claude Code (terminal in VS Code) | Anthropic Claude Opus 5.5 and Claude Fable 5.2 | code, review, docs, analysis, planning |
+| bananagoo | GitHub Copilot (VS Code) | Copilot autocomplete | code completion |
+| RabahSend | Cursor | xAI Grok 4.7; Cursor Auto mode (model chosen by Cursor per request) | code, review, docs, analysis, planning |
 
 ## 3. Pre-event preparation
 
-Research and preparation notes written before the event with AI assistants are declared here and in section 8 of `technical_report.md` (D-043, D-029). To be confirmed by each member: the repository holds no record of pre-event tools or models, so none is listed yet.
+The project kit (docs and rules) was written before the event by TheDiRocco with Anthropic Claude Opus 5.5 in claude.ai. It is declared as pre-existing material and committed unchanged as tag `kit-v0` (D-029); it is also listed in section 7 of `technical_report.md`.
 
 ## 4. Development-time models (research experiments; never called by `make run`)
 
