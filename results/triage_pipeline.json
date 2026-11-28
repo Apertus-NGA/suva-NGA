@@ -1,8 +1,8 @@
 {
- "version": "triage_pipeline@1",
- "rulings": 6234,
- "kept_by_layer1": 1115,
- "core_rulings_read_by_apertus": 391,
+ "version": "triage_pipeline@2",
+ "rulings": 6055,
+ "kept_by_layer1": 1090,
+ "core_rulings_read_by_apertus": 377,
  "apertus_readings_failed": 0,
  "consensus_readings": [
   "scale_area",
@@ -12,10 +12,92 @@
   "verdict",
   "yes_strict"
  ],
- "training_rulings": 643,
+ "training_rulings": 646,
  "training_relevant": 59,
  "relevant_not_kept_by_layer1": 0,
- "threshold": 0.4583,
+ "threshold": 0.4669,
+ "scorer": "scorer@2",
+ "rule_weights": {
+  "area_uvmv": {
+   "sign": 1,
+   "weight": 1.3257,
+   "mean": 0.1486,
+   "scale": 0.3557
+  },
+  "area_iv": {
+   "sign": 1,
+   "weight": 2.4056,
+   "mean": 0.3127,
+   "scale": 0.4636
+  },
+  "appeal_by_institution": {
+   "sign": 1,
+   "weight": 0.3673,
+   "mean": 0.0898,
+   "scale": 0.2859
+  },
+  "five_judges": {
+   "sign": 1,
+   "weight": 0.4473,
+   "mean": 0.0573,
+   "scale": 0.2324
+  },
+  "publication": {
+   "sign": 1,
+   "weight": 0.0513,
+   "mean": 0.0248,
+   "scale": 0.1554
+  },
+  "manifestly_unfounded": {
+   "sign": -1,
+   "weight": -0.3017,
+   "mean": 0.0743,
+   "scale": 0.2623
+  },
+  "suva_party": {
+   "sign": 1,
+   "weight": 1.1138,
+   "mean": 0.1037,
+   "scale": 0.3049
+  },
+  "single_judge": {
+   "sign": -1,
+   "weight": -2.301,
+   "mean": 0.3638,
+   "scale": 0.4811
+  },
+  "consensus": {
+   "sign": 1,
+   "weight": 0.2799,
+   "mean": -0.0325,
+   "scale": 0.3776
+  },
+  "core_topics": {
+   "sign": 1,
+   "weight": 0.2138,
+   "mean": 0.9536,
+   "scale": 1.3194
+  },
+  "long_accident": {
+   "sign": 1,
+   "weight": 0.3337,
+   "mean": 0.0108,
+   "scale": 0.1035
+  },
+  "long_disability": {
+   "sign": -1,
+   "weight": -0.8618,
+   "mean": 0.0294,
+   "scale": 0.169
+  },
+  "other_accident_insurer": {
+   "sign": 1,
+   "weight": 0.5965,
+   "mean": 0.0495,
+   "scale": 0.217
+  }
+ },
+ "intercept": -4.2047,
  "out_of_quarter": {
   "protocol": "fit on one listed quarter; on the other, promote 40% of its core rulings; folds pooled",
   "submitted": 120,
@@ -27,12 +109,12 @@
   "per_quarter": {
    "2026 Q1": {
     "submitted": 66,
-    "relevant_found": 28,
+    "relevant_found": 29,
     "relevant": 31
    },
    "2025 Q4": {
     "submitted": 54,
-    "relevant_found": 27,
+    "relevant_found": 26,
     "relevant": 28
    }
   }
@@ -43,24 +125,19 @@
    "suspected_relevant": 9
   },
   "2025 Q4": {
-   "kept": 295,
+   "kept": 296,
    "suspected_relevant": 54
   },
   "2026 Q1": {
-   "kept": 348,
+   "kept": 350,
    "suspected_relevant": 66
   },
   "2026 Q2": {
-   "kept": 416,
+   "kept": 421,
    "suspected_relevant": 76
-  },
-  "2026 Q3": {
-   "kept": 2,
-   "suspected_relevant": 0
-  },
-  "2026 Q4": {
-   "kept": 31,
-   "suspected_relevant": 6
   }
- }
+ },
+ "mode": "REPLAY",
+ "layer1_apertus_failed": 0,
+ "run_id": 2
 }
