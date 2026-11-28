@@ -1,0 +1,38 @@
+{
+  "benchmark": "selection_strategy_followup",
+  "source_scores": "data/derived/selection_benchmark/scores.json",
+  "source_aggregates": "results/selection_benchmark.json",
+  "evaluation_quarter": "2026 Q1",
+  "calibration_quarter": "2025 Q4",
+  "parameters_refit_on_evaluation": false,
+  "production_strategy_modified": false,
+  "wilson_recall_95": {
+    "z": 1.96,
+    "topk_0_40": {"tp": 24, "relevant": 29, "low": 0.654512, "high": 0.924023},
+    "topk_0_60": {"tp": 26, "relevant": 29, "low": 0.736146, "high": 0.964186},
+    "threshold_0_46": {"tp": 29, "relevant": 29, "low": 0.883026, "high": 1.0}
+  },
+  "paired_bootstrap_f2": {
+    "draws": 10000,
+    "seed": 20261128,
+    "resample": "evaluation rows with replacement; both cuts recomputed inside each draw; parameters frozen",
+    "topk_0_40_minus_threshold_0_46": {"low": -0.081057, "median": 0.043699, "high": 0.149209, "share_positive": 0.7626},
+    "topk_0_60_minus_threshold_0_46": {"low": -0.108675, "median": -0.019481, "high": 0.058964, "share_positive": 0.3248},
+    "topk_0_40_minus_model_threshold": {"low": 0.003668, "median": 0.092162, "high": 0.162660, "share_positive": 0.9779}
+  },
+  "hybrid": {
+    "rule": "Top-K 0.40 union score >= t",
+    "t_grid": [0.0, 1.0, 0.01],
+    "chosen_on": "2025 Q4",
+    "tie_break": "higher F2, then higher recall, then higher precision, then fewer selected, then higher t",
+    "q4_f2_plateau": [0.22, 0.46],
+    "chosen_t": 0.46,
+    "q4_marginal_topk_0_40": 0.620301,
+    "q1_marginal_topk_0_40": 0.621067,
+    "equals_threshold_at_chosen_t": true,
+    "calibration": {"tp": 19, "fp": 43, "fn": 0, "precision": 0.306452, "recall": 1.0, "f2": 0.688406, "selected": 62},
+    "evaluation": {"tp": 29, "fp": 80, "fn": 0, "precision": 0.266055, "recall": 1.0, "f2": 0.644444, "selected": 109},
+    "q1_best_t_not_used": 1.0,
+    "bootstrap_f2_minus_threshold_0_46": {"low": 0.0, "median": 0.0, "high": 0.0, "share_positive": 0.0}
+  }
+}
