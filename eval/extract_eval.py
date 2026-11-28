@@ -250,6 +250,50 @@ def write_all(name_set: str, name: str, choice_name: str, frame: str = "none") -
     print(f"{len(rows)} fiches -> {REFINE_OUT / f'refined_{name_set}_{name}.jsonl'}")
 
 
+def run(name_set: str, name: str) -> None:
+    """Both fiches of each ruling through the pipeline's own path (pipeline.write with the extractive writer and
+    its v2 fallback), one ruling at a time and timed; nothing is stored. Rows in refine_eval's format, the v2
+    draft beside each fiche."""
+    import functools
+    import time
+
+    from eval.refine_eval import OUT as REFINE_OUT
+    from src.llm.client import client_from_env
+    from src.summarize import pipeline
+    from src.summarize.refine import Model, gateway
+    from src.summarize.refine.model import gateway_labeler
+    from suva_data import db
+
+    drafts = {(r["docket"], r["language"]): r for r in _jsonl(REFINE_OUT / f"drafts_{name_set}.jsonl")}
+    client = client_from_env("live")
+    transport, labeler = gateway(client=client), gateway_labeler(client=client)
+    rows = []
+    with db.connect() as conn:
+        for docket in sets()[name_set]:
+            rid = conn.execute("SELECT id FROM rulings WHERE docket = %s", (docket,)).fetchone()[0]
+            ruling = pipeline.load_ruling(conn, rid)
+            shots = {lang: pipeline.examples(conn, lang, docket) for lang in pipeline.LANGUAGES}
+            lexicons = {lang: pipeline.lexicon(conn, lang, docket) for lang in pipeline.LANGUAGES}
+            start = time.perf_counter()
+            result = pipeline.write(ruling, shots, functools.partial(pipeline._chat, mode="live"), None, lexicons,
+                                    lambda budget: Model(transport, budget=budget, labeler=labeler))  # fmt: skip
+            seconds = round(time.perf_counter() - start, 1)
+            for lang, fiche in result["languages"].items():
+                trace = (fiche.get("extract") or {}).get("trace", [])
+                rows.append({"docket": docket, "language": lang, "text": fiche["text"], "writer": fiche["writer"],
+                             "draft": drafts.get((docket, lang), {}).get("text", ""), "seconds": seconds,
+                             "calls": (fiche.get("extract") or {}).get("calls", 0), "trace": trace,
+                             "problems": fiche["problems"], "errors": result.get("extract_errors"),
+                             "checks_before": {}, "checks_after": {}})  # fmt: skip
+            print(
+                f"{docket} ({ruling['language']}): {seconds} s, writers "
+                f"{[f['writer'] for f in result['languages'].values()]}",
+                flush=True,
+            )
+    _write(REFINE_OUT / f"refined_{name_set}_{name}.jsonl", rows)
+    print(f"{len(rows)} fiches -> {REFINE_OUT / f'refined_{name_set}_{name}.jsonl'}")
+
+
 def report(name_set: str, name: str) -> dict:
     golds = {r["docket"]: r for r in _jsonl(OUT / f"gold_{name_set}.jsonl")}
     chosen = {r["docket"]: r for r in _jsonl(OUT / f"chosen_{name_set}_{name}.jsonl")}
@@ -305,7 +349,7 @@ def report(name_set: str, name: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("filter", "choose", "write", "report"))
+    parser.add_argument("command", choices=("filter", "choose", "write", "run", "report"))
     parser.add_argument("--set", default="iterate", choices=("iterate", "holdout"))
     parser.add_argument("--name", default="c1")
     parser.add_argument("--passages", default="rank", choices=("rank", "list"))
@@ -322,6 +366,9 @@ def main(argv: list[str] | None = None) -> int:
         (results / f"extract_filter_{args.set}.json").write_text(json.dumps(summary, indent=2) + "\n")
     elif args.command == "choose":
         choose_all(args.set, args.name, args.passages, not args.no_profiles)
+        return 0
+    elif args.command == "run":
+        run(args.set, args.name)
         return 0
     elif args.command == "write":
         write_all(args.set, args.name, args.choice, args.frame)
