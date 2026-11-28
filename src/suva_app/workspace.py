@@ -17,6 +17,8 @@ from suva_data import config
 if str(config.REPO) not in sys.path:  # src/summarize lives at the repository root
     sys.path.insert(0, str(config.REPO))
 
+from src.llm.client import ReplayMiss  # noqa: E402, F401  (main.py maps it to 503)
+from src.llm.config import ConfigError  # noqa: E402, F401  (main.py maps it to 503)
 from src.summarize import finish, pipeline, summarize  # noqa: E402
 from src.summarize.prompts import VERSION as PROMPT_VERSION  # noqa: E402
 from src.summarize.prompts import system_prompt  # noqa: E402
