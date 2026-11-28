@@ -203,6 +203,7 @@ def _v3(ruling: dict, category: str, shots: dict[str, list[dict]], make_model) -
         out[language] = {"text": fiche.text, "raw": "", "finish_notes": fiche.notes, "writer": "v3",
                          "extract": {"version": v3.VERSION, "draft": "", "calls": fiche.calls + record.calls,
                                      "checks_before": {}, "checks_after": {},
+                                     "confidence": v3.confidence(record, fiche),
                                      "trace": v3.as_steps(record, fiche)}}  # fmt: skip
     return out
 
@@ -269,6 +270,7 @@ def _refine_params(result: dict) -> dict | None:
                 "version": trace["version"], "draft": trace["draft"], "calls": trace["calls"],
                 "checks_before": trace["checks_before"], "checks_after": trace["checks_after"],
                 "steps": trace["trace"],
+                **({"confidence": trace["confidence"]} if trace.get("confidence") else {}),
             }  # fmt: skip
     if not out:
         return None

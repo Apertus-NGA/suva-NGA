@@ -14,6 +14,7 @@ from src.summarize.refine.model import ModelFailed
 from src.summarize.v3 import record as record_part
 from src.summarize.v3 import verify as verify_part
 from src.summarize.v3 import write as write_part
+from src.summarize.v3.confidence import confidence
 from src.summarize.v3.types import VERSION, Fiche, Record
 
 LANGUAGES = ("de", "fr")
@@ -63,6 +64,7 @@ def as_steps(record: Record, fiche: Fiche) -> list[dict]:
             "quote": " … ".join(p.source for p in sources),
             "text": s.text,
             "status": s.status,
+            "entailment": s.entailment,
         }
         if s.problems:
             entry["why_not"] = "; ".join(s.problems)
@@ -77,4 +79,4 @@ def as_steps(record: Record, fiche: Fiche) -> list[dict]:
     ]  # fmt: skip
 
 
-__all__ = ["VERSION", "Fiche", "Record", "as_steps", "fiches"]
+__all__ = ["VERSION", "Fiche", "Record", "as_steps", "confidence", "fiches"]
