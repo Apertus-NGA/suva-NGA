@@ -12,11 +12,13 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
+from pathlib import Path as FsPath
 from typing import Annotated, Literal
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.db.pg import DatabaseNotConfigured
@@ -30,6 +32,10 @@ UUID_PATTERN = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 RulingId = Annotated[str, Path(pattern=UUID_PATTERN, description="corpus.ruling.ruling_id (UUID)")]
 RequestId = Annotated[str, Path(pattern=UUID_PATTERN, description="ops.user_request.request_id (UUID)")]
 Language = Literal["de", "fr"]
+# The built React UI (src/web, `npm run build`), served at "/" when present; API_UI_DIST points elsewhere.
+DEFAULT_UI_DIST = FsPath(__file__).resolve().parents[2] / "src" / "web" / "dist"
+# Another name the UI sends for an action, mapped before the write (the stored action keeps one name).
+RELEVANCE_ALIASES = {"confirm_relevant": "mark_relevant"}
 
 
 def create_app(settings: Settings | None = None, launcher: Launcher | None = None) -> FastAPI:
@@ -65,7 +71,15 @@ def create_app(settings: Settings | None = None, launcher: Launcher | None = Non
         return JSONResponse(status_code=503, content={"detail": "the database connection failed"})
 
     _routes(app)
+    _mount_ui(app, FsPath(settings.ui_dist) if settings.ui_dist else DEFAULT_UI_DIST)
     return app
+
+
+def _mount_ui(app: FastAPI, directory: FsPath) -> None:
+    """Serve the built UI at "/" when its directory holds an index.html. Mounted after every route, so the API
+    routes keep priority; without a build, nothing is mounted and "/" answers 404."""
+    if directory.is_dir() and (directory / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=directory, html=True), name="ui")
 
 
 @contextmanager
@@ -87,7 +101,9 @@ def _session(request: Request, *, read_only: bool) -> Iterator[psycopg.Connectio
 
 
 class RelevanceDecision(BaseModel):
-    action: Literal["mark_relevant", "mark_not_relevant", "reopen"]
+    action: Literal["mark_relevant", "confirm_relevant", "mark_not_relevant", "reopen"] = Field(
+        description="confirm_relevant is an alias of mark_relevant"
+    )
     comment: str | None = Field(default=None, max_length=2000)
     token: str | None = Field(
         default=None, description="decision_token of the row the expert saw: 409 if the ruling changed since"
@@ -213,7 +229,12 @@ def _routes(app: FastAPI) -> None:
         with _session(request, read_only=False) as conn:
             return _guard(
                 lambda: writes.decide_relevance(
-                    conn, ruling_id, decision.action, decision.comment, decision.token, threshold=_threshold(request)
+                    conn,
+                    ruling_id,
+                    RELEVANCE_ALIASES.get(decision.action, decision.action),
+                    decision.comment,
+                    decision.token,
+                    threshold=_threshold(request),
                 )
             )
 

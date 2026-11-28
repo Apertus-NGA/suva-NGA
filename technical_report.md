@@ -7,7 +7,7 @@ numbers say.
 - **Challenge:** Identification of relevant Federal Court judgements and preparation of a legal summary
 - **Event:** On-site Zurich
 - **Team:** NGA - Need GPUs for Apertus — TheDiRocco, RabahSend, bananagoo
-- **Demo:** `<to fill: link to video>`
+- **Demo:** <https://youtu.be/TL9me1PCdXk>
 
 ## 1. Summary
 
@@ -29,7 +29,7 @@ The repository holds two parts that run side by side.
 
 **The audited data layer.** A six-schema PostgreSQL database, a first filter in which every rule's outcome is stored per ruling with the matched text, a FastAPI service, and a hardened Docker cluster. The Scout scorer is registered in it as a versioned step, and its scores are loaded with a check: the loader recomputes each score from the stored facts and the registered weights and refuses any ruling where they disagree <!-- code src/scorer/, tests/test_scorer_load.py, decision D-094 -->. On the integration run of 28 Nov, 925 rulings were loaded with a score and 205 promoted <!-- integration run, 28 Nov; not in a results/ file -->.
 
-Diagrams: relevance steps `docs/TRIAGE_PIPELINE.md` §2; summary writer `docs/V3.md` §2; cluster `docs/DEPLOY.md` §1. <!-- CHECK: these three files exist on main after the merge -->
+Diagrams: relevance steps `docs/TRIAGE_PIPELINE.md` §2; summary writer `docs/V3.md` §2; cluster `docs/DEPLOY.md` §1.
 
 ### Target architecture (mandatory)
 
@@ -46,7 +46,7 @@ Diagrams: relevance steps `docs/TRIAGE_PIPELINE.md` §2; summary writer `docs/V3
 | Data | the corpus, downloaded once from Hugging Face | none in replay; a refresh of new rulings calls bger.ch and two mirrors |
 | Model | Apertus v1.5 weights, for b) only | the Apertus endpoint `LLM_BASE_URL`; it must return token log-probabilities |
 
-No other external service at runtime: no telemetry, no closed model. <!-- CHECK: the built UI loads no font or script from a CDN -->
+No other external service at runtime: no telemetry, no closed model. The interface loads no font or script from another host.
 
 ## 3. Use of Apertus
 
@@ -60,11 +60,11 @@ No other external service at runtime: no telemetry, no closed model. <!-- CHECK:
 | Matter of a ruling when code cannot read it | one token among eight options |
 | Summary: record of what to say, writing, sentence-by-sentence entailment check, repair | sentence ids and closed formats for the record; free text for the summary, then checked by code |
 
-Apertus never supplies an identifier: docket numbers, dates, articles and links are read from the source by code. Every call goes through one client: temperature 0, a timeout, the served model checked against an allow-list of Apertus v1.5 ids, the full request and answer logged, and a cache that replays a run without the gateway. Prompts are in `src/triage/reading_prompts.py` and `src/summarize/v3/`. <!-- CHECK paths after merge -->
+Apertus never supplies an identifier: docket numbers, dates, articles and links are read from the source by code. Every call goes through one client: temperature 0, a timeout, the served model checked against an allow-list of Apertus v1.5 ids, the full request and answer logged, and a cache that replays a run without the gateway. Prompts are in `src/triage/reading_prompts.py`, `src/area_judge.py` and `src/summarize/v3/`.
 
 **Why Apertus is one input and not the whole score.** We first tested zero-shot Apertus against a three-signal rule with no model, on 59 relevant rulings. For a list of 45 rulings per quarter, recall was 0.780 for the rule, 0.746 for the 8B and 0.576 for the 70B; F2 was 0.706, 0.675 and 0.521 <!-- API:results/finetune_benchmark_v3.md, Primary metrics: Recall / F2 of the top-45 list per quarter -->. So the scorer combines facts and readings, and the lawyer has the last word.
 
-Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weights), as evaluation judges of summaries during development <!-- RES:results/judge_run_pipeline_v1.json judge_model; RES:results/judge_metaeval_dev_deepseek.json -->; Apertus 70B thinking, in research experiments only; coding assistants, including closed models, listed in `MODELS.md`. <!-- CHECK: MODELS.md §2 is filled by each member -->
+Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weights), as evaluation judges of summaries during development <!-- RES:results/judge_run_pipeline_v1.json judge_model; RES:results/judge_metaeval_dev_deepseek.json -->; Apertus 70B thinking, in research experiments only; coding assistants, including closed models, listed in `MODELS.md`.
 
 ## 4. Data
 
@@ -89,7 +89,7 @@ Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weig
 **Relevance.**
 - With 59 relevant rulings, one ruling moves recall by 0.017 (1 of 59).
 - Both labelled quarters shaped the features, the prompts and the list size. The test fits the weights on one quarter and tests on the other, but the design saw both, so the numbers are optimistic. Only the Q2/2026 list is a true prediction.
-- Apertus's share is modest: its consensus weighs 0.28 per standard deviation against 2.25 for the strongest code-read rule <!-- RES:results/triage_pipeline.json rule_weights.consensus.weight 0.2763, rule_weights.area_iv.weight 2.2536 -->.
+- Apertus's share is modest: its consensus weighs 0.28 per standard deviation against 2.26 for the strongest code-read rule <!-- RES:results/triage_pipeline.json rule_weights.consensus.weight 0.2763, rule_weights.single_judge.weight -2.2619 (largest in absolute value; area_iv 2.2536) -->.
 - Of 23 rulings Suva summarised in an earlier quarter, never used as labels, 16 score above the cut and 2 score very low <!-- RES:results/triage_pipeline.json summarised_by_suva_not_in_training -->.
 - A ruling the filter drops gets no score. Only accident, military and disability rulings decided by more than one judge are read by Apertus; other kept rulings are scored from the facts.
 
@@ -122,7 +122,7 @@ Recall first, then F2 = 5·TP / (4·N + submitted), N being the number of truly 
 
 ### How to run
 
-**Prerequisites:** git, Docker with compose, Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node for the UI build. <!-- CHECK: exact prerequisites and whether a Docker-only path exists -->
+**Prerequisites:** git, make, Docker with compose, Python 3.12+ with [uv](https://docs.astral.sh/uv/), and Node.js with npm: the first run builds the interface, and without npm only the API is served. The first run needs internet access for the database image, the packages and the corpus.
 
 **Configuration:** copy `.env.example` to `.env`. For live calls set:
 
@@ -135,11 +135,11 @@ LLM_API_KEY   your API key
 **Run:**
 
 ```
-make run        # replay: no gateway call, no key; then serves the app on http://127.0.0.1:8000
-make run-live ARGS="--limit 5"   # real Apertus calls, a smoke run; ARGS="--all" for everything
+make run
+make run-live ARGS="--limit 5"
 ```
 
-`make run` starts the database, pulls the corpus from the team's public dataset when the database is empty, scores the rulings and writes the summaries from the committed answers, then serves the interface. Every output is labelled `LIVE` or `REPLAY`. <!-- CHECK: commands, port and the ARGS run-live needs (the Scout Makefile takes ARGS="--limit N" or "--all") -->
+`make run` is the replay: no gateway call, no key. It starts the database, pulls the corpus from the team's public dataset when the database is empty, scores the rulings and writes the summaries from the committed answers, then serves the interface on <http://127.0.0.1:8000>. `make run-live` makes real Apertus calls and needs `ARGS`: `--limit 5` is a smoke run, `--all` runs everything. Every output is labelled `LIVE` or `REPLAY`.
 
 **Expected duration:** about 2.5 minutes for `SERVE=0 make run` from a fresh clone (measured 149 s on 28 Nov on a laptop, Docker image and Python packages already cached; the run pulls the dataset), plus the first image and package downloads on a new machine.
 

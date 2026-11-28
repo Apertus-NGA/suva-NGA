@@ -71,3 +71,5 @@ research/out/
 # --- Notebooks (appended, G13d) ---
 # Local notebooks and their outputs (they can hold Suva author fields, D-051); kept out of git
 notebooks/
+# the UI built for src/api (make web-api, D-101)
+src/web/dist-api/

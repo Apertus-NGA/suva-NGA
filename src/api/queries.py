@@ -90,6 +90,9 @@ WITH scope AS MATERIALIZED (
 ), summaries AS MATERIALIZED (
   SELECT c.ruling_id, coalesce(bool_or(c.expert_verdict = 'validated'), false) AS summary_validated
   FROM summ.v_summary_current c WHERE c.preset_code = 'suva_house' GROUP BY c.ruling_id
+), refs AS MATERIALIZED (
+  -- Suva's own summary of the ruling (gold.suva_summary), when one is linked to it
+  SELECT DISTINCT g.ruling_id FROM gold.suva_summary g WHERE g.ruling_id IS NOT NULL
 ), latest_ingest AS (
   -- the latest usable INCREMENTAL ingest: the first ingest loads the base, so is_new needs a later one
   SELECT run_id FROM ops.pipeline_run
@@ -102,7 +105,7 @@ WITH scope AS MATERIALIZED (
     coalesce(v.publication_date, v.publication_date_approx) AS published_any,
     v.quarter_by_decision, v.quarter_by_publication, v.court, v.register_letter, v.language,
     v.gegenstand AS subject, v.bger_url, v.primary_text_id, v.star,
-    {_AREA_CASE} AS area,
+    {_AREA_CASE} AS area, nullif(h.head, '') AS rubric,
     sc.pipeline_label, sc.step, sc.score_0_100, sc.score_raw, sc.score_source, sc.reason_code,
     sc.reason_label_de, sc.reason_label_fr, sc.explanation_de, sc.outcome, sc.mode, sc.label_origin,
     sc.assessment_id, sc.run_id, sc.expert_verdict, sc.reviewed_label, sc.review_is_stale,
@@ -119,7 +122,8 @@ WITH scope AS MATERIALIZED (
       ELSE 'not_assessed'
     END AS status,
     coalesce(r.created_by_run_id = li.run_id, false) AS is_new,
-    sm.ruling_id IS NOT NULL AS has_summary, coalesce(sm.summary_validated, false) AS summary_validated
+    sm.ruling_id IS NOT NULL AS has_summary, coalesce(sm.summary_validated, false) AS summary_validated,
+    rf.ruling_id IS NOT NULL AS has_reference
   FROM corpus.v_ruling v
   JOIN corpus.ruling r ON r.ruling_id = v.ruling_id
   LEFT JOIN latest_ingest li ON true
@@ -132,6 +136,7 @@ WITH scope AS MATERIALIZED (
                                             '[(,;].*$', '')), '*')) AS head) h ON true
   LEFT JOIN scope sc ON sc.ruling_id = v.ruling_id
   LEFT JOIN summaries sm ON sm.ruling_id = v.ruling_id
+  LEFT JOIN refs rf ON rf.ruling_id = v.ruling_id
 ), rows AS (
   SELECT base.*, {_STATUS_RANK} AS status_rank FROM base
 )
@@ -222,6 +227,8 @@ def ruling_row(r: dict[str, Any]) -> dict[str, Any]:
         "court": r["court"],
         "language": r["language"],
         "area": r["area"],
+        "rubric": r["rubric"],
+        "star": r["star"],
         "subject": r["subject"],
         "bger_url": r["bger_url"],
         "status": r["status"],
@@ -239,6 +246,7 @@ def ruling_row(r: dict[str, Any]) -> dict[str, Any]:
         "is_new": r["is_new"],
         "has_summary": r["has_summary"],
         "summary_validated": r["summary_validated"],
+        "has_reference": r["has_reference"],
         "decision_token": decision_token(r),
         "expert": {
             "verdict": r["expert_verdict"],
@@ -316,9 +324,14 @@ def facets(conn: psycopg.Connection, f: Filters, *, threshold: float | None) -> 
 
 def relevance(conn: psycopg.Connection, row: dict[str, Any]) -> dict[str, Any]:
     """The "why" card: the current label's lineage (v_scope_trace), layer 1's fired rules with their offsets in the
-    ruling text, and layer 2's reading of Apertus. `rules` stays empty: no per-rule score exists in this layer."""
+    ruling text, and layer 2's reading of Apertus. `rules` lists the scorer's signals (src/scorer/load.py) when the
+    current layer-2 assessment was written by the scorer; otherwise it stays empty (the 8B judge has no rule)."""
     if row["assessment_id"] is None:
-        return {"state": "not_assessed", "reason": "no assessment of the default pipeline forms a label yet"}
+        return {
+            "state": "not_assessed",
+            "reason": "no assessment of the default pipeline forms a label yet",
+            "reason_code": "NOT_ASSESSED",
+        }
     with conn.cursor() as cur:
         cur.execute(
             "SELECT t.*, pr.status AS run_status, pr.started_at AS run_started_at, pr.finished_at AS run_finished_at"
@@ -358,8 +371,11 @@ def relevance(conn: psycopg.Connection, row: dict[str, Any]) -> dict[str, Any]:
                     }
                 )
         layer2 = None
+        signal_rules: list[dict[str, Any]] = []
+        readings: list[dict[str, Any]] = []
         layer2_hop = next((h for h in hops if h["step"] == "layer2_judge"), None)
         if layer2_hop:
+            signal_rules, readings = _scorer_signals(cur, layer2_hop["assessment_id"])
             cur.execute(
                 "SELECT j.requested_model, j.served_model, j.question_language, j.logprob_yes, j.logprob_no, j.p_yes,"
                 " j.yes_no_in_top, j.top_logprobs, j.text_chars_total, j.text_chars_sent, j.truncation,"
@@ -429,8 +445,62 @@ def relevance(conn: psycopg.Connection, row: dict[str, Any]) -> dict[str, Any]:
         "text_id": str(text_id) if text_id else None,
         "layer1": layer1,
         "layer2": layer2,
-        "rules": [],
+        "rules": signal_rules,
+        "readings": readings,
+        "read_by_apertus": (
+            any(r["source"] == "apertus" and r["applies"] for r in signal_rules) if signal_rules else layer2 is not None
+        ),
     }
+
+
+def _number(value: Any) -> float | None:
+    try:
+        return None if value is None else float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _direction(definition: dict[str, Any], detail: dict[str, Any]) -> int | None:
+    """The rule's fixed direction (ops.rule.definition), else the sign of its stored contribution."""
+    registered = definition.get("direction")
+    if registered in (1, -1):
+        return int(registered)
+    contribution = _number(detail.get("contribution"))
+    if contribution is None or contribution == 0:
+        return None
+    return 1 if contribution > 0 else -1
+
+
+def _scorer_signals(cur: psycopg.Cursor, assessment_id: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """(rules, readings) of a layer-2 assessment written by the scorer: its `signal` reasons, in the scorer's order.
+    Detail keys from src/scorer/load.py: value, contribution, effect, and readings on the Apertus rule when read."""
+    cur.execute(
+        "SELECT r.rule_code, r.definition, ar.outcome, ar.detail FROM triage.assessment_reason ar"
+        " JOIN ops.rule r ON r.rule_id = ar.rule_id WHERE ar.assessment_id = %s AND ar.effect = 'signal'"
+        " ORDER BY ar.ordinal",
+        [assessment_id],
+    )
+    rules: list[dict[str, Any]] = []
+    readings: list[dict[str, Any]] = []
+    for x in cur.fetchall():
+        definition = x["definition"] if isinstance(x["definition"], dict) else {}
+        detail = x["detail"] if isinstance(x["detail"], dict) else {}
+        feature = definition.get("feature")
+        source = definition.get("source") or ("apertus" if feature == "consensus" else "code")
+        rules.append(
+            {
+                "rule": x["rule_code"],
+                "feature": feature,
+                "source": source,
+                "direction": _direction(definition, detail),
+                "applies": x["outcome"] == "fired",
+                "value": _number(detail.get("value")),
+                "effect": _number(detail.get("effect")),
+            }
+        )
+        if isinstance(detail.get("readings"), dict) and not readings:
+            readings = [{"reading": k, "level": _number(v)} for k, v in detail["readings"].items()]
+    return rules, readings
 
 
 def ruling_text(conn: psycopg.Connection, text_id: Any) -> dict[str, Any] | None:
@@ -602,6 +672,44 @@ def scoring(conn: psycopg.Connection) -> dict[str, Any]:
             " ORDER BY version_label DESC LIMIT 1"
         )
         prompt = cur.fetchone()
+        cur.execute(
+            "SELECT cv.config FROM ops.v_profile p"
+            " JOIN ops.component_version cv ON cv.component_version_id = p.component_version_id"
+            " WHERE p.is_default AND p.profile_version = %s AND p.step = 'layer2_judge' LIMIT 1",
+            [version],
+        )
+        judge = cur.fetchone()
+        scorer_rules: list[dict[str, Any]] = []
+        intercept = None
+        config = judge["config"] if judge and isinstance(judge["config"], dict) else {}
+        weights = config.get("rule_weights")
+        if isinstance(weights, dict) and weights:
+            cur.execute(
+                "SELECT r.rule_code, r.definition ->> 'feature' AS feature, r.definition ->> 'source' AS source"
+                " FROM ops.v_profile p"
+                " JOIN ops.component_version_rule cvr ON cvr.component_version_id = p.component_version_id"
+                " JOIN ops.rule r ON r.rule_id = cvr.rule_id"
+                " WHERE p.is_default AND p.profile_version = %s AND p.step = 'layer2_judge'",
+                [version],
+            )
+            codes = {x["feature"]: x for x in cur.fetchall()}
+            apertus = set(config.get("apertus_rules") or [])
+            intercept = _number(config.get("intercept"))
+            for feature in config.get("features") or list(weights):
+                w = weights.get(feature) or {}
+                registered = codes.get(feature) or {}
+                weight = _number(w.get("weight"))
+                scorer_rules.append(
+                    {
+                        "rule": registered.get("rule_code") or feature,
+                        "feature": feature,
+                        "source": registered.get("source") or ("apertus" if feature in apertus else "code"),
+                        "direction": _direction({"direction": w.get("sign")}, {"contribution": weight}),
+                        "weight": weight,
+                        "effect": 0,
+                        "share": None,
+                    }
+                )
     return {
         "profile": None if version is None else {"code": steps[0]["profile_code"], "version": version},
         "steps": steps,
@@ -612,7 +720,8 @@ def scoring(conn: psycopg.Connection) -> dict[str, Any]:
             "score_raw": "ln P(Ja) - ln P(Nein) (the logit), used to order ties",
             "label": "always potentially: only a ranking step decides in_scope (D-063, D-021)",
         },
-        "rules": [],
+        "rules": scorer_rules,
+        "intercept": intercept,
     }
 
 

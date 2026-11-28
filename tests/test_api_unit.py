@@ -216,3 +216,98 @@ def test_a_request_waits_for_a_free_session_then_answers_503(monkeypatch):
         app.state.db_slots.release()
     r = TestClient(app).get("/api/learning")  # the session is free again: now the missing DATABASE_URL answers
     assert r.status_code == 503 and "DATABASE_URL" in r.json()["detail"]
+
+
+class _FakeConnection:
+    """Declared mock: stands for the database session the route opens; the write itself is mocked too."""
+
+    def close(self) -> None:
+        pass
+
+
+def test_confirm_relevant_is_an_alias_of_mark_relevant(monkeypatch):
+    # Mocks (declared): src.api.app.connect returns _FakeConnection; writes.decide_relevance records the action.
+    seen: list[str] = []
+    monkeypatch.setattr("src.api.app.connect", lambda settings, read_only: _FakeConnection())
+
+    def fake_decide(conn, ruling_id, action, comment, token, *, threshold):
+        seen.append(action)
+        return {"id": ruling_id, "action_stored": action}
+
+    monkeypatch.setattr("src.api.app.writes.decide_relevance", fake_decide)
+    c = client()
+    rid = "00000000-0000-0000-0000-000000000001"
+    r = c.post(f"/api/rulings/{rid}/relevance", json={"action": "confirm_relevant"})
+    assert r.status_code == 200 and r.json()["action_stored"] == "mark_relevant"
+    assert c.post(f"/api/rulings/{rid}/relevance", json={"action": "mark_not_relevant"}).status_code == 200
+    assert seen == ["mark_relevant", "mark_not_relevant"]
+    assert c.post(f"/api/rulings/{rid}/relevance", json={"action": "confirm"}).status_code == 422
+    assert seen == ["mark_relevant", "mark_not_relevant"]  # a refused action never reaches the write
+
+
+def test_the_built_ui_is_served_at_the_root_and_the_api_keeps_priority(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    (tmp_path / "index.html").write_text("<!doctype html><title>UI build</title>", encoding="utf-8")
+    (tmp_path / "app.js").write_text("console.log(1)", encoding="utf-8")
+    c = client(ui_dist=str(tmp_path))
+    root = c.get("/")
+    assert root.status_code == 200 and "UI build" in root.text
+    assert c.get("/app.js").text == "console.log(1)"
+    assert c.get("/api/rulings", params={"sort": "bogus"}).status_code == 422  # the API route, not the UI
+    health = c.get("/api/health")
+    assert health.status_code == 503 and health.json()["ok"] is False
+
+
+def test_no_ui_is_mounted_without_an_index_html(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert client(ui_dist=str(tmp_path)).get("/").status_code == 404
+    assert client(ui_dist=str(tmp_path / "missing")).get("/").status_code == 404
+    assert Settings.from_env({"API_UI_DIST": str(tmp_path)}).ui_dist == str(tmp_path)
+    assert Settings.from_env({}).ui_dist is None
+
+
+class _FakeCursor:
+    """Declared mock: a cursor that answers the stored rows of triage.assessment_reason joined to ops.rule."""
+
+    def __init__(self, rows):
+        self.rows, self.sql = rows, []
+
+    def execute(self, sql, args=None):
+        self.sql.append(sql)
+
+    def fetchall(self):
+        return self.rows
+
+
+def test_scorer_signals_become_rules_and_readings():
+    cur = _FakeCursor(
+        [
+            {
+                "rule_code": "SC_AREA_UVMV",
+                "definition": {"feature": "area_uvmv", "source": "code", "direction": 1},
+                "outcome": "fired",
+                "detail": {"value": 1.0, "contribution": 3.04, "effect": 3.57},
+            },
+            {
+                "rule_code": "SC_SINGLE_JUDGE",
+                "definition": {"feature": "single_judge"},  # no registered direction: the contribution's sign
+                "outcome": "not_fired",
+                "detail": {"value": 0.0, "contribution": 1.69, "effect": 0.0},
+            },
+            {
+                "rule_code": "SC_CONSENSUS",
+                "definition": {"feature": "consensus", "direction": 1},
+                "outcome": "fired",
+                "detail": {"value": 0.4, "contribution": 0.4, "effect": 0.4, "readings": {"r1": 0.5, "r2": None}},
+            },
+        ]
+    )
+    rules, readings = queries._scorer_signals(cur, "a-1")
+    assert "effect = 'signal'" in cur.sql[0]
+    assert [(r["rule"], r["source"], r["direction"], r["applies"]) for r in rules] == [
+        ("SC_AREA_UVMV", "code", 1, True),
+        ("SC_SINGLE_JUDGE", "code", 1, False),
+        ("SC_CONSENSUS", "apertus", 1, True),
+    ]
+    assert rules[0]["value"] == 1.0 and rules[0]["effect"] == 3.57
+    assert readings == [{"reading": "r1", "level": 0.5}, {"reading": "r2", "level": None}]
