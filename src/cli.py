@@ -194,16 +194,32 @@ class Stages:
         if not todo:
             return f"nothing to do: every suspected-relevant ruling already has a current summary (asked for {n})"
         extra = {"mode": mode} if accepts_mode else {}
+        from src.llm.client import ReplayMiss
+
+        done: list[str] = []
+        uncached: list[str] = []  # replay only: no cached answer is not an error, the run still reaches the UI
         failed: list[str] = []
         for index, (ruling_id, docket) in enumerate(todo, start=1):
             print(f"  {index}/{len(todo)} {docket}", flush=True)
             try:
                 sp.summarise_ruling(conn, ruling_id, **extra)
+                done.append(docket)
+            except ReplayMiss as exc:
+                if mode != "replay":
+                    failed.append(f"{docket}: {type(exc).__name__}: {exc}")
+                else:
+                    uncached.append(docket)
             except (Exception, SystemExit) as exc:  # noqa: BLE001  the gateway client exits with SystemExit
                 failed.append(f"{docket}: {type(exc).__name__}: {exc}")
         if failed:
             raise StageError(f"{len(failed)} of {len(todo)} failed: " + "; ".join(failed))
-        return f"{len(todo)} rulings summarised in German and French: {', '.join(d for _, d in todo)}"
+        line = f"{len(done)} rulings summarised in German and French: {', '.join(done) or 'none'}"
+        if uncached:
+            line += (
+                f"; {len(uncached)} not in the replay cache, left without a summary ({', '.join(uncached)}): "
+                '`make run-live ARGS="--limit N"` writes them'
+            )
+        return line
 
     def serve(self) -> int:
         return serve()

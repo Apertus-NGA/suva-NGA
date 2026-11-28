@@ -188,6 +188,37 @@ def test_summaries_pass_the_mode_when_the_summariser_accepts_it(monkeypatch):
     assert "8C_1/2026" in message
 
 
+def test_a_replay_miss_is_reported_not_fatal_so_the_run_still_reaches_the_ui(monkeypatch):
+    from src.llm.client import ReplayMiss
+    from src.summarize import pipeline as sp
+
+    def summarise_ruling(conn, ruling_id, ask=None, model=None, mode="live"):
+        if ruling_id == 8:
+            raise ReplayMiss("no cached answer for abc (prompt v2); run in live mode")
+        return {"languages": {"de": {}, "fr": {}}}
+
+    monkeypatch.setattr(sp, "summarise_ruling", summarise_ruling)
+    todo = [(7, "8C_1/2026"), (8, "8C_2/2026")]
+    monkeypatch.setattr(cli.Stages, "summary_candidates", lambda self, conn, n: (True, todo))
+    message = cli.Stages().summarise(None, "replay", 2)
+    assert "1 rulings summarised in German and French: 8C_1/2026" in message
+    assert "1 not in the replay cache" in message and "8C_2/2026" in message and "run-live" in message
+
+
+def test_a_replay_miss_in_live_mode_or_any_other_error_still_fails_the_stage(monkeypatch):
+    from src.llm.client import ReplayMiss
+    from src.summarize import pipeline as sp
+
+    def summarise_ruling(conn, ruling_id, ask=None, model=None, mode="live"):
+        raise ReplayMiss("unexpected in live") if mode == "live" else KeyError("boom")
+
+    monkeypatch.setattr(sp, "summarise_ruling", summarise_ruling)
+    monkeypatch.setattr(cli.Stages, "summary_candidates", lambda self, conn, n: (True, [(7, "8C_1/2026")]))
+    for mode in ("live", "replay"):
+        with pytest.raises(cli.StageError, match="1 of 1 failed"):
+            cli.Stages().summarise(None, mode, 1)
+
+
 # --- the triage stage (src/triage/pipeline.py) ---------------------------------------------------------
 
 
