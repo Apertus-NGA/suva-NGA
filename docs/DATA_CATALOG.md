@@ -11,7 +11,7 @@ An exhaustive, raw list of the data that exists. It makes no recommendation and 
 | Layer 1 (deterministic pre-filter) | implemented, filled |
 | Layer 2 (Apertus relevance judge) | implemented, filled |
 | Ranking (threshold, top 30, release, export) | schema only, **empty** |
-| Layer 3 (summaries) | schema only, **empty**. **Section 13 is a preview: subject to change.** |
+| Layer 3 (summaries) | schema only, **empty** in this snapshot. Writer built on branch `layer3/summ-writer` (D-095 to D-098): **section 13 lists what it writes**; regenerate the counts after a layer-3 run. |
 | HTTP API | `src/api/`, `make serve` (`docs/API.md`, D-092), added after this snapshot |
 
 ## 0. How this was produced
@@ -69,8 +69,9 @@ layer 2 (Apertus 8B) ──►        triage.assessment (step layer2_judge, upst
                                · triage.llm_judgement · ops.llm_call · ops.blob (exact messages)
 every step ──►                  ops.pipeline_run · ops.span · ops.log_event · ops.run_metric · audit.change_log
 ranking (NOT BUILT) ──►         triage.threshold · ranking · ranking_entry · ops.release   → triage.v_export_ranked
-layer 3 (NOT BUILT) ──►         summ.summary · summary_version · summary_text · summary_claim · claim_citation
-                               · verification_check                                     → summ.v_summary_current
+layer 3 (Apertus 70B, §13) ──►  corpus.segmentation · consideration (own splitter) · summ.summary · summary_version
+                               · summary_text · summary_claim · claim_citation · verification_check
+                               · ops.llm_call · ops.blob · ops.user_request (status)     → summ.v_summary_current
 UI writes (functions) ──►       gold.expert_review · summ.summary_version (expert edit) · ops.user_request
 ```
 
@@ -547,32 +548,43 @@ Constraints that shape these writes (from the DDL):
 |---|---|
 | `triage.threshold`, `triage.ranking`, `triage.ranking_entry`, `ops.release`, views `triage.v_current_release`, `triage.v_export_ranked` | the ranking step (D-021 open): F2 threshold, rank, top-10 and top-30 marks, `final_score_0_100`, delivered list |
 | `triage.justification`, `triage.assessment_evidence` | a justification step (key statement, cited considerations) |
-| `corpus.segmentation`, `corpus.consideration`, `corpus.ruling_parse`, `corpus.ingest_issue` | segment and parse steps (considerations, parties, outcome, bench) |
+| `corpus.segmentation`, `corpus.consideration`, `corpus.ruling_parse`, `corpus.ingest_issue` | segment and parse steps (considerations, parties, outcome, bench); layer 3 writes own-splitter segmentations for the rulings it summarises (§13) |
 | `gold.suva_summary` | a loader of Suva's summary texts |
 | `gold.expert_review`, `ops.user_request` | UI writes |
 | `ops.work_item`, `ops.artifact`, `ops.llm_call_example` | work queue, exported artefacts, few-shot links |
-| all of `summ.*` except `perspective_anchor`, `preset` | layer 3 |
+| all of `summ.*` except `perspective_anchor`, `preset` | layer 3: its writer exists on branch `layer3/summ-writer` (§13); empty until a layer-3 run |
 
-## 13. Layer 3 (summaries): PREVIEW, SUBJECT TO CHANGE
+## 13. Layer 3 (summaries): what the writer stores (D-094 to D-097)
 
-> **For any reader, human or agent:** layer 3 is **not implemented**. The `summ` schema below exists in the DDL and has SQL tests (`tests/sql/50_summ_test.sql`), but **no code writes it** and **no data exists**. The summariser that will fill it is not chosen. Field names, statuses and shapes may change before layer 3 lands; do not treat this section as a stable contract.
+> **For any reader, human or agent:** the counts of this catalog predate layer 3, so every `summ.*` table above shows 0 rows. The writer exists on branch `layer3/summ-writer` (`docs/LAYER3.md`); the shapes below are what it writes, tested end to end on PostgreSQL 17 (`tests/test_layer3_db.py`). The DDL is unchanged except one function and 16 reason codes (`docs/DDL_CHANGES.md`, entry of 28 Nov, layer 3). Regenerate this section's counts after a layer-3 run.
 
-What the DDL defines today:
-- **`summ.summary`**: one per (ruling, preset); unique `(ruling_id, preset_code)`.
-- **`summ.summary_version`**: versions of a summary: `version_no` (max + 1), `origin` (`generated | repaired | regenerated | expert_edit`), `parent_version_id` (required unless `generated`), `preset_version_id`, `component_version_id`, `source_segmentation_id`, `creator_kind` (`pipeline | expert`), creator run or actor, `quality_status` (`draft | verified | flagged | rejected`), `is_current` (one current version per summary), `mode`, span.
-- **`summ.summary_text`**: exactly one German and one French text per version (checked at commit): `language` (`de | fr`), `title_line`, `body`, `word_count`, `paragraph_count` (1..20), `llm_call_id`, `repair_llm_call_id`.
-- **`summ.summary_claim`**: statements of a text: `section` (`facts | law | application | outcome | practice`), `model_text` (≤ 300 characters), `rendered_text`, `status` (`verified | flagged | rejected`), `edited_from_claim_id`.
-- **`summ.claim_citation`**: claim → consideration (must belong to the version's source segmentation).
-- **`summ.verification_check`**: one check per claim or text: `rule_id` (verify rules `V1_IDS_IN_SET` … `V6_ACTING_PARTY`), `status` (`pass | fail | not_applicable`).
-- **`summ.preset`**, **`summ.preset_version`**, **`summ.preset_version_prompt`**, **`summ.perspective_anchor`**: presets of a summary; seeded: preset `suva_house` (name DE `Suva-Stil`, FR `Style Suva`, perspective 5, style `by_ruling_language`, mandatory, selectable) and anchors 0, 3, 5, 7, 10 (labels DE/FR, status `draft`, no rubric yet).
-- **`summ.v_summary_current`**: the current version per (ruling, preset) with both texts, the verifier status and the latest expert review.
-- **`summ.v_mandatory_summary_gaps`**: the in-scope rulings of the current release that lack a non-rejected `suva_house` summary (a release gate).
-- Write paths: `summ.create_expert_version(...)` (expert edit), `gold.submit_review('summary_version', …, 'validated'|'rejected', …)`, `ops.submit_request('summary', …)`.
+**Who writes what.**
 
-Elsewhere in the repo, outside this data layer:
-- `src/summarize/summarize.py` on `main`: a probe generator (reads a parquet, writes `data/trial/<docket>.json`, no database).
-- Branches `handoff/components`, `summarize/extract`, `summarize/refine`, `triage/apertus-features`: summary pipelines and a summary workspace (generate, edit, confirm, revise with 9 revision reasons) that write the **other** data layer (`db/migrations`: `summaries`, `summary_events`, `model_runs`), not `summ.*`.
-- Targets described in the docs (not built): German and French each written from the source, never translated; Suva's structure (title line `BGer-Urteil <docket> vom <date>` / `Arrêt du TF <docket> du <date>`, plain paragraphs, bger.ch link, no author line); references rendered by code from consideration ids; six verifier checks per statement (`docs/ARCHITECTURE.md` S6-S7, `docs/CHALLENGE.md` §8, `docs/DB_DDL_PLANNING.md` §13).
+| Relation | Written by | One row = | Values a reader meets |
+|---|---|---|---|
+| `corpus.segmentation` | layer 3, segment V0.1.0 (D-096) | one splitting of one text, reused per (text, segment version) | `method` = `own_splitter`; `status` = `ok` \| `failed` (`failed`: no reasoning heading or no numbering, `consideration_count` 0); `is_primary` = false; `expected_count` NULL; `coverage_ratio`; `offsets_found_ratio` 1.0 when considerations exist |
+| `corpus.consideration` | layer 3 | one numbered consideration | `e_number` = the court's numbering (`2.1`), `depth` (`2.1` → 2), `parent_consideration_id`, `char_start` / `char_end` in the stored text, `content`; `cid` (`c1`…) and `is_citable` (depth ≥ 1) generated |
+| `summ.preset_version` | `make db-registry` | `suva_house` V1.0.0, active | `config`: perspective 5, style `by_ruling_language`, writer `v3`, title templates DE/FR, matter in the ruling's language only |
+| `summ.summary` | layer 3 | one (ruling, `suva_house`) | uuid5 of ruling and preset |
+| `summ.summary_version` | layer 3 (`origin` `generated`) or `summ.create_expert_version` (`expert_edit`) | one immutable DE + FR pair | `origin` = `generated`; `parent_version_id` NULL; `creator_kind` = `pipeline` with `creator_run_id` and `mode` = `LIVE` \| `REPLAY`; `quality_status` = `verified` (both fiches v3, `ok`, no claim flagged) \| `flagged`; `is_current` (a generated version never displaces a current expert edit); `source_segmentation_id` = the own-splitter segmentation |
+| `summ.summary_text` | layer 3 | one language of a version (exactly `de` + `fr`) | `title_line` by code (`BGer-Urteil <docket> vom <date>` / `Arrêt du TF <docket> du <date>`, `– <matter>` only in the ruling's language); `body` (the engine's fiche, plain paragraphs); `word_count`; `paragraph_count` 1..20; `llm_call_id` (that language's write call, always set for a pipeline text); `repair_llm_call_id` |
+| `summ.summary_claim` | layer 3 | one kept sentence | `section` = `facts` \| `law` \| `application` \| `outcome` (never `practice` for `suva_house`); `model_text` (the model's sentence, cut at 300 characters with "…" when longer; NULL for a code sentence); `rendered_text` (the sentence as it reads in `summary_text.body`); `status` = `verified` \| `flagged` (flagged also when the sentence is not found in the body: entailment check `detail.not_in_body`); none for a v2 fallback text |
+| `summ.claim_citation` | layer 3 | one cited consideration of a claim | a consideration of the version's source segmentation, resolved by code from the sentence's label (`E.3.1` → `3.1`); unresolved labels are not cited |
+| `summ.verification_check` | layer 3, verify V1.0.0 | one check code on one claim, or one failed code of one removed sentence (a sentence removed with no failed check, left out for length: one `not_applicable` row under `V3_ENTAILMENT`) | `target_kind` = `claim` \| `text`; `rule_id` → `ops.rule.rule_code` `V3_LANGUAGE` … `V3_DUPLICATE` (10 rules); `status` = `pass` \| `fail` \| `not_applicable`; `detail` (entailment P(Ja), label, ruling sentence, why a sentence was removed) |
+| `ops.llm_call` | layer 3 | one attempt or cache hit | `step` = `summarise` (purposes `record`, `write`, `repair`, `missing`, `v2_write`, `v2_repair`) \| `verify` (`entail`); `model_role` = `generator` \| `repair` \| `judge`; `params.prompt_tag` (`v3-write@2/de`…); `prompt_version_id` NULL; `parsed_ok` false for an answer the engine rejected (`parse_error` says why); `error_reason_code` `L3_REPLAY_MISS` for a replay miss; also written for the rulings of a run that ended `failed` |
+| `ops.user_request` (kind `summary`) | the API files it; layer 3 updates `status`, `run_id`, `status_detail` | one request | `pending` → `accepted` → `done` \| `failed`; `rejected` with `L3_PRESET_UNAVAILABLE` or `L3_FEW_SHOT_EXAMPLE` |
+| `summ.preset_version_prompt`, `ops.prompt_version` (layer 3), `ops.llm_call_example` | nobody | | layer 3's prompts are code, not versioned prompt files (the write prompt holds Suva's example fiches, D-031) |
+
+**How to read a summary** (the API reads the first two):
+- `summ.v_summary_current` for `preset_code = 'suva_house'`: the current version and both texts.
+- `summ.summary_text` ⋈ `summ.summary_claim` on `summary_version_id`: the sentences per language, in `ordinal` order, with section and status.
+- `summ.claim_citation` ⋈ `corpus.consideration`: the considerations behind each sentence, with offsets into `corpus.ruling_text.content`.
+- `summ.verification_check` ⋈ `ops.rule`: every check, `pass`, `fail` or `not_applicable`, with its evidence.
+- `ops.llm_call` ⋈ `ops.blob` on `messages_sha256`: the exact messages and the raw answer of every call; `summary_text.llm_call_id` names the one that wrote a text.
+
+**Not changed by layer 3:** `summ.v_mandatory_summary_gaps` and the release gate stay empty until the ranking step (S4) writes a release; `corpus.v_ruling.primary_segmentation_id` stays NULL (the own splitter is never primary); `summ.perspective_anchor` keeps its draft anchors without rubrics.
+
+Elsewhere in the repo, outside this data layer: branches `handoff/components`, `summarize/extract`, `summarize/refine`, `summarize/v3`, `triage/apertus-features` hold summary pipelines that write the **other** data layer (`db/migrations`: `summaries`, `summary_events`, `model_runs`), not `summ.*`; layer 3 ported only `summarize/v3`'s summary code (D-094).
 
 ## 14. Run files on disk (`data/runs/<run_id>/`, git-ignored)
 
@@ -587,6 +599,10 @@ Each run writes its files first, then loads the database in one transaction. The
 | layer 2 | `llm_attempts.jsonl` | one attempt or cache hit | `at, attempt, cache_hit, cache_key, content, endpoint, error, finish_reason, index, latency_s, messages_sha256, mode, params, prompt_version, requested, served, status, trace, usage` |
 | layer 2 | `messages.jsonl` | one message set | `sha256, content` |
 | layer 2 | `manifest.json` | the run | `run_id, step, version, profile, profile_version, kind, mode, population, layer1_run, judge_declared, judge_requested, model_override, client_size, prompt, prompt_template_sha256, status, metrics, files` |
+| layer 3 | `summaries.jsonl` | one ruling | `ruling_id, docket, decision_date, rank_score, requests, outcome, reason_code, error, quality, segmentation {status, considerations, coverage_ratio}, texts[] {language, writer, fiche_status, title_line, body, word_count, paragraph_count, write_call_id, repair_call_id, claims[], removed[], unknown_checks}, result {ruling_id, engine_version, record_status, propositions[], fiches {de, fr}}, started_at, finished_at` |
+| layer 3 | `calls.jsonl` | one call or cache hit | `ruling_id, messages_sha256, cache_key, call_id, purpose, prompt_version, language, response_text, requested_model, served_model, size, params {…, client_log}, usage, latency_ms, cache_hit, error, started_at, finished_at` |
+| layer 3 | `messages.jsonl` | one message set | `sha256, content` (the write prompts hold Suva's example fiches: git-ignored, D-031) |
+| layer 3 | `manifest.json` | the run | `run_id, step, versions, preset, profile, mode, population, layer2_run, engine_declared, model_declared, model_resolved, model_override, status, files`, then after the commit `metrics, outcomes` |
 
 Committed aggregates (no Suva label per docket): `results/layer1_validation.json`, `results/layer1_validation_reference.json`, `results/ingest_closure.json`, `results/layer2_validation.json`, `results/layer2_q2_2026.json`; expected outputs per version in `expected/ingest/`, `expected/layer1/`, `expected/layer2/`.
 

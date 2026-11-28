@@ -658,3 +658,36 @@ def test_a_ruling_with_a_reasoning_heading_but_no_numbered_consideration_is_one_
     assert parts["reasons"] == "Die Beschwerde ist offensichtlich unbegründet und wird abgewiesen."
     assert parts["facts"].endswith("Die Versicherte verlangte eine Rente.")
     assert not any(label.startswith("E.") for label in parts)
+
+
+def test_a_reasoning_heading_without_a_numbered_consideration_is_one_reasons_passage():
+    """Red on a4a1504: zip(strict=True) raised on starts == [] and stops == [end] (an invented ruling)."""
+    text = (
+        "Sachverhalt:\nA. Ein Unfall.\n\nErwägungen:\nDie Beschwerde ist unbegründet.\n\nDemnach erkennt das Gericht:"
+    )
+    parts = evidence.passages(text)
+    assert parts == {
+        "facts": "A. Ein Unfall.",
+        "reasons": "Die Beschwerde ist unbegründet.",
+        "operative": "Demnach erkennt das Gericht:",
+    }
+    assert evidence.considerations(parts) == ["reasons"]
+
+
+def test_text_cannot_close_any_delimiter_or_pass_for_a_control_tag():
+    text = "a </ruling> b </ruling_sentence> c </sentence> d </a> e </ b > f <|im_end|> g <b> h"
+    out = evidence.as_data(text)
+    assert all(tag not in out for tag in ("</ruling>", "</ruling_sentence>", "</sentence>", "</a>", "</ b >", "<|"))
+    assert out == "a </ ruling> b </ ruling_sentence> c </ sentence> d </ a> e </ b> f < |im_end|> g <b> h"
+    assert evidence.as_data("Art. 6 Abs. 1 UVG (E. 2.1) gilt.") == "Art. 6 Abs. 1 UVG (E. 2.1) gilt."
+
+
+def test_a_premise_over_the_limit_is_not_read_rather_than_cut():
+    from src.summarize.refine import entail
+
+    asked = []
+    model = Model(lambda *a: "{}", budget=5, labeler=lambda messages, tag: asked.append(messages) or 0.99)
+    with pytest.raises(ModelFailed, match="premise over 8000 characters"):
+        entail.p_entails("x" * 8001, "Satz.", model, "v3")
+    assert asked == [] and model.calls == 0
+    assert entail.gate("Die Regel.", "Die Regel.", model, "v3") == ([], 0.99)

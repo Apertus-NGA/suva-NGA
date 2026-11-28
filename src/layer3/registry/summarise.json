@@ -1,0 +1,60 @@
+{
+  "step": "summarise",
+  "doc": "docs/LAYER3.md. The summary owner's v3 writer (branch summarize/v3 at a4a1504, ported to src/summarize/) writes the German and French fiches of one ruling; v2 is its fallback per language. A version is immutable (D-064).",
+  "config_schema": {
+    "schema_code": "summarise.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: engine, fallback, the language pair, the model role of each call purpose, the quality rule, expert-edit and unchanged-text policies."
+  },
+  "rules": [],
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "v3 engine at a4a1504, v2 fallback",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "engine": "v3@a4a1504",
+        "fallback": "v2",
+        "languages": [
+          "de",
+          "fr"
+        ],
+        "call_roles": {
+          "record": "judge",
+          "write": "generator",
+          "verify": "judge",
+          "entail": "judge",
+          "repair": "repair",
+          "missing": "generator",
+          "v2_write": "generator",
+          "v2_repair": "repair"
+        },
+        "verify_purposes": [
+          "verify",
+          "entail"
+        ],
+        "quality": "verified_if_both_v3_ok_and_no_failed_check",
+        "keep_expert_current": true,
+        "skip_unchanged": true
+      },
+      "rules": [],
+      "models": {
+        "generator": "apertus-v1-5-70b",
+        "repair": "apertus-v1-5-70b",
+        "judge": "apertus-v1-5-70b"
+      },
+      "decision": "D-095",
+      "validation": null,
+      "changelog": "Initial (D-095): record (propositions by sentence id, copied and checked by code), write per language from the ruling (never translated, D-014), verify per sentence, outcome added by code; v2 per language when v3 fails. Every call the large Apertus model; the labelling calls (record, verify, entail) are bound to the judge role, the only reading role of ops.model_role."
+    }
+  ]
+}
