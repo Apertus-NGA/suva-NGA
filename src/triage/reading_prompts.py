@@ -61,7 +61,6 @@ SYS_L = (
     "ob sie für die Fallführung in der Unfallversicherung etwas Neues lehren. Du lässt dich nicht davon beeindrucken, dass ein Urteil lang ist oder viele "
     "Rechtssätze zitiert: Die meisten Urteile wenden nur Bekanntes an. Du stützt dich ausschliesslich auf den vorgelegten Text."
 )
-AREA = {"UV": "Unfallversicherung", "MV": "Militärversicherung", "IV": "Invalidenversicherung"}
 
 
 def tail_doc(r):
