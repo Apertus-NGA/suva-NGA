@@ -21,7 +21,7 @@ const CONFIDENCE: Array<{ label: Key; body: Key; weight: number }> = [
 
 /** The open box: the steps from a ruling to its score, and the rule table of the current run. */
 export function ScoringPage() {
-  const { t, tx, formatNumber } = useI18n();
+  const { t, tx } = useI18n();
   const [scoring, setScoring] = useState<Scoring | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -43,7 +43,6 @@ export function ScoringPage() {
   const rules = [...scoring.rules].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
   const widest = Math.max(...rules.map((r) => Math.abs(r.effect)), 1);
   const counts = { n: rules.length, facts: rules.filter((r) => r.source === "code").length, share: Math.round(scoring.share_promoted * 100) };
-  const percent = (share: number) => `${formatNumber(Math.round(share * 100))}%`;
 
   return (
     <div className="flex flex-col gap-4 px-6 pb-6">
@@ -72,7 +71,6 @@ export function ScoringPage() {
               <th className="w-[110px] font-medium">{t("scoring.col.source")}</th>
               <th className="w-[170px] font-medium">{t("scoring.col.direction")}</th>
               <th className="w-[290px] font-medium">{t("scoring.col.strength")}</th>
-              <th className="w-[120px] pr-5 text-right font-medium">{t("scoring.col.share")}</th>
             </tr>
           </thead>
           <tbody>
@@ -106,7 +104,6 @@ export function ScoringPage() {
                       {rule.source === "apertus" && <span className="whitespace-nowrap text-[11px] text-faint">{t("scoring.perStep")}</span>}
                     </div>
                   </td>
-                  <td className="pr-5 text-right tabular-nums text-muted">{rule.share === null ? "–" : percent(rule.share)}</td>
                 </tr>
               );
             })}
@@ -114,32 +111,33 @@ export function ScoringPage() {
         </table>
       </section>
 
-      <div>
-        <section className="rounded-xl bg-surface px-5 py-5">
+      {/* Side by side on a wide screen, so neither card leaves half its width empty. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_3fr]">
+        <section className="flex flex-col justify-center rounded-xl bg-surface px-5 py-5">
           <h2 className="text-[13px] font-medium text-ink">{t("scoring.formula")}</h2>
-          <p className="mt-1.5 max-w-[86ch] text-[13px] leading-5 text-muted">{t("scoring.formula.body")}</p>
-          <p className="mt-3 max-w-[86ch] rounded-md bg-wash px-3 py-2 font-mono text-[12px] leading-5 text-ink">
+          <p className="mt-1.5 text-[13px] leading-5 text-muted">{t("scoring.formula.body")}</p>
+          <p className="mt-3 rounded-md bg-wash px-3 py-2 font-mono text-[12px] leading-5 text-ink">
             score = 100 / (1 + e<sup>−(start + Σ rules)</sup>)
             {scoring.intercept !== null && <span className="text-muted"> · start = {scoring.intercept.toFixed(2)}</span>}
           </p>
         </section>
-      </div>
 
       <section id="confidence" className="scroll-mt-4 rounded-xl bg-surface px-5 py-5">
         <h2 className="text-[13px] font-medium text-ink">{t("scoring.confidence.title")}</h2>
-        <p className="mt-1.5 max-w-[86ch] text-[13px] leading-5 text-muted">{t("scoring.confidence.body")}</p>
+        <p className="mt-1.5 text-[13px] leading-5 text-muted">{t("scoring.confidence.body")}</p>
         <ul className="mt-3">
           {CONFIDENCE.map((part) => (
             <li key={part.label} className="flex items-baseline gap-4 border-t border-line py-2.5 text-[13px] leading-5">
               <span className="w-[44px] shrink-0 font-medium tabular-nums text-ink">{part.weight}%</span>
-              <span className="w-[220px] shrink-0 text-ink">{t(part.label)}</span>
+              <span className="w-[176px] shrink-0 text-ink">{t(part.label)}</span>
               <span className="min-w-0 flex-1 text-muted">{t(part.body)}</span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 max-w-[86ch] text-[13px] leading-5 text-muted">{t("scoring.confidence.levels")}</p>
-        <p className="mt-1.5 max-w-[86ch] text-[12px] leading-[18px] text-faint">{t("scoring.confidence.limits")}</p>
+        <p className="mt-3 text-[13px] leading-5 text-muted">{t("scoring.confidence.levels")}</p>
+        <p className="mt-1.5 text-[12px] leading-[18px] text-faint">{t("scoring.confidence.limits")}</p>
       </section>
+      </div>
     </div>
   );
 }
