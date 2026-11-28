@@ -31,14 +31,15 @@ ORDER_MARKERS = (
 )
 
 
-def _court_passes(docket: str, area: str) -> bool:
+def _gate(docket: str, area: object, text: str, title: object = None):
     """The script is launched from src/summarize: courts.py lives in src/."""
     src = str(ROOT / "src")
     if src not in sys.path:
         sys.path.insert(0, src)
-    from courts import passes
+    from courts import area_for_gate, decide
 
-    return passes(docket, area)
+    filled = area_for_gate(area, title)
+    return decide(docket, area, text, title), filled
 
 
 def load_env() -> None:
@@ -357,7 +358,8 @@ def row_for(rulings, docket: str) -> dict:
         "docket": row.docket,
         "decision_date": str(row.decision_date)[:10],
         "division": row.division,
-        "area": row.area,
+        "area": row.area if isinstance(row.area, str) and row.area.strip() else None,
+        "title": row.subject if isinstance(row.subject, str) and row.subject.strip() else None,
         "text": clean(row.text),
     }
 
@@ -707,13 +709,16 @@ def summarize(docket: str) -> dict:
     target = row_for(rulings, docket)
     if docket in FEW_SHOT or docket in EXCLUDED:
         raise SystemExit(f"{docket} is a few-shot example or is excluded from it")
-    if not _court_passes(target["docket"], target["area"]):
-        raise SystemExit(f"{docket} does not pass the filter ({target['division']}, {target['area']})")
-    category = category_of(target["area"])
+    decision, filled = _gate(target["docket"], target["area"], target["text"], target["title"])
+    if not decision.kept:
+        raise SystemExit(
+            f"{docket} does not pass the filter ({target['division']}, {filled}, {decision.subject}, {decision.text})"
+        )
+    category = category_of(filled if isinstance(filled, str) else None)
     out = {
         "docket": docket,
         "model": os.environ["LLM_NAME"],
-        "filter": True,
+        "filter": {"kept": decision.kept, "subject": decision.subject, "text": decision.text},
         "prompt": VERSION,
         "category": category,
         "languages": {},

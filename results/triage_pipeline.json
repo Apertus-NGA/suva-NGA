@@ -1,0 +1,66 @@
+{
+ "version": "triage_pipeline@1",
+ "rulings": 6234,
+ "kept_by_layer1": 1115,
+ "core_rulings_read_by_apertus": 391,
+ "apertus_readings_failed": 0,
+ "consensus_readings": [
+  "scale_area",
+  "scale_generic",
+  "scale_headnote",
+  "scale_tail",
+  "verdict",
+  "yes_strict"
+ ],
+ "training_rulings": 643,
+ "training_relevant": 59,
+ "relevant_not_kept_by_layer1": 0,
+ "threshold": 0.4583,
+ "out_of_quarter": {
+  "protocol": "fit on one listed quarter; on the other, promote 40% of its core rulings; folds pooled",
+  "submitted": 120,
+  "relevant_found": 55,
+  "relevant_total": 59,
+  "recall": 0.932,
+  "precision": 0.458,
+  "f2": 0.772,
+  "per_quarter": {
+   "2026 Q1": {
+    "submitted": 66,
+    "relevant_found": 28,
+    "relevant": 31
+   },
+   "2025 Q4": {
+    "submitted": 54,
+    "relevant_found": 27,
+    "relevant": 28
+   }
+  }
+ },
+ "by_quarter": {
+  "2025 Q3": {
+   "kept": 23,
+   "suspected_relevant": 9
+  },
+  "2025 Q4": {
+   "kept": 295,
+   "suspected_relevant": 54
+  },
+  "2026 Q1": {
+   "kept": 348,
+   "suspected_relevant": 66
+  },
+  "2026 Q2": {
+   "kept": 416,
+   "suspected_relevant": 76
+  },
+  "2026 Q3": {
+   "kept": 2,
+   "suspected_relevant": 0
+  },
+  "2026 Q4": {
+   "kept": 31,
+   "suspected_relevant": 6
+  }
+ }
+}
