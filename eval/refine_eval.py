@@ -144,16 +144,21 @@ def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None
     print(f"{len(rows)} refined -> {OUT / f'refined_{name_set}_{name}.jsonl'}")
 
 
-def judge(name_set: str, name: str) -> None:
+def _label(name_set: str, name: str, repetition: int) -> str:
+    return f"refine_{name_set}_{name}" + (f"_rep{repetition}" if repetition else "")
+
+
+def judge(name_set: str, name: str, repetition: int = 0) -> None:
     before = [{"docket": r["docket"], "language": r["language"], "summary": r["text"]}
               for r in _jsonl(OUT / f"drafts_{name_set}.jsonl")]  # fmt: skip
     after = [{"docket": r["docket"], "language": r["language"], "summary": r["text"]}
              for r in _jsonl(OUT / f"refined_{name_set}_{name}.jsonl")]  # fmt: skip
-    for label, rows in ((f"refine_{name_set}_before", before), (f"refine_{name_set}_{name}", after)):
+    for label, rows in ((_label(name_set, "before", repetition), before), (_label(name_set, name, repetition), after)):
         path = OUT / f"{label}.judge.jsonl"
         _write(path, rows)
-        subprocess.run([sys.executable, "-m", "eval.judge.run", "--candidates", str(path), "--name", label],
-                       check=True, cwd=ROOT)  # fmt: skip
+        command = [sys.executable, "-m", "eval.judge.run", "--candidates", str(path), "--name", label,
+                   "--repetition", str(repetition)]  # fmt: skip
+        subprocess.run(command, check=True, cwd=ROOT)
 
 
 def _detail(label: str) -> dict[tuple[str, str], dict]:
@@ -161,10 +166,11 @@ def _detail(label: str) -> dict[tuple[str, str], dict]:
     return {(r["docket"], r["language"]): r for r in rows}
 
 
-def report(name_set: str, name: str) -> dict:
+def report(name_set: str, name: str, repetition: int = 0) -> dict:
     from statistics import median
 
-    before, after = _detail(f"refine_{name_set}_before"), _detail(f"refine_{name_set}_{name}")
+    before = _detail(_label(name_set, "before", repetition))
+    after = _detail(_label(name_set, name, repetition))
     refined = {(r["docket"], r["language"]): r for r in _jsonl(OUT / f"refined_{name_set}_{name}.jsonl")}
     keys = sorted(set(before) & set(after))
     criteria = sorted({c for r in before.values() for c in r["verdicts"]})
@@ -202,6 +208,7 @@ def report(name_set: str, name: str) -> dict:
     result = {
         "run": name,
         "set": name_set,
+        "judge_repetition": repetition,
         "judge": "provisional (rubric not validated, docs/JUDGE.md §5)",
         "bars": BARS,
         "all": block(None),
@@ -210,7 +217,7 @@ def report(name_set: str, name: str) -> dict:
         "calls_per_summary_median": median([r["calls"] for r in refined.values()]) if refined else None,
         "changed_summaries": sum(r["text"] != r["draft"] for r in refined.values()),
     }
-    path = ROOT / "results" / f"refine_eval_{name_set}_{name}.json"
+    path = ROOT / "results" / f"refine_eval_{_label(name_set, name, repetition)[len('refine_') :]}.json"
     path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     a = result["all"]
     print(f"{name_set}/{name}: {a['summaries']} summaries, changed {result['changed_summaries']}, "
@@ -261,6 +268,7 @@ def main() -> None:
     parser.add_argument("--name", default="r1")
     parser.add_argument("--steps", nargs="*")
     parser.add_argument("--docket")
+    parser.add_argument("--repetition", type=int, default=0, help="judge repetition (0 is the first)")
     args = parser.parse_args()
     if args.command == "sample":
         print(json.dumps(sets(), indent=1))
@@ -269,11 +277,11 @@ def main() -> None:
     elif args.command == "refine":
         refine_all(args.set, args.name, args.steps)
     elif args.command == "judge":
-        judge(args.set, args.name)
+        judge(args.set, args.name, args.repetition)
     elif args.command == "show":
         show(args.set, args.name, args.docket)
     else:
-        report(args.set, args.name)
+        report(args.set, args.name, args.repetition)
 
 
 if __name__ == "__main__":

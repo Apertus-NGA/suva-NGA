@@ -103,13 +103,19 @@ def main() -> None:
     parser.add_argument("--criteria", nargs="*")
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--dry-run", action="store_true", help="run the deterministic checks only, call nothing")
+    parser.add_argument("--repetition", type=int, default=0, help="an independent repeat of the judge (new cache key)")
     args = parser.parse_args()
 
     refs = data.references()
     bands = length_bands(refs)
     items, skipped = build_items(data.candidates(args.candidates), refs)
     criteria = args.criteria or list(CRITERIA)
-    tasks = [Task(f"{n}|{cid}", cid, item) for n, item in enumerate(items) for cid in criteria if applicable(cid, item)]
+    tasks = [
+        Task(f"{n}|{cid}", cid, item, repetition=args.repetition)
+        for n, item in enumerate(items)
+        for cid in criteria
+        if applicable(cid, item)
+    ]
     print(f"{len(items)} summaries, {len(tasks)} judge calls, skipped {skipped}")
     verdicts = {}
     model = effort = "none (dry run)"

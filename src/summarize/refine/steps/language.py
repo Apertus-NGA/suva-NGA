@@ -19,7 +19,7 @@ from src.summarize.refine.steps.common import NAME, editable, guarded, polish
 from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
 from src.summarize.refine.steps.facts import judge_sentences
 
-VERSION = "language@2"
+VERSION = "language@3"
 MAX_FIX = 3
 PROBLEMS = ["grammar", "calque_or_foreign_word", "wrong_word", "not_impersonal_register", "placeholder", "clumsy"]
 
@@ -101,11 +101,12 @@ class Language(Step):
                 problems.append("ß")
             if checks.restates_outcome(new) and not checks.restates_outcome(sentence):
                 problems.append("states the outcome")
-            if problems or problem != "placeholder":
+            if problems:
                 return problems
-            # a placeholder became a role: the facts check must agree it is that person's role in the ruling
+            # A rewording must not change what the sentence says (run r1: one 'clumsy' fix added a condition the
+            # court never set). The facts check must find the new wording 'same' as the ruling.
             target = next((s.id for s in after.sentences if s.text == new), None)
             verdict = judge_sentences(after, [target], ctx, f"{FACTS_VERSION}/recheck").get(target, {}).get("verdict")
-            return [] if verdict == "same" else [f"re-check of the role: {verdict or 'unchecked'}"]
+            return [] if verdict == "same" else [f"re-check against the ruling: {verdict or 'unchecked'}"]
 
         return Candidate(f"{problem}: {span}", sentence, patch=Patch("replace", "s0", new), verify=guarded(check))
