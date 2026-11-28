@@ -24,8 +24,6 @@ from typing import Any
 
 import numpy as np
 
-from src.triage import scorer as sc
-
 SHARES = (0.30, 0.40, 0.50, 0.60, 0.70)
 FOLDS = (("2025 Q4", "2026 Q1"), ("2026 Q1", "2025 Q4"))  # (train, test); the first is the primary direction
 
@@ -35,7 +33,13 @@ def f2(tp: int, fp: int, fn: int) -> float:
 
 
 def logistic() -> Any:
-    return sc._model()
+    """The unconstrained logistic regression of triage_pipeline@1 (the experiments' baseline). The pipeline's
+    current scorer is sign-constrained and takes its own fixed inputs (``src.triage.scorer``)."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    return make_pipeline(StandardScaler(), LogisticRegression(C=1.0, class_weight="balanced", max_iter=3000))
 
 
 def xgboost() -> Any:

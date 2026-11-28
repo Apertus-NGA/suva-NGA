@@ -34,7 +34,7 @@ from src.triage import readings as rd
 from src.triage import scorer as sc
 from src.triage.reading_prompts import sections
 
-VERSION = "triage_pipeline@1"
+VERSION = "triage_pipeline@2"
 CORE_AREAS = ("UV", "MV", "IV")
 LISTED = ("2025 Q4", "2026 Q1")  # the quarters for which Suva's list is complete
 RESULTS = Path(__file__).resolve().parents[2] / "results" / "triage_pipeline.json"
@@ -183,6 +183,9 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
         "training_relevant": int(y.sum()),
         "relevant_not_kept_by_layer1": relevant_all - int(y.sum()),
         "threshold": round(model.threshold, 4),
+        "scorer": sc.VERSION,
+        "rule_weights": {k: {a: round(b, 4) for a, b in v.items()} for k, v in model.weights().items()},
+        "intercept": round(model.model.intercept_, 4),
         "out_of_quarter": measured,
         "by_quarter": {
             q: {
@@ -214,6 +217,8 @@ def write(conn: Any, result: dict[str, Any], model_names: list[dict[str, str]]) 
         "reading_prompts": {name: version for name, (version, _) in rd.READINGS.items()},
         "scorer": sc.VERSION,
         "features": sc.FEATURES,
+        "rule_weights": model.weights(),
+        "intercept": model.model.intercept_,
         "threshold": model.threshold,
         "consensus_stats": result["consensus"].stats,
         "measured": summary["out_of_quarter"],
@@ -266,7 +271,7 @@ def model_names(client: Any) -> list[dict[str, str]]:
             "role": "six relevance readings and the layer-1 matter reading",
         },
         {
-            "name": "logistic regression (scikit-learn)",
+            "name": "sign-constrained logistic regression (own code, src/triage/scorer.py)",
             "role": "combines code-read facts and the Apertus consensus into the score",
         },
     ]
