@@ -1,10 +1,14 @@
 # Our single entry point (`make run` is our convention, D-042). Targets: AGENTS.md §6.
-# Skeleton: stages not built yet print STUB and what they will do (docs/STATE.md lists them).
+# A fresh clone with .env filled needs only `make run`: database up, migrated, ingested if empty, triage,
+# summaries, then the API and UI on 127.0.0.1:8000. Every line is labelled LIVE or REPLAY (src/cli.py).
+# crawl, refit, eval, eval-private and claims are still stubs that print STUB.
 
 PY ?= $(if $(shell command -v uv 2>/dev/null),uv run --frozen python,python3)
 MODE ?= replay
 SERVE ?= 1
+SUMMARY_LIMIT ?= 5
 ARGS ?=
+RUN_FLAGS = --summary-limit $(SUMMARY_LIMIT) $(if $(filter 0,$(SERVE)),--no-serve,)
 
 WRITE ?= 0
 
@@ -13,15 +17,14 @@ WRITE ?= 0
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
-run: ## end-to-end run from the committed snapshot (MODE=replay|live, SERVE=0 to skip serving)
-	$(PY) -m src.cli run --mode $(MODE) $(ARGS)
-	@if [ "$(SERVE)" != "0" ]; then $(MAKE) --no-print-directory serve; fi
+run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, triage, top SUMMARY_LIMIT (5) summaries, serve; SERVE=0 stops before serving
+	$(PY) -m src.cli run --mode $(MODE) $(RUN_FLAGS) $(ARGS)
 
-run-live: ## the same pipeline with real calls; needs LLM_* and ARGS="--limit N" or ARGS="--all"
-	$(PY) -m src.cli run --mode live $(ARGS)
+run-live: ## the same, LIVE (needs LLM_*); ARGS="--limit N": smoke, triage of the first N rulings not written, N summaries; ARGS="--all": full triage written
+	$(PY) -m src.cli run --mode live $(RUN_FLAGS) $(ARGS)
 
-serve: ## serve the API and the UI only
-	$(PY) -m src.cli serve $(ARGS)
+serve: ## serve the API and the UI on 127.0.0.1:8000 (builds src/web/dist with npm first when missing)
+	$(PY) -m src.cli serve
 
 smoke-llm: ## gateway probe -> results/gateway_probe.json (ARGS="--long --sizes 8000,16000 --ramp 1,2,4")
 	$(PY) -m src.cli smoke-llm $(ARGS)
@@ -32,7 +35,7 @@ warmup: ## warm the 70B before a demo or a measurement
 crawl: ## Neuheiten lists and ruling pages, politely (>= 2 s between requests, cache)
 	$(PY) -m src.cli crawl $(ARGS)
 
-triage: ## relevance pipeline v1 -> results/triage_pipeline.json (MODE=replay|live; WRITE=1 stores predictions for the UI)
+triage: ## relevance pipeline v1 -> results/triage_pipeline.json (MODE=replay|live; WRITE=1 stores predictions; ARGS="--limit N" is a smoke run that writes nothing)
 	$(PY) -m src.triage.pipeline --mode $(MODE) $(if $(filter 1,$(WRITE)),--write,) $(ARGS)
 
 refit: ## rerun the scoring with the current labels, expert corrections included
