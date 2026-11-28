@@ -15,89 +15,83 @@
  "training_rulings": 646,
  "training_relevant": 59,
  "relevant_not_kept_by_layer1": 0,
- "threshold": 0.4669,
+ "threshold": 0.4673,
  "scorer": "scorer@2",
  "rule_weights": {
   "area_uvmv": {
    "sign": 1,
-   "weight": 1.3257,
+   "weight": 1.2844,
    "mean": 0.1486,
    "scale": 0.3557
   },
   "area_iv": {
    "sign": 1,
-   "weight": 2.4056,
+   "weight": 2.2536,
    "mean": 0.3127,
    "scale": 0.4636
   },
   "appeal_by_institution": {
    "sign": 1,
-   "weight": 0.3673,
+   "weight": 0.3681,
    "mean": 0.0898,
    "scale": 0.2859
   },
   "five_judges": {
    "sign": 1,
-   "weight": 0.4473,
+   "weight": 0.3476,
    "mean": 0.0573,
    "scale": 0.2324
   },
   "publication": {
    "sign": 1,
-   "weight": 0.0513,
+   "weight": 0.0586,
    "mean": 0.0248,
    "scale": 0.1554
   },
   "manifestly_unfounded": {
    "sign": -1,
-   "weight": -0.3017,
+   "weight": -0.2869,
    "mean": 0.0743,
    "scale": 0.2623
   },
   "suva_party": {
    "sign": 1,
-   "weight": 1.1138,
+   "weight": 1.0766,
    "mean": 0.1037,
    "scale": 0.3049
   },
   "single_judge": {
    "sign": -1,
-   "weight": -2.301,
+   "weight": -2.2619,
    "mean": 0.3638,
    "scale": 0.4811
   },
   "consensus": {
    "sign": 1,
-   "weight": 0.2799,
+   "weight": 0.2763,
    "mean": -0.0325,
    "scale": 0.3776
   },
   "core_topics": {
    "sign": 1,
-   "weight": 0.2138,
+   "weight": 0.2437,
    "mean": 0.9536,
    "scale": 1.3194
   },
   "long_accident": {
    "sign": 1,
-   "weight": 0.3337,
+   "weight": 0.3415,
    "mean": 0.0108,
    "scale": 0.1035
   },
-  "long_disability": {
-   "sign": -1,
-   "weight": -0.8618,
-   "mean": 0.0294,
-   "scale": 0.169
-  },
   "other_accident_insurer": {
    "sign": 1,
-   "weight": 0.5965,
+   "weight": 0.5789,
    "mean": 0.0495,
    "scale": 0.217
   }
  },
- "intercept": -4.2047,
+ "intercept": -4.0186,
  "out_of_quarter": {
   "protocol": "fit on one listed quarter; on the other, promote 40% of its core rulings; folds pooled",
   "submitted": 120,
@@ -119,6 +113,11 @@
    }
   }
  },
+ "summarised_by_suva_not_in_training": {
+  "rulings": 23,
+  "scored_above_threshold": 16,
+  "scored_below_0.10": 2
+ },
  "by_quarter": {
   "2025 Q3": {
    "kept": 23,
@@ -139,5 +138,5 @@
  },
  "mode": "REPLAY",
  "layer1_apertus_failed": 0,
- "run_id": 2
+ "run_id": 3
 }
