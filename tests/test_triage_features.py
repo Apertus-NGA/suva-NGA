@@ -184,3 +184,22 @@ def test_paired_bootstrap_prefers_the_informative_variant():
     same = vr.paired_bootstrap(good, good, n_boot=50)
     assert same["mean"] == 0 and same["p_better"] == 0
     assert "_folds" not in vr.public(good) and "mean_found" in vr.public(good)
+
+
+def test_considerations_are_read_from_numbered_reasoning():
+    reasoning = ev.p.sections(REASONING_RULING)["reasoning"]
+    assert [n for n, _ in ev.considerations(reasoning)] == ["1", "2"]
+    assert ev.considerations(reasoning)[1][1].startswith("Der Leidensabzug")
+
+
+def test_consideration_reading_accepts_only_a_listed_number():
+    yes = logprobs(Ja=0.7, Nein=0.3)
+    client = FakeTextClient("Ja\n2", yes)
+    good = ev.read_statement_cons(client, REASONING_RULING)
+    user = client.sent[0][0][1]["content"]
+    assert "gewählt aus dieser Liste: 1, 2;" in user
+    assert good["consideration"] == "2" and good["f_cons_verified"] == pytest.approx(0.7)
+    assert good["evidence"].startswith("Der Leidensabzug") and good["f_cons_own"] == pytest.approx(0.7)
+    invented = ev.read_statement_cons(FakeTextClient("Ja\nE. 7.3", yes), REASONING_RULING)
+    assert invented["consideration"] is None and invented["f_cons_verified"] == 0.0
+    assert ev.read_statement_cons(FakeTextClient("Ja\n2", yes), "Kein nummerierter Text.")["f_cons_p"] is None

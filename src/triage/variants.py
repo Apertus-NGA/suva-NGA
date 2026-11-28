@@ -176,3 +176,27 @@ def paired_bootstrap(
 def public(result: dict[str, Any]) -> dict[str, Any]:
     """The result without its per-ruling arrays (aggregates only, D-031)."""
     return {k: v for k, v in result.items() if not k.startswith("_")}
+
+
+def repeated_cv(
+    variants: Sequence[Variant], table: dict[str, np.ndarray], share: float = 0.40, repeats: int = 10
+) -> dict[str, list[int]]:
+    """A second protocol, as the research sprint used: stratified 5-fold over both listed quarters, repeated with
+    new splits. For each repeat, the out-of-fold scores of each quarter are cut at ``share`` of its core rulings
+    and the relevant rulings found are summed over the quarters. The folds are the same for every variant, so the
+    lists are paired by repeat."""
+    from sklearn.model_selection import StratifiedKFold
+
+    y, quarter, core = table["y"].astype(int), table["quarter"], table["core"].astype(bool)
+    out: dict[str, list[int]] = {v.name: [] for v in variants}
+    for rep in range(repeats):
+        folds = list(StratifiedKFold(5, shuffle=True, random_state=1000 + rep).split(np.zeros(len(y)), y))
+        for v in variants:
+            x = np.column_stack([table[c] for c in v.columns]).astype(float)
+            oof = np.zeros(len(y))
+            for train, test in folds:
+                oof[test] = fit_score(v, x[train], y[train], x[test])
+            out[v.name].append(
+                sum(_found(oof[quarter == q], y[quarter == q], core[quarter == q], share) for q in np.unique(quarter))
+            )
+    return out

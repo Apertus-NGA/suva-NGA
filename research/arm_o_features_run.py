@@ -32,6 +32,8 @@ OUT = ROOT / "data" / "derived" / "triage_features"
 READERS = {
     "topic": lambda client, text, size: features.read_topic(client, text, size),
     "statement": lambda client, text, size: evidence.read_statement(client, text, size),
+    "cons": lambda client, text, size: evidence.read_statement_cons(client, text, size),
+    "statement_rep1": lambda client, text, size: evidence.read_statement(client, text, size, repetition=1),
 }
 
 

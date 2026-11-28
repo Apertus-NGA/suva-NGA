@@ -114,6 +114,24 @@ def build_table(kept: list[dict], extra: pd.DataFrame | None) -> tuple[dict[str,
         added += [f"{c}_{size}" for c in cols]
     for c in added:  # neutral value for rulings no reading covers: the mean of the rulings read
         df[c] = df[c].fillna(df[c].mean())
+    for c in [c for c in added if c.startswith(("f_stmt_p_", "f_topic_shared_"))]:  # extreme probabilities
+        df[f"{c}_logit"] = logit(df[c])
+        added.append(f"{c}_logit")
+    # Consensus+ : the six readings and the new ones, each standardised over the core rulings and averaged with
+    # equal weights, as pipeline.Consensus does (no label involved). Topic counts only inside disability insurance.
+    core_mask = df["core"].astype(bool)
+    for size in ("small", "large"):
+        extra_cols = [c for c in (f"f_stmt_p_{size}_logit", f"f_topic_shared_{size}_logit") if c in df]
+        if not extra_cols:
+            continue
+        parts = [df["consensus"] / df.loc[core_mask, "consensus"].std()]
+        for c in extra_cols:
+            z = (df[c] - df.loc[core_mask, c].mean()) / df.loc[core_mask, c].std()
+            if "topic" in c:
+                z = z * df["area_iv_flag"]
+            parts.append(z.where(core_mask, 0.0))
+        df[f"consensus_plus_{size}"] = sum(parts) / len(parts)
+        added.append(f"consensus_plus_{size}")
     for c in [c for c in added if c.startswith("f_topic_")]:  # the topic matters inside disability insurance
         df[f"{c}_iv"] = df[c] * df["area_iv_flag"]
         added.append(f"{c}_iv")
@@ -154,6 +172,12 @@ def main(argv: list[str] | None = None) -> int:
                 *base_cols, f"f_stmt_own_{size}", f"f_topic_shared_{size}_iv"]
             sets[f"facts8+stmt_own+topic_shared_iv[{size}] (no consensus)"] = [
                 *FACTS, f"f_stmt_own_{size}", f"f_topic_shared_{size}_iv"]
+    for size in ("small", "large"):
+        if f"consensus_plus_{size}" in added:
+            sets[f"facts8+consensus_plus[{size}] (no fitted weight)"] = [*FACTS, f"consensus_plus_{size}"]
+            sets[f"facts8+consensus+stmt_p_logit[{size}]"] = [*base_cols, f"f_stmt_p_{size}_logit"]
+            sets[f"facts8+consensus+stmt_p_logit+shared_logit_iv[{size}]"] = [
+                *base_cols, f"f_stmt_p_{size}_logit", f"f_topic_shared_{size}_logit_iv"]
     variants = []
     for name, cols in sets.items():
         variants.append(vr.Variant(f"LR {name}", cols, vr.logistic))

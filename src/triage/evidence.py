@@ -30,8 +30,7 @@ MIN_QUOTE = 40  # characters: shorter is not a statement
 MATCH = 0.9  # share of the quote that must appear as one contiguous run of the reasoning
 
 QUESTION = (
-    p.YES_STRICT.rsplit("\n\n", 1)[0]
-    + "\n\nAntworte in genau zwei Zeilen:\nZeile 1: Ja oder Nein\n"
+    p.YES_STRICT.rsplit("\n\n", 1)[0] + "\n\nAntworte in genau zwei Zeilen:\nZeile 1: Ja oder Nein\n"
     "Zeile 2: bei Ja den Satz der Erwägungen, in dem das Gericht diese Aussage trifft, wörtlich und in der Sprache des Urteils (höchstens 60 Wörter); bei Nein einen Bindestrich."
 )
 
@@ -95,11 +94,24 @@ def p_yes(logprobs: dict[str, Any] | None) -> float | None:
     return yes / (yes + no) if yes + no > 0 else None
 
 
-def read_statement(client: Any, ruling_text: str, size: str = "large") -> dict[str, Any]:
-    empty = {"label": None, "quote": "", "quote_ok": None, "f_stmt_p": None, "f_stmt_verified": None, "f_stmt_own": None}
+def read_statement(client: Any, ruling_text: str, size: str = "large", repetition: int = 0) -> dict[str, Any]:
+    empty = {
+        "label": None,
+        "quote": "",
+        "quote_ok": None,
+        "f_stmt_p": None,
+        "f_stmt_verified": None,
+        "f_stmt_own": None,
+    }
     try:
         result = client.chat(
-            build_messages(ruling_text), max_tokens=160, size=size, prompt_version=VERSION, logprobs=True, top_logprobs=20
+            build_messages(ruling_text),
+            max_tokens=160,
+            size=size,
+            prompt_version=VERSION,
+            logprobs=True,
+            top_logprobs=20,
+            repetition=repetition,
         )
     except Exception:  # noqa: BLE001  a failed reading stays empty, never a "no"
         return empty
@@ -117,4 +129,84 @@ def read_statement(client: Any, ruling_text: str, size: str = "large") -> dict[s
         "f_stmt_p": prob,
         "f_stmt_verified": prob if ok else 0.0,
         "f_stmt_own": prob if own else 0.0,
+    }
+
+
+# -- version 2: Apertus chooses the consideration from a list; code fetches its text (G1) ----------------------
+# Apertus paraphrased or translated in version 1 instead of quoting (measured 28 Nov: 0 of 40 70B quotes found in
+# the reasoning). So it no longer writes the evidence: it picks a consideration number from the list code read in
+# the ruling, and code returns that consideration's text. The evidence is then real by construction; code checks
+# that the number is on the list and that the consideration is not the standard-of-review or admissibility part.
+
+VERSION_CONS = "statement_consideration@1"
+_HEAD = re.compile(r"(?m)^[ \t ]*(\d{1,2}(?:\.\d{1,2}){0,3})\.(?=[\s ])")
+_BOILERPLATE = re.compile(
+    r"kognition|prüfungsbefugnis|eintreten|eintretensvoraussetzung|pouvoir d'examen|recevab|cognizione|ammissibil"
+)
+
+
+def considerations(reasoning: str) -> list[tuple[str, str]]:
+    """(number, text) of each numbered consideration of the reasoning, in order."""
+    heads = list(_HEAD.finditer(reasoning))
+    return [
+        (m.group(1), reasoning[m.end() : (heads[i + 1].start() if i + 1 < len(heads) else len(reasoning))].strip())
+        for i, m in enumerate(heads)
+    ]
+
+
+def question_cons(numbers: list[str]) -> str:
+    return (
+        p.YES_STRICT.rsplit("\n\n", 1)[0] + "\n\nAntworte in genau zwei Zeilen:\nZeile 1: Ja oder Nein\n"
+        "Zeile 2: bei Ja die Nummer der Erwägung, in der das Gericht diese Aussage trifft, gewählt aus dieser Liste: "
+        + ", ".join(numbers)
+        + "; bei Nein einen Bindestrich."
+    )
+
+
+def parse_number(content: str) -> tuple[str | None, str | None]:
+    lines = [ln.strip() for ln in (content or "").strip().splitlines() if ln.strip()]
+    label, _ = parse(content)
+    rest = " ".join(lines[1:]) if len(lines) > 1 else ""
+    m = re.search(r"\d{1,2}(?:\.\d{1,2}){0,3}", rest)
+    return label, (m.group(0) if (m and label == "ja") else None)
+
+
+def read_statement_cons(client: Any, ruling_text: str, size: str = "large") -> dict[str, Any]:
+    empty = {
+        "label": None,
+        "consideration": None,
+        "evidence": "",
+        "f_cons_p": None,
+        "f_cons_verified": None,
+        "f_cons_own": None,
+    }
+    reasoning = p.sections(ruling_text)["reasoning"]
+    cons = considerations(reasoning)
+    if not cons:
+        return empty  # no numbered reasoning: nothing to point at, the reading is not asked
+    numbers = [n for n, _ in cons]
+    messages = [
+        {"role": "system", "content": p.SYS_L},
+        {"role": "user", "content": f"{p.doc(p.sections(ruling_text))}\n\n{question_cons(numbers)}"},
+    ]
+    try:
+        result = client.chat(
+            messages, max_tokens=12, size=size, prompt_version=VERSION_CONS, logprobs=True, top_logprobs=20
+        )
+    except Exception:  # noqa: BLE001  a failed reading stays empty, never a "no"
+        return empty
+    prob = p_yes(result.logprobs)
+    if prob is None:
+        return empty
+    label, number = parse_number(result.content)
+    text = dict(cons).get(number, "") if number else ""
+    ok = bool(text)
+    own = ok and not _BOILERPLATE.search(_norm(text[:400]))
+    return {
+        "label": label,
+        "consideration": number if ok else None,
+        "evidence": text[:600],
+        "f_cons_p": prob,
+        "f_cons_verified": prob if ok else 0.0,
+        "f_cons_own": prob if own else 0.0,
     }
