@@ -9,11 +9,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = ("LLM_NAME", "LLM_BASE_URL", "LLM_API_KEY")
-CODE_DIRS = ("src", "eval")
+CODE_DIRS = ("src", "eval", "experiments")  # experiments/: experimental code, held to the same G2/G3 rules
 
 
 def code_files() -> list[Path]:
-    return sorted(p for d in CODE_DIRS if (ROOT / d).is_dir() for p in (ROOT / d).rglob("*.py"))
+    """Python files of the code dirs. Test folders are left out, as the root tests/ is: their mocks name the
+    gateway's endpoint on purpose (declared mocks, G9)."""
+    return sorted(
+        p
+        for d in CODE_DIRS
+        if (ROOT / d).is_dir()
+        for p in (ROOT / d).rglob("*.py")
+        if "tests" not in p.relative_to(ROOT / d).parts
+    )
 
 
 def gateway_access_outside_llm(files: list[Path], root: Path = ROOT) -> list[str]:
