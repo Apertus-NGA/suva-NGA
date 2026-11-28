@@ -10,13 +10,13 @@ identifier.
 
 from __future__ import annotations
 
-from src.summarize.refine import checks
+from src.summarize.refine import checks, entail
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, polish
+from src.summarize.refine.steps.common import NAME, guarded, polish, terms_hint
 
-VERSION = "economy@1"
+VERSION = "economy@2"
 MAX_FIX = 2
 
 PROMPT = (
@@ -44,7 +44,7 @@ class Economy(Step):
     def _repair(self, sentence: str, outcome: str, ctx: Context) -> Candidate:
         lang = NAME[ctx.language]
         shape = obj({"a_action": enum(["rewrite", "delete"]), "b_sentence": STRING})
-        prompt = PROMPT.format(lang=lang, outcome=outcome, sentence=sentence)
+        prompt = PROMPT.format(lang=lang, outcome=outcome, sentence=sentence) + terms_hint(ctx)
         answer = ctx.model.ask([{"role": "user", "content": prompt}], "economy", shape, VERSION, max_tokens=300)
         if answer["a_action"] == "delete":
             return Candidate("outcome stated twice: sentence deleted", sentence, patch=Patch("delete", "s0"))
@@ -58,7 +58,12 @@ class Economy(Step):
             problems += checks.new_identifiers(new, sentence, ctx.source)
             if len(new) > len(sentence):
                 problems.append("longer than before")
-            return problems
+            if problems:
+                return problems
+            gated, value = entail.gate(sentence, new, ctx.model, "economy")
+            detail["entailment"] = value
+            return gated
 
+        detail: dict = {}
         return Candidate("outcome stated twice: restatement removed", sentence, patch=Patch("replace", "s0", new),
-                         verify=check)  # fmt: skip
+                         verify=guarded(check), detail=detail)  # fmt: skip

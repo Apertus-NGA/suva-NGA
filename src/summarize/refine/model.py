@@ -19,6 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 Transport = Callable[[list[dict], dict, str, int], str]  # (messages, response_format, prompt_version, max_tokens)
+Labeler = Callable[[list[dict], str], "float | None"]  # (messages, prompt_version) -> P(Ja) from the first token
 
 
 class ModelFailed(RuntimeError):
@@ -106,6 +107,7 @@ class Model:
 
     transport: Transport
     budget: int = 24
+    labeler: Labeler | None = None
     calls: int = 0
     log: list[dict] = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -127,6 +129,24 @@ class Model:
             self.log.append({"prompt": prompt_version, "error": f"{type(exc).__name__}: {exc}"[:300]})
             raise ModelFailed(f"call failed: {type(exc).__name__}: {exc}") from exc
 
+    def p_yes(self, messages: list[dict], prompt_version: str) -> float:
+        """P(Ja) of a one-token Ja/Nein question, read from the first token's log-probabilities (the signal that
+        measured best on this gateway, docs/LESSONS.md). Raises ModelFailed when it cannot be read."""
+        if self.labeler is None:
+            raise ModelFailed("no labeler: a yes/no reading is not available")
+        with self._lock:
+            if self.calls >= self.budget:
+                raise ModelFailed("call budget exhausted")
+            self.calls += 1
+        try:
+            value = self.labeler(messages, prompt_version)
+        except Exception as exc:  # noqa: BLE001
+            raise ModelFailed(f"reading failed: {type(exc).__name__}: {exc}") from exc
+        if value is None:
+            raise ModelFailed("no Ja or Nein among the first token's alternatives")
+        self.log.append({"prompt": prompt_version, "p_yes": round(value, 4)})
+        return value
+
     def ask(self, messages: list[dict], name: str, schema: dict, prompt_version: str, max_tokens: int = 800) -> dict:
         """The validated answer. One retry when the answer is not valid JSON or breaks the schema."""
         sent = [*messages[:-1], {**messages[-1], "content": messages[-1]["content"] + "\n\n" + describe(schema)}]
@@ -147,6 +167,41 @@ class Model:
             self.log.append({"prompt": prompt_version, "ok": True, "attempt": attempt})
             return answer
         raise AssertionError("unreachable")
+
+
+_YES, _NO = {"ja", "yes", "oui"}, {"nein", "no", "non"}
+
+
+def p_yes_from(logprobs: dict | None) -> float | None:
+    """P(yes) / (P(yes) + P(no)) over the first token's alternatives; None when neither is among them."""
+    import math
+
+    if not logprobs or not logprobs.get("content"):
+        return None
+    yes = no = 0.0
+    for alt in logprobs["content"][0].get("top_logprobs", []):
+        token = alt["token"].strip().strip(".\"':,*)(").lower()
+        if token in _YES:
+            yes += math.exp(alt["logprob"])
+        elif token in _NO:
+            no += math.exp(alt["logprob"])
+    return yes / (yes + no) if yes + no > 0 else None
+
+
+def gateway_labeler(mode: str = "live", client=None) -> Labeler:
+    """One-token Ja/Nein readings through the shared client (max_tokens 1, top_logprobs 20)."""
+    from src.llm.client import client_from_env
+
+    shared = client or client_from_env(mode)
+
+    def label(messages: list[dict], prompt_version: str) -> float | None:
+        result = shared.chat(
+            messages, max_tokens=1, prompt_version=prompt_version, logprobs=True, top_logprobs=20,
+            first_token_only=True,
+        )  # fmt: skip
+        return p_yes_from(result.logprobs)
+
+    return label
 
 
 def gateway(mode: str = "live", client=None) -> Transport:

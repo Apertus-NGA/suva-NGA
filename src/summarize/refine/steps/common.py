@@ -29,6 +29,24 @@ def with_reference(sentence: str, label: str | None, language: str) -> str:
     return sentence[:-1] + ref + "." if sentence.endswith(".") else sentence + ref + "."
 
 
+# Calques the judge failed in run r2 (T1 fell from 0.83 to 0.67): the French word in a German fiche and the reverse.
+CALQUES = {
+    "de": ["Gutachten (nicht: Expertise)", "Vorinstanz oder kantonales Gericht (nicht: untere Instanz)",
+           "Invalidenrente (nicht: Rente allein, wenn die IV-Rente gemeint ist)"],
+    "fr": ["autorité précédente ou juridiction cantonale (pas: instance inférieure)",
+           "rente d'invalidité (pas: rente seule, s'il s'agit de la rente AI)", "expertise (pas: Gutachten)"],
+}  # fmt: skip
+
+
+def terms_hint(ctx) -> str:
+    """The matter's glossary in the fiche's language, for any prompt that writes text (src/summarize/v2)."""
+    from src.summarize.refine.steps.terms import pairs
+
+    own = [row[ctx.language] for row in pairs(ctx.category)]
+    listed = "; ".join(dict.fromkeys(own + CALQUES[ctx.language]))
+    return f"\nSwiss {NAME[ctx.language]} terms to use: {listed}."
+
+
 def polish(text: str, ctx) -> str:
     """Code's normalisation of any model-written text before it is checked: the fiche language's abbreviations,
     citation forms and spelling, no invented consideration reference (the same as the form step)."""

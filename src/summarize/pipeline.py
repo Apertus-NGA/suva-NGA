@@ -47,7 +47,7 @@ from src.summarize.prompts import VERSION as PROMPT_VERSION  # noqa: E402
 from src.summarize.prompts import category_of  # noqa: E402
 
 PIPELINE_VERSION = "1"
-REFINE_BUDGET = 60  # Apertus calls of refine per ruling: the shared record and both languages
+REFINE_BUDGET = 80  # Apertus calls of refine per ruling: the shared record and both languages
 LANGUAGES = ("de", "fr")
 MODES = ("live", "replay")
 CATEGORIES = ("uv", "iv", "kv", "bv", "vvg", "other")
@@ -232,9 +232,16 @@ def summarise_ruling(
     shots = {language: examples(conn, language, ruling["docket"]) for language in LANGUAGES}
     refine_model = None
     if refining:
+        from src.llm.client import client_from_env
         from src.summarize.refine import Model, gateway
+        from src.summarize.refine.model import gateway_labeler
 
-        refine_model = Model(refine_transport or gateway(mode), budget=REFINE_BUDGET)
+        if refine_transport is None:
+            client = client_from_env(mode)
+            refine_transport, labeler = gateway(client=client), gateway_labeler(client=client)
+        else:
+            labeler = getattr(refine_transport, "label", None)
+        refine_model = Model(refine_transport, budget=REFINE_BUDGET, labeler=labeler)
     lexicons = {language: lexicon(conn, language, ruling["docket"]) for language in LANGUAGES} if refine_model else None
     result = write(ruling, shots, ask or functools.partial(_chat, mode=mode), refine_model, lexicons)
     result["mode"] = "injected" if ask is not None else mode

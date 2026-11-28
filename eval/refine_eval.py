@@ -107,12 +107,13 @@ def drafts(name_set: str) -> None:
 def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None:
     from src.llm.client import client_from_env
     from src.summarize.refine import Model, evidence, gateway, read_record, refine_fiche
+    from src.summarize.refine.model import gateway_labeler
     from src.summarize.refine.steps import default_steps
 
     draft_rows = {(r["docket"], r["language"]): r for r in _jsonl(OUT / f"drafts_{name_set}.jsonl")}
     rulings = _rulings(sets()[name_set])
     client = client_from_env("live")
-    transport = gateway(client=client)
+    transport, labeler = gateway(client=client), gateway_labeler(client=client)
 
     def one(ruling: dict) -> list[dict]:
         try:
@@ -122,13 +123,13 @@ def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None
             return []
 
     def _one(ruling: dict) -> list[dict]:
-        model = Model(transport, budget=40)
+        model = Model(transport, budget=40, labeler=labeler)
         record = read_record(ruling["text"], evidence.passages(ruling["text"]), model)
         rows = []
         for lang in ("de", "fr"):
             draft = draft_rows[(ruling["docket"], lang)]
             chosen = [s for s in default_steps() if steps is None or s.id in steps]
-            per = Model(transport, budget=24)
+            per = Model(transport, budget=30, labeler=labeler)
             result = refine_fiche(draft["text"], lang, ruling["text"], draft["category"], per, record,
                                   ruling["lexicon"][lang], ruling["language"], chosen)  # fmt: skip
             rows.append({"docket": ruling["docket"], "language": lang, "record": record, **result.as_dict(),

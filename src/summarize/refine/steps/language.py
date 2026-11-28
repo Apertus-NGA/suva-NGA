@@ -11,15 +11,13 @@ from __future__ import annotations
 
 import re
 
-from src.summarize.refine import checks
+from src.summarize.refine import checks, entail
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, editable, guarded, polish
-from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
-from src.summarize.refine.steps.facts import judge_sentences
+from src.summarize.refine.steps.common import NAME, editable, guarded, polish, terms_hint
 
-VERSION = "language@3"
+VERSION = "language@4"
 MAX_FIX = 3
 PROBLEMS = ["grammar", "calque_or_foreign_word", "wrong_word", "not_impersonal_register", "placeholder", "clumsy"]
 
@@ -83,9 +81,11 @@ class Language(Step):
         lang = NAME[ctx.language]
         prompt = REPAIR.format(lang=lang, problem=problem.replace("_", " "), span=span, sentence=sentence,
                                spelling=_SPELLING[ctx.language], roles=_ROLES[ctx.language])  # fmt: skip
+        prompt += terms_hint(ctx)
         messages = [{"role": "system", "content": SYSTEM.format(lang=lang)}, {"role": "user", "content": prompt}]
         new = ctx.model.ask(messages, "rewrite", obj({"a_sentence": STRING}), f"{VERSION}/repair", 400)["a_sentence"]
         new = polish(new, ctx)
+        detail: dict = {}
 
         def check(before: Draft, after: Draft) -> list[str]:
             problems = checks.same_identifiers(new, sentence)
@@ -104,9 +104,13 @@ class Language(Step):
             if problems:
                 return problems
             # A rewording must not change what the sentence says (run r1: one 'clumsy' fix added a condition the
-            # court never set). The facts check must find the new wording 'same' as the ruling.
-            target = next((s.id for s in after.sentences if s.text == new), None)
-            verdict = judge_sentences(after, [target], ctx, f"{FACTS_VERSION}/recheck").get(target, {}).get("verdict")
-            return [] if verdict == "same" else [f"re-check against the ruling: {verdict or 'unchecked'}"]
+            # court never set): the old sentence must say everything the new one says. For a placeholder the role
+            # comes from the ruling, so the facts of the ruling are given as well.
+            premise = sentence if problem != "placeholder" else f"{ctx.parts.get('facts', '')}\n\n{sentence}"
+            gated, value = entail.gate(premise, new, ctx.model, "language")
+            detail["entailment"] = value
+            return gated
 
-        return Candidate(f"{problem}: {span}", sentence, patch=Patch("replace", "s0", new), verify=guarded(check))
+        return Candidate(
+            f"{problem}: {span}", sentence, patch=Patch("replace", "s0", new), verify=guarded(check), detail=detail
+        )

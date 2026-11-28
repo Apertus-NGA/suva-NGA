@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import re
 
-from src.summarize.refine import evidence
+from src.summarize.refine import entail, evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, editable, guarded, polish, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, editable, guarded, polish, terms_hint, written_sentence_problems
 
-VERSION = "facts@5"
+VERSION = "facts@6"
 MAX_FIX = 3
 VERDICTS = ["same", "stronger_or_broader", "different", "not_in_ruling"]
 
@@ -119,7 +119,7 @@ class Facts(Step):
         delete = ", or delete it if the ruling does not state it at all" if may_delete else ""
         task = REPAIR.format(lang=lang, verdict=verdict["verdict"].replace("_", " "), sentence=sentence,
                              hint=verdict.get("hint", ""), delete=delete)  # fmt: skip
-        messages = evidence.messages(ctx.parts, task)
+        messages = evidence.messages(ctx.parts, task + terms_hint(ctx))
         answer = ctx.model.ask(messages, "sentence_repair", shape, f"{VERSION}/repair", max_tokens=400)
         detail = {"verdict": verdict["verdict"], "detected_evidence_found": verdict["verified"],
                   "detected_by": verdict.get("by", "model")}  # fmt: skip
@@ -143,14 +143,12 @@ class Facts(Step):
             if problems:
                 return problems
             target = next((s.id for s in after.sentences if s.text == new), None)
-            if target is None:
-                return ["the new sentence is not in the result"]
-            again = judge_sentences(after, [target], ctx, f"{VERSION}/recheck")
-            if again.get(target, {}).get("verdict") != "same":
-                return [f"re-check: still {again.get(target, {}).get('verdict', 'unchecked')}"]
-            if code_flags(after, ctx).get(target):
+            if target is not None and code_flags(after, ctx).get(target):
                 return ["still names Suva, which the ruling does not"]
-            return []
+            # The gate: the passage the repair rests on must say everything the new sentence says (entail.py).
+            gated, value = entail.gate(ctx.parts[found[0]], new, ctx.model, "facts")
+            detail["entailment"] = value
+            return gated
 
         return Candidate(
             f"not backed by the ruling ({verdict['verdict']}): rewritten", sentence,

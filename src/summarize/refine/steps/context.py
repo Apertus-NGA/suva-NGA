@@ -9,15 +9,13 @@ the pointer, the language and the identifiers; the facts step's check (one call)
 
 from __future__ import annotations
 
-from src.summarize.refine import checks, evidence
+from src.summarize.refine import checks, entail, evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, guarded, polish, repeats, written_sentence_problems
-from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
-from src.summarize.refine.steps.facts import judge_sentences
+from src.summarize.refine.steps.common import NAME, guarded, polish, repeats, terms_hint, written_sentence_problems
 
-VERSION = "context@4"
+VERSION = "context@5"
 
 TASK = (
     "Task: the {lang} summary below of the ruling above is too short and lacks the facts a lawyer needs to "
@@ -38,13 +36,14 @@ class ContextStep(Step):
         low, _ = checks.LENGTH_BAND[ctx.language]
         if draft.words() >= low or not draft.sentences:
             return []
-        task = TASK.format(lang=NAME[ctx.language], summary=draft.numbered())
+        task = TASK.format(lang=NAME[ctx.language], summary=draft.numbered()) + terms_hint(ctx)
         facts_labels = [label for label in ctx.parts if label in ("facts", "text")] or list(ctx.parts)
         shape = obj({"a_label": enum(facts_labels), "b_opening": STRING, "c_text": STRING})
         answer = ctx.model.ask(evidence.messages(ctx.parts, task), "context", shape, VERSION, max_tokens=400)
         found = evidence.find(answer["b_opening"], ctx.parts, answer["a_label"], 2)
         text = polish(answer["c_text"], ctx)
         first = draft.sentences[0].text
+        detail: dict = {}
 
         def check(before: Draft, after: Draft) -> list[str]:
             # The pointer is evidence when code finds it; the gate is the facts check below (a sentence that sums up
@@ -54,13 +53,14 @@ class ContextStep(Step):
                 problems.append("placeholder")
             if problems:
                 return problems
-            target = next((s.id for s in after.sentences if s.text == text), None)
-            verdict = judge_sentences(after, [target], ctx, f"{FACTS_VERSION}/recheck").get(target, {}).get("verdict")
-            return [] if verdict == "same" else [f"re-check: {verdict or 'unchecked'}"]
+            premise = ctx.parts.get("facts") or (ctx.parts[found[0]] if found else None)
+            gated, value = entail.gate(premise, text, ctx.model, "context")
+            detail["entailment"] = value
+            return gated
 
         return [
             Candidate(
                 f"under {low} words: facts added from the ruling", first, found[0] if found else None,
-                found[1] if found else None, Patch("insert_before", "s0", text), guarded(check),
+                found[1] if found else None, Patch("insert_before", "s0", text), guarded(check), detail,
             )
         ]  # fmt: skip

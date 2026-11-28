@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 
 from src.summarize import finish
-from src.summarize.refine.checks import restates_outcome
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.step import Candidate, Context, Step
 
@@ -39,7 +38,9 @@ def fixed(text: str, language: str, source: str) -> str:
 
 
 class Form(Step):
-    id, version, kind = "form", "2", "code"
+    # 3: no longer appends the outcome sentence when a draft buries it (run r2: when the restatement could not be
+    # taken out, the summary said the outcome twice; T4 fell from 0.79 to 0.67).
+    id, version, kind = "form", "3", "code"
 
     def __init__(self, label: str = "form") -> None:
         self.id = label
@@ -60,20 +61,4 @@ class Form(Step):
                 out.append(
                     Candidate("form of the fiche's language", sentence.text, patch=Patch("replace", sentence.id, new))
                 )
-        out += self._outcome(draft, ctx)
         return out
-
-    def _outcome(self, draft: Draft, ctx: Context) -> list[Candidate]:
-        """The outcome as the code-written last sentence (finish.py) when the draft buries it in another sentence.
-        The economy step then takes the restatement out of that sentence."""
-        kind = finish.outcome_kind(ctx.source)
-        if not kind or any(s.locked and restates_outcome(s.text) for s in draft.sentences):
-            return []
-        body = [s for s in draft.sentences if not (s.locked and not restates_outcome(s.text))]  # not the note
-        if not body:
-            return []
-        last = body[-1]
-        sentence = finish._OUTCOME[kind][ctx.language]
-        return [
-            Candidate("the outcome as its own last sentence", last.text, patch=Patch("insert_after", last.id, sentence))
-        ]

@@ -13,13 +13,21 @@ G1), normalises the text and checks language and identifiers. A re-check call mu
 
 from __future__ import annotations
 
-from src.summarize.refine import evidence
+from src.summarize.refine import entail, evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Skip, Step
-from src.summarize.refine.steps.common import NAME, guarded, polish, repeats, with_reference, written_sentence_problems
+from src.summarize.refine.steps.common import (
+    NAME,
+    guarded,
+    polish,
+    repeats,
+    terms_hint,
+    with_reference,
+    written_sentence_problems,
+)
 
-VERSION = "holding@3"
+VERSION = "holding@4"
 NONE = "none"
 
 SYSTEM = (
@@ -42,13 +50,6 @@ REPAIR = (
     "- b_sentences: one entry per item above, in the same order: the item id and its sentence in {lang}. Restate "
     "each rule in your own words, faithful in content and strength, with the established Swiss legal terms of "
     "{lang}; no article, date or number that is not in the quote; no consideration number (code adds it)."
-)
-
-
-CONFIRM = (
-    'Rule {rid} of the court ({label}):\n"{rule}"\n\nSentence of a summary:\n<sentence>\n{sentence}\n</sentence>\n\n'
-    "- a_states: 'yes' if the sentence states this rule faithfully (the same test, condition or meaning, in any "
-    "wording or language, neither stronger nor weaker), 'no' otherwise."
 )
 
 
@@ -111,6 +112,7 @@ class Holding(Step):
         shape = obj({"a_after": STRING, "b_sentences": array(obj({"a_item": enum(item_ids), "b_text": STRING}))})
         prompt_anchors = f"Allowed ids for a_after: {', '.join(anchors)}.\n"
         prompt = REPAIR.format(lang=lang, what="\n".join(items), summary=draft.numbered()) + "\n" + prompt_anchors
+        prompt += terms_hint(ctx)
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         reply = ctx.model.ask(messages, "holding_repair", shape, f"{VERSION}/repair", max_tokens=700)
         position = reply["a_after"] if reply["a_after"] in anchors else anchors[-1]
@@ -119,6 +121,7 @@ class Holding(Step):
             label = answer["label"] if entry["a_item"] == "A" else rules[int(entry["a_item"][1:]) - 1]["label"]
             written.append(with_reference(polish(entry["b_text"], ctx), label, ctx.language))
         text = " ".join(written)
+        readings: dict = {}
         after_sentence = draft.get(position).text
 
         def check(before: Draft, after: Draft) -> list[str]:
@@ -127,20 +130,14 @@ class Holding(Step):
             problems = written_sentence_problems(text, "", ctx, max_words=60 * len(written)) + repeats(text, before)
             if problems:
                 return problems
-            # A targeted question per added rule about the sentence written for it (run r4: searching the whole
-            # summary again missed four inserted rules that state them).
+            # Each written sentence must be said by the ruling sentence it restates (entail.py): the rule's for a
+            # rule, the court's answer for the answer (run r2: two inserted rules added a condition).
             still = []
             for entry, sentence in zip(reply["b_sentences"], written, strict=True):
-                if entry["a_item"] == "A":
-                    continue
-                rule = rules[int(entry["a_item"][1:]) - 1]
-                prompt = CONFIRM.format(rid=entry["a_item"], label=rule["label"],
-                                        rule=evidence.as_data(rule["quote"]), sentence=sentence)  # fmt: skip
-                said = ctx.model.ask(
-                    [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
-                    "holding_confirm", obj({"a_states": enum(["yes", "no"])}), f"{VERSION}/confirm", max_tokens=20,
-                )  # fmt: skip
-                if said["a_states"] != "yes":
+                source = answer if entry["a_item"] == "A" else rules[int(entry["a_item"][1:]) - 1]
+                gated, value = entail.gate(source["quote"], sentence, ctx.model, "holding")
+                readings[entry["a_item"]] = value
+                if gated:
                     still.append(entry["a_item"])
             return [f"re-check: {', '.join(still)} not stated faithfully"] if still else []
 
@@ -151,5 +148,5 @@ class Holding(Step):
             rules[0]["quote"],
             Patch("insert_after", "s0", text),
             guarded(check),
-            {"added": item_ids},
+            {"added": item_ids, "entailment": readings},
         )
