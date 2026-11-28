@@ -137,12 +137,12 @@ def test_features_follow_the_declared_order_and_unknown_publication_is_not_yes()
         "single_judge": 0.0,
         "consensus": 0.7,
         "core_topics": 3.0,
-        "long_accident": 0.0,  # a long ruling counts under its own area only
-        "long_disability": 1.0,
+        "long_accident": 0.0,  # a long ruling counts in accident and military insurance only
         "other_accident_insurer": 0.0,
     }
+    assert "long_disability" not in sc.FEATURES  # removed: it did not hold on rulings the fit never saw
     accident = dict(zip(sc.FEATURES, sc.features({"area": "UV", "long_ruling": True}, 0.0), strict=True))
-    assert accident["long_accident"] == 1.0 and accident["long_disability"] == 0.0 and accident["core_topics"] == 0.0
+    assert accident["long_accident"] == 1.0 and accident["core_topics"] == 0.0
 
 
 def toy_data(n: int = 120, seed: int = 0):
@@ -158,8 +158,8 @@ def toy_data(n: int = 120, seed: int = 0):
 def test_scorer_ranks_rulings_with_the_signals_higher_and_explains_each_rule():
     x, y = toy_data()
     model = sc.Scorer.fit(x, y, n_core=len(y))
-    strong = [1, 0, 1, 0, 0, 0, 0, 0, 1.5, 0, 0, 0, 0]
-    weak = [0, 0, 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0, 0]
+    strong = [1, 0, 1, 0, 0, 0, 0, 0, 1.5, 0, 0, 0]
+    weak = [0, 0, 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0]
     scores = model.score(np.array([strong, weak], float))
     assert scores[0] > scores[1] and 0 <= scores[1] <= scores[0] <= 1
     contributions = model.contributions(strong)
@@ -213,8 +213,8 @@ def test_the_cut_promotes_forty_percent_of_the_core_rulings_by_score():
 
 
 def test_explanation_is_built_from_the_rules_that_apply():
-    row = [1, 0, 1, 0, 0, 1, 0, 0, 0.9, 2, 0, 0, 0]
-    contributions = dict(zip(sc.FEATURES, [0.8, 0, 0.9, 0, 0, -0.7, 0, 0, 0.4, 0.3, 0, 0, 0], strict=True))
+    row = [1, 0, 1, 0, 0, 1, 0, 0, 0.9, 2, 0, 0]
+    contributions = dict(zip(sc.FEATURES, [0.8, 0, 0.9, 0, 0, -0.7, 0, 0, 0.4, 0.3, 0, 0], strict=True))
     text = sc.explanation_de("suspected_relevant", contributions, row, n_readings=6)
     assert text.startswith("Vermutlich relevant.")
     assert "Beschwerde eines Versicherers oder einer Behörde" in text and "Unfall- oder Militärversicherung" in text
@@ -275,7 +275,7 @@ def test_write_retires_earlier_predictions_and_stores_one_explained_row_per_kept
     pytest.importorskip("psycopg")
     x, y = toy_data()
     model = sc.Scorer.fit(x, y, n_core=len(y))
-    row = [1, 0, 1, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0]
+    row = [1, 0, 1, 0, 0, 0, 0, 0, 1.0, 0, 0, 0]
     kept = [
         {
             "id": 11,
@@ -292,9 +292,9 @@ def test_write_retires_earlier_predictions_and_stores_one_explained_row_per_kept
             "id": 12,
             "tier": "possibly_relevant",
             "score": 0.08,
-            "x": [0.0] * 13,
+            "x": [0.0] * len(sc.FEATURES),
             "consensus": 0.0,
-            "contributions": model.contributions([0.0] * 13),
+            "contributions": model.contributions([0.0] * len(sc.FEATURES)),
             "layer1": {"subject": "kept_subject", "kept": True},
             "signals": {"area": "KV"},
         },
