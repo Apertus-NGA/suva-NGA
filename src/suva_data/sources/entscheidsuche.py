@@ -422,11 +422,24 @@ class EntscheidsucheAdapter:
                     self.repeated_ids.append({"source_key": source_key, "raw_file": raw_file})
                     continue
                 if note:
-                    self.docket_notes.append({"source_key": source_key, "note": note, "docket": docket,
-                                              "reference": source.get("reference"), "raw_file": raw_file})
+                    self.docket_notes.append(
+                        {
+                            "source_key": source_key,
+                            "note": note,
+                            "docket": docket,
+                            "reference": source.get("reference"),
+                            "raw_file": raw_file,
+                        }
+                    )
                 if docket is None:
-                    self.undetermined.append({"source_key": source_key, "decision_date": decision_date,
-                                              "reference": source.get("reference"), "raw_file": raw_file})
+                    self.undetermined.append(
+                        {
+                            "source_key": source_key,
+                            "decision_date": decision_date,
+                            "reference": source.get("reference"),
+                            "raw_file": raw_file,
+                        }
+                    )
                     continue
                 record = copy.deepcopy(source)
                 attachment = record.get("attachment")
@@ -439,8 +452,14 @@ class EntscheidsucheAdapter:
                     text = html_to_text(document.read_bytes())
                     reason = textnorm.bad_text_reason(text)
                     if reason:
-                        self.bad_documents.append({"source_key": source_key, "docket": docket, "reason": reason,
-                                                   "document_file": record["document_file"]})
+                        self.bad_documents.append(
+                            {
+                                "source_key": source_key,
+                                "docket": docket,
+                                "reason": reason,
+                                "document_file": record["document_file"],
+                            }
+                        )
                 else:
                     record["text_origin"] = "search_api"
                 fields: dict = {"division": division_of(docket)}

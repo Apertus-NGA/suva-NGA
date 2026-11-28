@@ -228,7 +228,6 @@ def gate_record(docket: str, area: object = None, title: object = None, text: ob
     }
 
 
-
 LAYER1_COLUMNS = ["docket", "subject", "text", "apertus", "matter", "in_scope_probability", "kept"]
 
 
@@ -263,6 +262,7 @@ def layer1_record(
         return row
     row.update({key: answer[key] for key in ("apertus", "matter", "in_scope_probability", "kept")})
     return row
+
 
 def _tally(rows: list[dict], key: str) -> dict[str, int]:
     counts: dict[str, int] = {}

@@ -29,7 +29,9 @@ class SourceRecord:
     source_key: str  # unique and stable within the source (e.g. HF decision_id, entscheidsuche id, 'YYYYMMDD:docket')
     docket: str  # canonical form, see normalise_docket
     decision_date: str | None  # ISO 'YYYY-MM-DD'
-    fields: dict = field(default_factory=dict)  # subset of config.CANONICAL_FIELDS; omit a key when unknown (never '' / False as a default)
+    fields: dict = field(
+        default_factory=dict
+    )  # subset of config.CANONICAL_FIELDS; omit a key when unknown (never '' / False as a default)
     record: dict = field(default_factory=dict)  # the source's own record, JSON-serialisable, WITHOUT the full text
     text: str | None = None  # full text exactly as the source gives it (no cleaning), or None
     raw_file: str | None = None  # path of the snapshot file it came from, relative to SNAPSHOT_DIR

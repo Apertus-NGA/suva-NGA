@@ -75,9 +75,7 @@ def migrate(conn: psycopg.Connection, migrations_dir: Path | None = None) -> lis
                 continue
             with conn.transaction():
                 conn.execute(sql.encode("utf-8"))  # bytes: no parameters, so '%' in SQL needs no escaping
-                conn.execute(
-                    "INSERT INTO schema_migrations (filename, sha256) VALUES (%s, %s)", (path.name, digest)
-                )
+                conn.execute("INSERT INTO schema_migrations (filename, sha256) VALUES (%s, %s)", (path.name, digest))
             applied_now.append(path.name)
     finally:
         conn.execute("SELECT pg_advisory_unlock(%s)", (_MIGRATE_LOCK_KEY,))

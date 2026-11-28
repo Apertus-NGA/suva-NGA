@@ -61,7 +61,9 @@ class FakeES:
         if self.fail_at and self.fail_at[0] == len(self.calls):
             return self.fail_at[1], b"<html>nope</html>"
         if self.refuse_search_after and "search_after" in request:
-            return 200, json.dumps({"error": {"root_cause": [{"type": "illegal_argument_exception"}]}, "status": 400}).encode()
+            return 200, json.dumps(
+                {"error": {"root_cause": [{"type": "illegal_argument_exception"}]}, "status": 400}
+            ).encode()
 
         bool_query = request["query"]["bool"]
         selected = [
@@ -85,8 +87,14 @@ class FakeES:
                 "total": {"value": len(selected) + self.total_offset, "relation": "eq"},
                 "max_score": None,
                 "hits": [
-                    {"_index": "entscheidsuche.v2-ch_bger", "_type": "_doc", "_id": h["_id"], "_score": None,
-                     "_source": copy.deepcopy(h["_source"]), "sort": [h["_source"]["date"], h["_id"]]}
+                    {
+                        "_index": "entscheidsuche.v2-ch_bger",
+                        "_type": "_doc",
+                        "_id": h["_id"],
+                        "_score": None,
+                        "_source": copy.deepcopy(h["_source"]),
+                        "sort": [h["_source"]["date"], h["_id"]],
+                    }
                     for h in page
                 ],
             },
@@ -152,7 +160,9 @@ def test_paging_uses_search_after_and_stops_at_the_total(tmp_path):
 
 def test_requests_are_spaced_by_the_delay(tmp_path):
     sleeps: list[float] = []
-    adapter = EntscheidsucheAdapter(snapshot_dir=tmp_path, delay=1.5, http=FakeES(fixture_hits()), sleep=sleeps.append, page_size=2)
+    adapter = EntscheidsucheAdapter(
+        snapshot_dir=tmp_path, delay=1.5, http=FakeES(fixture_hits()), sleep=sleeps.append, page_size=2
+    )
     adapter.fetch(WINDOW)
     assert adapter.request_count == 4  # 3 for December, 1 for January
     assert sleeps == [1.5, 1.5, 1.5]  # before every request except the very first
@@ -198,7 +208,11 @@ def test_extras_are_queried_in_batches(tmp_path):
     # 8C_72/2025 (December) is among the 120 and outside this January window. Batches follow the sorted
     # (string order) case numbers, so both known rulings fall into the second batch.
     pages = [json.loads(p.read_text("utf-8")) for p in sorted((tmp_path / "entscheidsuche/extras").glob("*.json"))]
-    assert [[h["_source"]["reference"][0] for h in page["hits"]] for page in pages] == [[], [EXTRA_DOCKET, IN_WINDOW_GOLD], []]
+    assert [[h["_source"]["reference"][0] for h in page["hits"]] for page in pages] == [
+        [],
+        [EXTRA_DOCKET, IN_WINDOW_GOLD],
+        [],
+    ]
     assert [page["total"] for page in pages] == [0, 2, 0]  # an empty batch still leaves its (empty) page as proof
 
 
@@ -256,7 +270,10 @@ def test_refusal_keeps_months_that_were_already_complete(tmp_path):
     server = FakeES(fixture_hits(), fail_at=(3, 429))
     with pytest.raises(EntscheidsucheRefused, match="429"):
         make_adapter(tmp_path, server).fetch(WINDOW, EXTRAS)
-    assert sorted(tree_bytes(tmp_path)) == ["entscheidsuche/2025-12/page_001.json", "entscheidsuche/2025-12/page_002.json"]
+    assert sorted(tree_bytes(tmp_path)) == [
+        "entscheidsuche/2025-12/page_001.json",
+        "entscheidsuche/2025-12/page_002.json",
+    ]
     assert tree_bytes(tmp_path / "entscheidsuche/2025-12") == tree_bytes(FIXTURE_ROOT / "2025-12")
 
 
@@ -312,7 +329,9 @@ def parse_fixtures(window=WINDOW, extras=EXTRAS):
 def test_parse_maps_the_fields():
     adapter, records = parse_fixtures()
     assert [r.source_key for r in records] == sorted(h["_id"] for h in fixture_hits())
-    assert len(records) == 7 and adapter.undetermined == [] and adapter.docket_notes == [] and adapter.repeated_ids == []
+    assert (
+        len(records) == 7 and adapter.undetermined == [] and adapter.docket_notes == [] and adapter.repeated_ids == []
+    )
 
     r = next(r for r in records if r.docket == IN_WINDOW_GOLD)
     assert r.source == config.ENTSCHEIDSUCHE == adapter.name
@@ -322,7 +341,10 @@ def test_parse_maps_the_fields():
     assert r.raw_file.startswith("entscheidsuche/2025-12/page_00") and (FIXTURES / r.raw_file).is_file()
     assert r.record["reference"] == ["8C_72/2025"]
     assert r.record["title"]["de"].startswith("Bundesgericht ")  # the title stays in the record only
-    assert r.record["attachment"]["content_url"] == "https://entscheidsuche.ch/docs/CH_BGer/CH_BGer_008_8C-72-2025_2025-12-11.html"
+    assert (
+        r.record["attachment"]["content_url"]
+        == "https://entscheidsuche.ch/docs/CH_BGer/CH_BGer_008_8C-72-2025_2025-12-11.html"
+    )
     assert "content" not in r.record["attachment"]
     json.dumps(r.record)  # JSON-serialisable
 
@@ -364,7 +386,9 @@ def test_parse_is_deterministic_and_does_not_deduplicate_rulings(tmp_path):
     hits = fixture_hits()
     twin = copy.deepcopy(next(h for h in hits if h["_source"]["reference"] == [IN_WINDOW_GOLD]))
     twin["_id"] = twin["_source"]["id"] = "CH_BGer_008_8C-72-2025_2025-12-11_bis"  # same docket + date, another id
-    write_page(tmp_path, "2025-12", hits[:3] + [twin] + [h for h in hits if h["_source"]["reference"] == [IN_WINDOW_GOLD]])
+    write_page(
+        tmp_path, "2025-12", hits[:3] + [twin] + [h for h in hits if h["_source"]["reference"] == [IN_WINDOW_GOLD]]
+    )
     adapter = EntscheidsucheAdapter(snapshot_dir=tmp_path)
     first, second = list(adapter.parse(WINDOW)), list(adapter.parse(WINDOW))
     assert first == second and [r.source_key for r in first] == sorted(r.source_key for r in first)
@@ -436,7 +460,9 @@ def test_parse_reads_a_ruling_saved_in_two_directories_once(tmp_path):
 
 def test_official_url_only_when_the_record_carries_a_bger_url(tmp_path):
     hit = copy.deepcopy(next(h for h in fixture_hits() if h["_source"]["reference"] == [IN_WINDOW_GOLD]))
-    url = "https://www.bger.ch/ext/eurospider/live/de/php/aza/http/index.php?highlight_docid=aza://11-12-2025-8C_72-2025"
+    url = (
+        "https://www.bger.ch/ext/eurospider/live/de/php/aza/http/index.php?highlight_docid=aza://11-12-2025-8C_72-2025"
+    )
     hit["_source"]["attachment"]["source"] = url
     write_page(tmp_path, "2025-12", [hit])
     (record,) = EntscheidsucheAdapter(snapshot_dir=tmp_path).parse(WINDOW)

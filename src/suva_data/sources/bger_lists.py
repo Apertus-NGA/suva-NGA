@@ -270,7 +270,12 @@ class BgerListAdapter:
                 list_date, entries = parse_day(page)
                 # The site may serve a different day for dates without a list; only keep exact matches.
                 if list_date != day:
-                    problem = {"kind": "list_date_mismatch", "file_date": day, "list_date": list_date, "entries": len(entries)}
+                    problem = {
+                        "kind": "list_date_mismatch",
+                        "file_date": day,
+                        "list_date": list_date,
+                        "entries": len(entries),
+                    }
             if problem:
                 if report is not None:
                     report.append({**problem, "raw_file": self._rel(day)})

@@ -90,11 +90,24 @@ def get_rulings(
     _one_of("sort", [sort], sorted(queries.SORTS))
     _one_of("order", [order], ("asc", "desc"))
     filters = queries.RulingFilters(
-        decided_from=decided_from, decided_to=decided_to, published_from=published_from, published_to=published_to,
-        divisions=division, areas=area, topics=_one_of("topic", topic, queries.TOPICS), languages=language,
-        outcomes=outcome, labels=_one_of("label", label, queries.LABELS),
-        statuses=_one_of("status", status, queries.STATUSES), starred=starred,
-        predicted_relevant=predicted_relevant, ingested=ingested, summarised=summarised, score_min=score_min, score_max=score_max, q=q,
+        decided_from=decided_from,
+        decided_to=decided_to,
+        published_from=published_from,
+        published_to=published_to,
+        divisions=division,
+        areas=area,
+        topics=_one_of("topic", topic, queries.TOPICS),
+        languages=language,
+        outcomes=outcome,
+        labels=_one_of("label", label, queries.LABELS),
+        statuses=_one_of("status", status, queries.STATUSES),
+        starred=starred,
+        predicted_relevant=predicted_relevant,
+        ingested=ingested,
+        summarised=summarised,
+        score_min=score_min,
+        score_max=score_max,
+        q=q,
     )
     return queries.list_rulings(conn, filters, sort=sort, order=order, limit=limit, offset=offset)
 

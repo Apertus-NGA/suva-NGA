@@ -120,9 +120,13 @@ def _merge_same_source(records: list[_Rec]) -> dict:
     return merged
 
 
-def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets: frozenset[str] = frozenset()) -> ReconcileReport:
+def reconcile(
+    conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets: frozenset[str] = frozenset()
+) -> ReconcileReport:
     rep = ReconcileReport()
-    conflicts: list[tuple] = []  # (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value)
+    conflicts: list[
+        tuple
+    ] = []  # (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value)
 
     with conn.transaction():
         cur = conn.cursor()
@@ -143,7 +147,18 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
             if not ddate or not DOCKET_RE.match(docket or ""):
                 rep.skipped += 1
                 status_updates[rid] = ("rejected", "reconcile: no decision date or invalid case number")
-                conflicts.append((docket or "", ddate, "decision_date" if not ddate else "docket", "invalid_value", None, source, None, _show(ddate or docket)))
+                conflicts.append(
+                    (
+                        docket or "",
+                        ddate,
+                        "decision_date" if not ddate else "docket",
+                        "invalid_value",
+                        None,
+                        source,
+                        None,
+                        _show(ddate or docket),
+                    )
+                )
                 continue
             if not (window.contains(ddate) or docket in extra_dockets):
                 rep.skipped += 1
@@ -161,7 +176,7 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
         rec_to_ruling: list[tuple] = []  # (source_record_id, docket, decision_date)
         canonical_record_ids: list[int] = []
 
-        for (docket, ddate) in sorted(groups, key=lambda k: (k[1], k[0])):
+        for docket, ddate in sorted(groups, key=lambda k: (k[1], k[0])):
             by_source = groups[(docket, ddate)]
             flags: dict = {"sources": [s for s in SOURCE_ORDER if s in by_source]}
             merged: dict[str, dict] = {}
@@ -180,8 +195,18 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                     rep.duplicates += 1
                     same_text = bool(extra.text and recs[0].text and extra.text[0] == recs[0].text[0])
                     status_updates[extra.id] = ("duplicate", f"reconcile: duplicate of {recs[0].source_key}")
-                    conflicts.append((docket, ddate, "record", "duplicate_collapsed", source, source, recs[0].source_key,
-                                      f"{extra.source_key} ({'same text' if same_text else 'no text' if not extra.text else 'DIFFERENT text'})"))
+                    conflicts.append(
+                        (
+                            docket,
+                            ddate,
+                            "record",
+                            "duplicate_collapsed",
+                            source,
+                            source,
+                            recs[0].source_key,
+                            f"{extra.source_key} ({'same text' if same_text else 'no text' if not extra.text else 'DIFFERENT text'})",
+                        )
+                    )
                     if extra.text and recs[0].text and not same_text:
                         flags["duplicate_with_different_text"] = True
                 for r in recs:
@@ -205,7 +230,9 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                         winner_source, values[f] = source, v
                         field_sources[f] = source
                     elif f not in NOT_COMPARED and _comparable(f, v) != _comparable(f, values[f]):
-                        conflicts.append((docket, ddate, f, "value_mismatch", winner_source, source, _show(values[f]), _show(v)))
+                        conflicts.append(
+                            (docket, ddate, f, "value_mismatch", winner_source, source, _show(values[f]), _show(v))
+                        )
 
             # --- text: highest tier that passes the bad-text check --------------------------------
             canonical = None
@@ -227,8 +254,18 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                 for source, (sha, chars) in good_hashes.items():
                     if source != canonical[0] and sha != canonical[2]:
                         flags["text_mismatch"] = True
-                        conflicts.append((docket, ddate, "text", "text_mismatch", canonical[0], source,
-                                          f"{canonical[2][:12]} ({canonical[3]} chars)", f"{sha[:12]} ({chars} chars)"))
+                        conflicts.append(
+                            (
+                                docket,
+                                ddate,
+                                "text",
+                                "text_mismatch",
+                                canonical[0],
+                                source,
+                                f"{canonical[2][:12]} ({canonical[3]} chars)",
+                                f"{sha[:12]} ({chars} chars)",
+                            )
+                        )
                 flags["text_sources"] = len(good_hashes)
             else:
                 flags["no_valid_text"] = True
@@ -243,13 +280,24 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
             in_window = window.contains(ddate)
             rep.rulings += 1
             rep.rulings_in_window += in_window
-            ruling_rows.append((
-                docket, ddate, division_of(docket), values.get("language"), values.get("publication_date"),
-                values.get("starred"), values.get("area"), values.get("subject"), values.get("outcome"),
-                json.dumps(values["cited_decisions"], ensure_ascii=False) if "cited_decisions" in values else None,
-                values.get("official_url"), json.dumps(field_sources, sort_keys=True),
-                json.dumps(flags, sort_keys=True), in_window,
-            ))
+            ruling_rows.append(
+                (
+                    docket,
+                    ddate,
+                    division_of(docket),
+                    values.get("language"),
+                    values.get("publication_date"),
+                    values.get("starred"),
+                    values.get("area"),
+                    values.get("subject"),
+                    values.get("outcome"),
+                    json.dumps(values["cited_decisions"], ensure_ascii=False) if "cited_decisions" in values else None,
+                    values.get("official_url"),
+                    json.dumps(field_sources, sort_keys=True),
+                    json.dumps(flags, sort_keys=True),
+                    in_window,
+                )
+            )
 
         # A case number with several decision dates is suspicious unless every source agrees on each date.
         for docket, dates in dates_by_docket.items():
@@ -257,8 +305,18 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                 source_sets = [frozenset(groups[(docket, d)]) & frozenset(TEXT_SOURCES) for d in dates]
                 if len(set(source_sets)) > 1 or any(len(s) < 2 for s in source_sets):
                     for d in sorted(dates):
-                        conflicts.append((docket, d, "decision_date", "value_mismatch", None, None,
-                                          ", ".join(sorted(dates)), "sources disagree on the decision date of this case number"))
+                        conflicts.append(
+                            (
+                                docket,
+                                d,
+                                "decision_date",
+                                "value_mismatch",
+                                None,
+                                None,
+                                ", ".join(sorted(dates)),
+                                "sources disagree on the decision date of this case number",
+                            )
+                        )
 
         # ---------------------------------------------------------------- write
         cur.execute(
@@ -310,7 +368,9 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
             cur.execute("DELETE FROM rulings WHERE id = ANY(%s)", ([i for i, _, _ in stale],))
             rep.rulings_removed = len(stale)
 
-        cur.execute("CREATE TEMP TABLE _s (id bigint PRIMARY KEY, docket text, decision_date date, status text, reason text) ON COMMIT DROP")
+        cur.execute(
+            "CREATE TEMP TABLE _s (id bigint PRIMARY KEY, docket text, decision_date date, status text, reason text) ON COMMIT DROP"
+        )
         ruling_of = {rid: (d, dd) for rid, d, dd in rec_to_ruling}
         with cur.copy("COPY _s (id, docket, decision_date, status, reason) FROM STDIN") as cp:
             for rid in sorted(status_updates):
@@ -323,12 +383,18 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                WHERE sr.id = s.id
                  AND (sr.status, sr.status_reason, sr.ruling_id) IS DISTINCT FROM (s.status, s.reason, r.id)"""
         )
-        cur.execute("UPDATE ruling_texts SET is_canonical = false WHERE is_canonical AND NOT (source_record_id = ANY(%s))", (canonical_record_ids,))
+        cur.execute(
+            "UPDATE ruling_texts SET is_canonical = false WHERE is_canonical AND NOT (source_record_id = ANY(%s))",
+            (canonical_record_ids,),
+        )
         cur.execute(
             """UPDATE ruling_texts t SET ruling_id = sr.ruling_id FROM source_records sr
                WHERE t.source_record_id = sr.id AND t.ruling_id IS DISTINCT FROM sr.ruling_id"""
         )
-        cur.execute("UPDATE ruling_texts SET is_canonical = true WHERE source_record_id = ANY(%s) AND NOT is_canonical", (canonical_record_ids,))
+        cur.execute(
+            "UPDATE ruling_texts SET is_canonical = true WHERE source_record_id = ANY(%s) AND NOT is_canonical",
+            (canonical_record_ids,),
+        )
         rep.canonical_texts = len(canonical_record_ids)
 
         # conflicts are derived: rebuild, in a stable order
@@ -338,7 +404,9 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
             """CREATE TEMP TABLE _c (docket text, decision_date date, field text, kind text, winner_source text,
                    loser_source text, winner_value text, loser_value text, ord serial) ON COMMIT DROP"""
         )
-        with cur.copy("COPY _c (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value) FROM STDIN") as cp:
+        with cur.copy(
+            "COPY _c (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value) FROM STDIN"
+        ) as cp:
             for c in conflicts:
                 cp.write_row(c)
         cur.execute(
@@ -357,11 +425,21 @@ def load_statute_refs(conn, rows) -> int:
     """rows: dicts with decision_id, law_code, article, paragraph, mention_count (Swiss Case Law, derived)."""
     with conn.transaction():
         cur = conn.cursor()
-        cur.execute("CREATE TEMP TABLE _st (decision_id text, law_code text, article text, paragraph text, mention_count integer) ON COMMIT DROP")
+        cur.execute(
+            "CREATE TEMP TABLE _st (decision_id text, law_code text, article text, paragraph text, mention_count integer) ON COMMIT DROP"
+        )
         with cur.copy("COPY _st FROM STDIN") as cp:
             for r in rows:
                 if r.get("law_code") and r.get("article"):
-                    cp.write_row((r["decision_id"], r["law_code"], r["article"], r.get("paragraph") or "", r.get("mention_count")))
+                    cp.write_row(
+                        (
+                            r["decision_id"],
+                            r["law_code"],
+                            r["article"],
+                            r.get("paragraph") or "",
+                            r.get("mention_count"),
+                        )
+                    )
         cur.execute("TRUNCATE statute_refs")
         cur.execute(
             """INSERT INTO statute_refs (ruling_id, law_code, article, paragraph, mention_count)

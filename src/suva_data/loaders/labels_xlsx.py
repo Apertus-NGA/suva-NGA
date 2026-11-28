@@ -191,9 +191,13 @@ def write_labels(conn, result: LabelsResult, label_set: str = config.LABEL_SET_X
         if missing:
             problems.append(f"no ruling for {len(missing)} docket(s): {missing}")
         if ambiguous:
-            problems.append(f"more than one ruling for {len(ambiguous)} docket(s) (docket: decision dates): {ambiguous}")
+            problems.append(
+                f"more than one ruling for {len(ambiguous)} docket(s) (docket: decision dates): {ambiguous}"
+            )
         if quarter_mismatch:
-            problems.append(f"quarter differs from the decision-date quarter for {len(quarter_mismatch)} label(s): {quarter_mismatch}")
+            problems.append(
+                f"quarter differs from the decision-date quarter for {len(quarter_mismatch)} label(s): {quarter_mismatch}"
+            )
         if changed:
             problems.append(
                 f"{len(changed)} label(s) already stored in {label_set!r} differ from the file"

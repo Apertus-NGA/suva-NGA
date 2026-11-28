@@ -124,7 +124,11 @@ def test_fetch_statute_refs_only_for_decisions_in_the_subset(adapter):
     assert ids <= set(WINDOW_IDS)
     assert "bger_8C_72_2025" in ids
     assert not ids & {"bger_8C_129_2025", "bger_4A_106_2025", "bger_8C_176_2025"}  # present in the fixture original
-    original = [r for r in pq.read_table(FIXTURES / "graph/statute_references.parquet").to_pylist() if r["decision_id"] in WINDOW_IDS]
+    original = [
+        r
+        for r in pq.read_table(FIXTURES / "graph/statute_references.parquet").to_pylist()
+        if r["decision_id"] in WINDOW_IDS
+    ]
     key = lambda r: tuple((r[c] is None, r[c]) for c in STATUTE_COLUMNS)  # noqa: E731  (nulls last)
     assert rows == sorted(original, key=key)
 
@@ -171,7 +175,9 @@ def test_fetch_downloads_only_missing_files_at_the_pinned_revision(adapter, monk
 
     monkeypatch.setattr(sc, "hf_hub_download", fake_download)
     adapter.fetch(WINDOW)
-    assert calls == [(config.SWISS_CASELAW_REPO, "graph/statute_references.parquet", "dataset", config.SWISS_CASELAW_REVISION)]
+    assert calls == [
+        (config.SWISS_CASELAW_REPO, "graph/statute_references.parquet", "dataset", config.SWISS_CASELAW_REVISION)
+    ]
     assert adapter.raw_path("graph/statute_references.parquet").exists()
     assert adapter.statutes_snapshot.exists()
     assert not (adapter.revision_dir / ".download").exists()
@@ -300,19 +306,42 @@ def test_parse_handles_blank_values_and_unparsable_dockets(tmp_path):
     base = pq.read_table(FIXTURES / "data/bger.parquet").to_pylist()[0]
 
     def row(decision_id, **changes):
-        unknown = dict.fromkeys(("title", "legal_area", "outcome", "publication_date", "marked_for_publication", "cited_decisions"))
-        return base | unknown | {"decision_id": decision_id, "decision_date": "2025-11-03", "docket_number": "8C_1/2025"} | changes
+        unknown = dict.fromkeys(
+            ("title", "legal_area", "outcome", "publication_date", "marked_for_publication", "cited_decisions")
+        )
+        return (
+            base
+            | unknown
+            | {"decision_id": decision_id, "decision_date": "2025-11-03", "docket_number": "8C_1/2025"}
+            | changes
+        )
 
     rows = [
-        row("a_blank", title=" , ", legal_area="", outcome="  ", publication_date="", cited_decisions="", marked_for_publication=None),
-        row("b_filled", title="Rente ,  ", publication_date="2025-11-20T00:00:00", cited_decisions='["8C_2/2020", "", 7]', marked_for_publication=True),
+        row(
+            "a_blank",
+            title=" , ",
+            legal_area="",
+            outcome="  ",
+            publication_date="",
+            cited_decisions="",
+            marked_for_publication=None,
+        ),
+        row(
+            "b_filled",
+            title="Rente ,  ",
+            publication_date="2025-11-20T00:00:00",
+            cited_decisions='["8C_2/2020", "", 7]',
+            marked_for_publication=True,
+        ),
         row("c_bad_json", cited_decisions="{not json", publication_date="20.11.2025"),
         row("d_no_docket", docket_number="BGE 150 V 1"),
         row("e_old_format", docket_number=" 8c-12-2025 ".upper()),
     ]
     adapter = sc.SwissCaselawAdapter(raw_dir=tmp_path / "raw", snapshot_dir=tmp_path / "snapshot")
     adapter.bger_snapshot.parent.mkdir(parents=True)
-    pq.write_table(pa.Table.from_pylist(rows, schema=pq.read_schema(FIXTURES / "data/bger.parquet")), adapter.bger_snapshot)
+    pq.write_table(
+        pa.Table.from_pylist(rows, schema=pq.read_schema(FIXTURES / "data/bger.parquet")), adapter.bger_snapshot
+    )
 
     parsed = records(adapter)
     assert list(parsed) == ["a_blank", "b_filled", "c_bad_json", "e_old_format"]
@@ -328,7 +357,9 @@ def test_parse_handles_blank_values_and_unparsable_dockets(tmp_path):
     assert parsed["c_bad_json"].record["cited_decisions"] == "{not json"  # the raw value is still in the record
     assert parsed["e_old_format"].docket == "8C_12/2025"
     # the row without a BGer case number is reported, not silently dropped
-    assert adapter.unparsable_dockets == [{"source_key": "d_no_docket", "docket_number": "BGE 150 V 1", "decision_date": "2025-11-03"}]
+    assert adapter.unparsable_dockets == [
+        {"source_key": "d_no_docket", "docket_number": "BGE 150 V 1", "decision_date": "2025-11-03"}
+    ]
     assert adapter.parse_stats == {"rows_read": 5, "records": 4, "not_selected": 0, "unparsable_docket": 1}
 
 

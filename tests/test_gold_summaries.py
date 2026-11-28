@@ -27,7 +27,9 @@ def real() -> list[GoldSummary]:
     return read_gold_summaries()
 
 
-def export_html(de="<p>Eins.</p><p>Zwei.</p>", fr="<p>Un.</p>", title="BGer-Urteil 8C_1/2025 vom 4. Dezember 2025") -> str:
+def export_html(
+    de="<p>Eins.</p><p>Zwei.</p>", fr="<p>Un.</p>", title="BGer-Urteil 8C_1/2025 vom 4. Dezember 2025"
+) -> str:
     de_section = f"<h2>Text DE</h2>{de}" if de is not None else ""
     fr_section = f"<h2>Text FR</h2>{fr}" if fr is not None else ""
     return (
@@ -138,7 +140,11 @@ def test_author_without_paragraph_tag_and_missing_link():
     summary = parse_export(html, "Export_9C_2_2025.html")
     assert summary.author == "Muster Anna (MUA), Rechtsanwältin"
     assert summary.source_url is None
-    assert (summary.docket, summary.title_language, summary.decision_date_from_title) == ("9C_2/2025", "fr", "2026-03-01")
+    assert (summary.docket, summary.title_language, summary.decision_date_from_title) == (
+        "9C_2/2025",
+        "fr",
+        "2026-03-01",
+    )
 
 
 @pytest.mark.parametrize(
@@ -162,7 +168,12 @@ def test_title_language_and_month_names(title, language, date):
 
 @pytest.mark.parametrize(
     "title",
-    ["BGer-Urteil 8C_1/2025", "BGer-Urteil 8C_1/2025 vom 4. Augst 2025", "BGer-Urteil 8C_1/2025 vom 31. Februar 2026", ""],
+    [
+        "BGer-Urteil 8C_1/2025",
+        "BGer-Urteil 8C_1/2025 vom 4. Augst 2025",
+        "BGer-Urteil 8C_1/2025 vom 31. Februar 2026",
+        "",
+    ],
 )
 def test_unparseable_title_date_is_none(title):
     assert parse_title_date(title) is None

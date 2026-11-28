@@ -53,7 +53,7 @@ def seed(conn) -> int:
     with conn.transaction():
         rows = conn.execute(
             _BASE + "SELECT id, docket, topic, label FROM list l "
-                    "WHERE NOT EXISTS (SELECT 1 FROM predictions p WHERE p.ruling_id = l.id AND p.is_current) ORDER BY id"
+            "WHERE NOT EXISTS (SELECT 1 FROM predictions p WHERE p.ruling_id = l.id AND p.is_current) ORDER BY id"
         ).fetchall()
         if not rows:
             return 0
@@ -64,8 +64,11 @@ def seed(conn) -> int:
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO predictions (ruling_id, run_id, score, relevant, explanation) VALUES (%s, %s, %s, %s, NULL)",
-                [(rid, run_id, s, s >= THRESHOLD) for rid, docket, topic, label in rows
-                 for s in [stub_score(docket, topic, label)]],
+                [
+                    (rid, run_id, s, s >= THRESHOLD)
+                    for rid, docket, topic, label in rows
+                    for s in [stub_score(docket, topic, label)]
+                ],
             )
     return len(rows)
 

@@ -11,8 +11,16 @@ from suva_data import config, db
 pytestmark = pytest.mark.db
 
 EXPECTED_TABLES = {
-    "ingest_runs", "raw_files", "rulings", "source_records", "ruling_texts", "conflicts",
-    "statute_refs", "labels", "gold_summaries", "schema_migrations",
+    "ingest_runs",
+    "raw_files",
+    "rulings",
+    "source_records",
+    "ruling_texts",
+    "conflicts",
+    "statute_refs",
+    "labels",
+    "gold_summaries",
+    "schema_migrations",
 }
 HASH = "a" * 64
 
@@ -22,7 +30,13 @@ def _tables(conn) -> set[str]:
 
 
 def _ruling(conn, docket="8C_72/2025", decision_date="2025-11-03", **extra) -> int:
-    cols = {"docket": docket, "decision_date": decision_date, "division": docket.split("_")[0], "in_window": True, **extra}
+    cols = {
+        "docket": docket,
+        "decision_date": decision_date,
+        "division": docket.split("_")[0],
+        "in_window": True,
+        **extra,
+    }
     query = f"INSERT INTO rulings ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) RETURNING id"
     return conn.execute(query, list(cols.values())).fetchone()[0]
 
@@ -36,6 +50,7 @@ def _source_record(conn, key="k1", docket="8C_72/2025") -> int:
 
 # --- migrations ---------------------------------------------------------------------------------
 
+
 def test_migrate_from_scratch_then_idempotent(db_conn):
     db_conn.execute("DROP SCHEMA public CASCADE")
     db_conn.execute("CREATE SCHEMA public")
@@ -48,12 +63,16 @@ def test_migrate_from_scratch_then_idempotent(db_conn):
     assert [r[0] for r in applied] == expected_files
 
     assert db.migrate(db_conn) == []  # second run: nothing to do, nothing re-applied
-    assert db_conn.execute("SELECT filename, sha256, applied_at FROM schema_migrations ORDER BY 1").fetchall() == applied
+    assert (
+        db_conn.execute("SELECT filename, sha256, applied_at FROM schema_migrations ORDER BY 1").fetchall() == applied
+    )
 
 
 def test_migrate_runs_in_filename_order_each_once(db_conn, tmp_path):
     (tmp_path / "902_b.sql").write_text("INSERT INTO _mig_order (step) VALUES ('902');")
-    (tmp_path / "901_a.sql").write_text("CREATE TABLE _mig_order (n serial, step text); INSERT INTO _mig_order (step) VALUES ('100%');")
+    (tmp_path / "901_a.sql").write_text(
+        "CREATE TABLE _mig_order (n serial, step text); INSERT INTO _mig_order (step) VALUES ('100%');"
+    )
     try:
         assert db.migrate(db_conn, tmp_path) == ["901_a.sql", "902_b.sql"]
         assert db.migrate(db_conn, tmp_path) == []
@@ -93,11 +112,15 @@ def test_fixture_gives_empty_tables(db_conn):
 
 # --- schema constraints ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("docket", ["8C-72-2025", "8C_72_2025", "8c_72/2025", "C_72/2025", "8C_72/25", " 8C_72/2025", ""])
+
+@pytest.mark.parametrize(
+    "docket", ["8C-72-2025", "8C_72_2025", "8c_72/2025", "C_72/2025", "8C_72/25", " 8C_72/2025", ""]
+)
 def test_rulings_reject_bad_docket(db_conn, docket):
     with pytest.raises(errors.CheckViolation):
         db_conn.execute(
-            "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES (%s, '2025-11-03', '8C', true)", (docket,)
+            "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES (%s, '2025-11-03', '8C', true)",
+            (docket,),
         )
 
 
@@ -150,7 +173,9 @@ def test_only_one_canonical_text_per_ruling(db_conn):
 
 def test_source_records_reject_unknown_source_and_status(db_conn):
     with pytest.raises(errors.CheckViolation):
-        db_conn.execute("INSERT INTO source_records (source, source_key, docket) VALUES ('wikipedia', 'k', '8C_72/2025')")
+        db_conn.execute(
+            "INSERT INTO source_records (source, source_key, docket) VALUES ('wikipedia', 'k', '8C_72/2025')"
+        )
     with pytest.raises(errors.CheckViolation):
         db_conn.execute(
             "INSERT INTO source_records (source, source_key, docket, status) VALUES ('swiss_caselaw', 'k', '8C_72/2025', 'done')"
@@ -159,7 +184,9 @@ def test_source_records_reject_unknown_source_and_status(db_conn):
 
 def test_raw_files_reject_bad_sha256(db_conn):
     with pytest.raises(errors.CheckViolation):
-        db_conn.execute("INSERT INTO raw_files (source, path, sha256, bytes) VALUES ('suva', 'a.xlsx', 'not-a-hash', 1)")
+        db_conn.execute(
+            "INSERT INTO raw_files (source, path, sha256, bytes) VALUES ('suva', 'a.xlsx', 'not-a-hash', 1)"
+        )
 
 
 def test_labels_reject_bad_value_and_quarter(db_conn):
@@ -167,20 +194,27 @@ def test_labels_reject_bad_value_and_quarter(db_conn):
     with pytest.raises(errors.CheckViolation):
         db_conn.execute("INSERT INTO labels (ruling_id, label_set, value) VALUES (%s, 's', 'maybe')", (rid,))
     with pytest.raises(errors.CheckViolation):
-        db_conn.execute("INSERT INTO labels (ruling_id, label_set, value, quarter) VALUES (%s, 's', 'relevant', '2025Q4')", (rid,))
+        db_conn.execute(
+            "INSERT INTO labels (ruling_id, label_set, value, quarter) VALUES (%s, 's', 'relevant', '2025Q4')", (rid,)
+        )
 
 
 # --- ingest_runs ------------------------------------------------------------------------------------
 
+
 def test_start_and_finish_run(db_conn):
     run_id = db.start_run(db_conn, "load", {"source": "swiss_caselaw", "note": "a\x00b"})
-    row = db_conn.execute("SELECT command, params, git_commit, status, finished_at FROM ingest_runs WHERE id = %s", (run_id,)).fetchone()
+    row = db_conn.execute(
+        "SELECT command, params, git_commit, status, finished_at FROM ingest_runs WHERE id = %s", (run_id,)
+    ).fetchone()
     assert row[0] == "load" and row[1] == {"source": "swiss_caselaw", "note": "ab"}
     assert row[2] == db.git_commit()
     assert row[3] == "running" and row[4] is None
 
     db.finish_run(db_conn, run_id, "ok", {"read": 3})
-    status, report, finished = db_conn.execute("SELECT status, report, finished_at FROM ingest_runs WHERE id = %s", (run_id,)).fetchone()
+    status, report, finished = db_conn.execute(
+        "SELECT status, report, finished_at FROM ingest_runs WHERE id = %s", (run_id,)
+    ).fetchone()
     assert status == "ok" and report == {"read": 3} and finished is not None
 
     with pytest.raises(ValueError):
@@ -195,4 +229,7 @@ def test_start_run_tolerates_missing_git(db_conn, monkeypatch):
 
     monkeypatch.setattr(db.subprocess, "run", boom)
     run_id = db.start_run(db_conn, "build")
-    assert db_conn.execute("SELECT git_commit, params FROM ingest_runs WHERE id = %s", (run_id,)).fetchone() == (None, {})
+    assert db_conn.execute("SELECT git_commit, params FROM ingest_runs WHERE id = %s", (run_id,)).fetchone() == (
+        None,
+        {},
+    )

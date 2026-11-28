@@ -34,9 +34,20 @@ TITLE_LANGUAGE_PREFIXES = (("BGer-Urteil", "de"), ("Arrêt du", "fr"), ("Sentenz
 
 # Month names without accents, lower case (titles are compared the same way).
 MONTHS = {
-    **dict(zip("januar februar marz april mai juni juli august september oktober november dezember".split(), range(1, 13))),
-    **dict(zip("janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre".split(), range(1, 13))),
-    **dict(zip("gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre".split(), range(1, 13))),
+    **dict(
+        zip("januar februar marz april mai juni juli august september oktober november dezember".split(), range(1, 13))
+    ),
+    **dict(
+        zip(
+            "janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre".split(), range(1, 13)
+        )
+    ),
+    **dict(
+        zip(
+            "gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre".split(),
+            range(1, 13),
+        )
+    ),
 }
 _TITLE_DATE_RE = re.compile(r"(?<!\d)(\d{1,2})(?:er|\.|º|°)?\s+([^\W\d_]+)\s+(\d{4})(?!\d)")
 _HTML_SPACE_RE = re.compile(r"[ \t\r\n\f]+")  # HTML white space; a no-break space is content and is kept
@@ -276,9 +287,13 @@ def write_gold_summaries(conn, summaries: list[GoldSummary]) -> dict[str, int]:
         if missing:
             problems.append(f"no ruling for {len(missing)} docket(s): {missing}")
         if ambiguous:
-            problems.append(f"more than one ruling for {len(ambiguous)} docket(s) (docket: decision dates): {ambiguous}")
+            problems.append(
+                f"more than one ruling for {len(ambiguous)} docket(s) (docket: decision dates): {ambiguous}"
+            )
         if date_mismatch:
-            problems.append(f"the date in the title is not the ruling's decision date for {len(date_mismatch)} summary(ies): {date_mismatch}")
+            problems.append(
+                f"the date in the title is not the ruling's decision date for {len(date_mismatch)} summary(ies): {date_mismatch}"
+            )
         if changed:
             problems.append(
                 f"{len(changed)} stored summary(ies) differ from the file; changed files are not overwritten"

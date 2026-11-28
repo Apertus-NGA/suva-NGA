@@ -45,7 +45,9 @@ def snapshot(tmp_path: Path) -> Path:
 class FakeSite:
     """Stands in for urllib.request.urlopen: serves cp1252 list pages, or blocks."""
 
-    def __init__(self, block_from_request: int | None = None, block_with: str = "page", fail_days: tuple[str, ...] = ()):
+    def __init__(
+        self, block_from_request: int | None = None, block_with: str = "page", fail_days: tuple[str, ...] = ()
+    ):
         self.block_from_request, self.block_with, self.fail_days = block_from_request, block_with, fail_days
         self.requests: list[urllib.request.Request] = []
 
@@ -94,7 +96,14 @@ def site(monkeypatch):
 def test_parse_day_reads_list_date_and_entries():
     list_date, entries = parse_day(PAGE)
     assert list_date == "2025-12-12"
-    assert [e.case for e in entries] == ["1C_594/2025", "4A_508/2025", "8C_313/2024", "8C_458/2025", "8C_648/2025", "7B_65/2023"]
+    assert [e.case for e in entries] == [
+        "1C_594/2025",
+        "4A_508/2025",
+        "8C_313/2024",
+        "8C_458/2025",
+        "8C_648/2025",
+        "7B_65/2023",
+    ]
     assert all(e.list_date == "2025-12-12" for e in entries)
 
 
@@ -158,7 +167,10 @@ def test_parse_french_entries_keep_accents_and_entities(snapshot):
     by_docket = {r.docket: r for r in BgerListAdapter(snapshot_dir=snapshot).parse(ALL)}
     fr = by_docket["7B_65/2023"]
     assert fr.fields["area"] == "Procédure pénale"
-    assert fr.fields["subject"] == "Confiscation et créance compensatrice (classement de la procédure); indemnisation de tiers"
+    assert (
+        fr.fields["subject"]
+        == "Confiscation et créance compensatrice (classement de la procédure); indemnisation de tiers"
+    )
     assert by_docket["8C_648/2025"].fields["area"] == "Santé & sécurité sociale"  # &amp; unescaped
 
 
@@ -186,7 +198,11 @@ def test_parse_omits_unknown_values_instead_of_empty_strings(snapshot):
 def test_parse_filters_by_decision_date_not_list_date(snapshot):
     adapter = BgerListAdapter(snapshot_dir=snapshot)
     # decision dates on the page: 11.11, 12.11, 13.11, 18.11, 01.12, 05.12 (all listed on 12.12)
-    assert [r.docket for r in adapter.parse(Window("2025-11-12", "2025-11-18"))] == ["4A_508/2025", "8C_313/2024", "8C_458/2025"]
+    assert [r.docket for r in adapter.parse(Window("2025-11-12", "2025-11-18"))] == [
+        "4A_508/2025",
+        "8C_313/2024",
+        "8C_458/2025",
+    ]
     assert [r.docket for r in adapter.parse(Window("2025-12-01", "2025-12-05"))] == ["7B_65/2023", "8C_648/2025"]
     # the list date itself is in this window, no decision date is
     assert list(adapter.parse(Window("2025-12-06", "2025-12-31"))) == []
@@ -223,7 +239,13 @@ def test_parse_skips_and_reports_page_with_mismatching_list_date(snapshot):
     recs = list(adapter.parse(ALL))
     assert {r.raw_file for r in recs} == {"bger_list/20251212.html"} and len(recs) == 6
     assert adapter.problems == [
-        {"kind": "list_date_mismatch", "file_date": "2025-12-16", "list_date": "2025-12-12", "entries": 6, "raw_file": "bger_list/20251216.html"}
+        {
+            "kind": "list_date_mismatch",
+            "file_date": "2025-12-16",
+            "list_date": "2025-12-12",
+            "entries": 6,
+            "raw_file": "bger_list/20251216.html",
+        }
     ]
 
 
@@ -235,7 +257,9 @@ def test_parse_reports_block_page_found_in_snapshot(snapshot):
 
 
 def test_parse_reports_invalid_docket_and_normalises_variants(snapshot):
-    page = PAGE.replace(">4A_508/2025</A>", ">Verfügung ohne Nummer</A>").replace(">1C_594/2025</A>", ">1C_0594/2025</A>")
+    page = PAGE.replace(">4A_508/2025</A>", ">Verfügung ohne Nummer</A>").replace(
+        ">1C_594/2025</A>", ">1C_0594/2025</A>"
+    )
     (snapshot / "20251212.html").write_text(page, encoding="utf-8")
     adapter = BgerListAdapter(snapshot_dir=snapshot)
     recs = {r.docket: r for r in adapter.parse(ALL)}
@@ -270,7 +294,14 @@ def test_fetch_skips_weekends_and_days_already_in_snapshot(snapshot, site, no_ne
     fake = site()
     adapter = BgerListAdapter(snapshot_dir=snapshot, lookahead_days=4, delay_s=2.0, today=date(2026, 1, 1))
     written = adapter.fetch(WEEK)
-    assert fake.days() == ["20251208", "20251209", "20251210", "20251211", "20251215", "20251216"]  # no 12 (present), no 13/14
+    assert fake.days() == [
+        "20251208",
+        "20251209",
+        "20251210",
+        "20251211",
+        "20251215",
+        "20251216",
+    ]  # no 12 (present), no 13/14
     assert written == [f"bger_list/{d}.html" for d in fake.days()]
     assert all((snapshot.parent / w).exists() for w in written)
     res = adapter.last_fetch
@@ -278,7 +309,9 @@ def test_fetch_skips_weekends_and_days_already_in_snapshot(snapshot, site, no_ne
     assert res.written == tuple(written)
     assert no_network == [2.0] * 5  # a delay between requests, none before the first
     assert {r.get_header("User-agent") for r in fake.requests} == {config.USER_AGENT}
-    assert all(r.full_url == bger_lists.URL.format(d=date(2025, 12, int(d[6:]))) for r, d in zip(fake.requests, fake.days()))
+    assert all(
+        r.full_url == bger_lists.URL.format(d=date(2025, 12, int(d[6:]))) for r, d in zip(fake.requests, fake.days())
+    )
     # second run: nothing left to do, no request
     assert adapter.fetch(WEEK) == [] and len(fake.requests) == 6
     assert adapter.last_fetch.status == "complete" and adapter.last_fetch.already_present == 7
@@ -304,7 +337,12 @@ def test_fetch_stops_at_first_block_and_never_stores_the_block_page(snapshot, si
     res = adapter.last_fetch
     assert res.status == "blocked" and res.blocked_on == "2025-12-10"
     assert res.remaining == ("2025-12-10", "2025-12-11", "2025-12-15", "2025-12-16")
-    assert sorted(p.name for p in snapshot.iterdir()) == ["20251208.html", "20251209.html", "20251212.html", "20251213.html"]
+    assert sorted(p.name for p in snapshot.iterdir()) == [
+        "20251208.html",
+        "20251209.html",
+        "20251212.html",
+        "20251213.html",
+    ]
     assert not any("Incapsula" in p.read_text(encoding="utf-8") for p in snapshot.iterdir())
 
 

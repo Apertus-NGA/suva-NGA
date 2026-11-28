@@ -69,8 +69,18 @@ def test_rule_1_unknown_title_is_dropped_with_a_distinct_reason_never_guessed(tm
         tmp_path,
         [
             ("2026 Q1", "8C_1/2026", dt.datetime(2026, 3, 1), None),
-            ("2026 Q1", "BGer-Urteil 999/2025 vom 3. Februar 2026", dt.datetime(2026, 3, 1), None),  # not in the override table
-            ("2026 Q1", "Urteil 8C_2/2026 vom 3. Februar 2026", dt.datetime(2026, 3, 1), None),  # a docket inside free text
+            (
+                "2026 Q1",
+                "BGer-Urteil 999/2025 vom 3. Februar 2026",
+                dt.datetime(2026, 3, 1),
+                None,
+            ),  # not in the override table
+            (
+                "2026 Q1",
+                "Urteil 8C_2/2026 vom 3. Februar 2026",
+                dt.datetime(2026, 3, 1),
+                None,
+            ),  # a docket inside free text
             ("2026 Q1", CANTONAL_TITLE, dt.datetime(2026, 3, 1), None),
         ],
     )
@@ -158,7 +168,9 @@ def add_ruling(conn, docket, decision_date, in_window=True) -> int:
     ).fetchone()[0]
 
 
-def label(docket, quarter, xlsx_row=2, erstellt="2026-03-23T10:30:07", url="https://intranet.example/x.aspx") -> LabelRow:
+def label(
+    docket, quarter, xlsx_row=2, erstellt="2026-03-23T10:30:07", url="https://intranet.example/x.aspx"
+) -> LabelRow:
     return LabelRow(docket, quarter, docket, xlsx_row, erstellt, url)
 
 
@@ -191,7 +203,10 @@ def test_write_real_labels_happy_path_and_idempotent(db_conn, real):
 
     before = db_conn.execute("SELECT id, ruling_id, quarter, metadata, created_at FROM labels ORDER BY id").fetchall()
     assert write_labels(db_conn, real) == {"read": 59, "dropped": 1, "inserted": 0, "unchanged": 59}
-    assert db_conn.execute("SELECT id, ruling_id, quarter, metadata, created_at FROM labels ORDER BY id").fetchall() == before
+    assert (
+        db_conn.execute("SELECT id, ruling_id, quarter, metadata, created_at FROM labels ORDER BY id").fetchall()
+        == before
+    )
 
 
 @pytest.mark.db
@@ -262,7 +277,19 @@ def test_v_relevance(db_conn):
     write_labels(db_conn, LabelsResult(rows=[label("8C_1/2025", "2025 Q4")]))
     write_gold_summaries(
         db_conn,
-        [GoldSummary("8C_2/2025", "Export_8C_2_2025.html", "BGer-Urteil 8C_2/2025 vom 28. August 2025", "de", "2025-08-28", "DE", "FR", "A", None)],
+        [
+            GoldSummary(
+                "8C_2/2025",
+                "Export_8C_2_2025.html",
+                "BGer-Urteil 8C_2/2025 vom 28. August 2025",
+                "de",
+                "2025-08-28",
+                "DE",
+                "FR",
+                "A",
+                None,
+            )
+        ],
     )
     view = {
         docket: (relevance, basis, quarter)

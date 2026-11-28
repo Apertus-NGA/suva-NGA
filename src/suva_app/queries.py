@@ -75,18 +75,18 @@ class RulingFilters:
     published_to: date | None = None
     divisions: list[str] = field(default_factory=list)
     areas: list[str] = field(default_factory=list)
-    topics: list[str] = field(default_factory=list)       # UV / MV / IV
+    topics: list[str] = field(default_factory=list)  # UV / MV / IV
     languages: list[str] = field(default_factory=list)
     outcomes: list[str] = field(default_factory=list)
-    labels: list[str] = field(default_factory=list)       # relevant / not_relevant / unknown (human labels)
-    statuses: list[str] = field(default_factory=list)     # see STATUSES
-    starred: bool | None = None                            # marked for publication in the official collection
-    predicted_relevant: bool | None = None                 # the system's decision
-    ingested: bool | None = None                           # added by a live update (True) / part of the base dataset
-    summarised: bool | None = None                         # has a summary: Suva's reference one or a generated one
-    score_min: int | None = None                           # 0..100
+    labels: list[str] = field(default_factory=list)  # relevant / not_relevant / unknown (human labels)
+    statuses: list[str] = field(default_factory=list)  # see STATUSES
+    starred: bool | None = None  # marked for publication in the official collection
+    predicted_relevant: bool | None = None  # the system's decision
+    ingested: bool | None = None  # added by a live update (True) / part of the base dataset
+    summarised: bool | None = None  # has a summary: Suva's reference one or a generated one
+    score_min: int | None = None  # 0..100
     score_max: int | None = None
-    q: str | None = None                                   # case number or subject contains
+    q: str | None = None  # case number or subject contains
 
 
 def _where(f: RulingFilters) -> tuple[str, list]:
@@ -105,9 +105,15 @@ def _where(f: RulingFilters) -> tuple[str, list]:
         add("publication_date >= %s", f.published_from)
     if f.published_to:
         add("publication_date <= %s", f.published_to)
-    for column, values in (("division", f.divisions), ("area", f.areas), ("topic", f.topics),
-                           ("language", f.languages), ("outcome", f.outcomes), ("label", f.labels),
-                           ("status", f.statuses)):
+    for column, values in (
+        ("division", f.divisions),
+        ("area", f.areas),
+        ("topic", f.topics),
+        ("language", f.languages),
+        ("outcome", f.outcomes),
+        ("label", f.labels),
+        ("status", f.statuses),
+    ):
         if values:
             add(f"{column} = ANY(%s)", list(values))
     if f.starred is not None:
@@ -129,8 +135,15 @@ def _where(f: RulingFilters) -> tuple[str, list]:
     return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
 
 
-def list_rulings(conn, filters: RulingFilters | None = None, *, sort: str = "decision_date", order: str = "desc",
-                 limit: int = 50, offset: int = 0) -> dict:
+def list_rulings(
+    conn,
+    filters: RulingFilters | None = None,
+    *,
+    sort: str = "decision_date",
+    order: str = "desc",
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
     """One page of rulings plus the total number matching the filters: {"total": n, "items": [...]}."""
     if sort not in SORTS:
         raise ValueError(f"sort must be one of {sorted(SORTS)}, got {sort!r}")
@@ -225,9 +238,11 @@ def display_title(subject: str | None, area: str | None) -> str | None:
 def facets(conn) -> dict:
     """The values each filter can take, with counts over all rulings, and whether scores are placeholders."""
     with conn.cursor(row_factory=dict_row) as cur:
+
         def counted(column: str, order: str = "n DESC, value") -> list[dict]:
             return cur.execute(
-                _BASE + f"SELECT {column} AS value, count(*) AS n FROM list WHERE {column} IS NOT NULL GROUP BY 1 ORDER BY {order}"
+                _BASE
+                + f"SELECT {column} AS value, count(*) AS n FROM list WHERE {column} IS NOT NULL GROUP BY 1 ORDER BY {order}"
             ).fetchall()
 
         ranges = cur.execute(

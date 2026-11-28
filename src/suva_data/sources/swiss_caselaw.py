@@ -89,7 +89,11 @@ def _jsonable(value):
 
 
 def _blank(value) -> bool:
-    return value is None or (isinstance(value, float) and math.isnan(value)) or (isinstance(value, str) and not value.strip())
+    return (
+        value is None
+        or (isinstance(value, float) and math.isnan(value))
+        or (isinstance(value, str) and not value.strip())
+    )
 
 
 def _write_deterministic(table: pa.Table, path: Path) -> None:
@@ -167,7 +171,11 @@ class SwissCaselawAdapter:
             marker = {}
         stat = path.stat()
         seen = marker.get(repo_file) or {}
-        if seen.get("size") == stat.st_size and seen.get("mtime_ns") == stat.st_mtime_ns and seen.get("sha256") == expected:
+        if (
+            seen.get("size") == stat.st_size
+            and seen.get("mtime_ns") == stat.st_mtime_ns
+            and seen.get("sha256") == expected
+        ):
             return
         actual = _sha256(path)
         if actual != expected:
@@ -267,7 +275,12 @@ class SwissCaselawAdapter:
     def _fields(row: dict, docket: str) -> dict:
         """Candidates for the canonical row. A key is present only when the source has a value."""
         fields: dict = {"division": division_of(docket)}
-        for target, column in (("language", "language"), ("area", "legal_area"), ("outcome", "outcome"), ("official_url", "source_url")):
+        for target, column in (
+            ("language", "language"),
+            ("area", "legal_area"),
+            ("outcome", "outcome"),
+            ("official_url", "source_url"),
+        ):
             if not _blank(row.get(column)):
                 fields[target] = row[column].strip()
         if (published := _iso_date(row.get("publication_date"))) is not None:

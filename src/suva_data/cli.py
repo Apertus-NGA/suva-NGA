@@ -59,7 +59,9 @@ def cmd_fetch(args) -> int:
     status = 0
     for a in adapters():
         if a.name == config.BGER_LIST and not args.include_bger:
-            print(f"{a.name}: skipped (bger.ch refuses non-browser clients; the archived pages in the snapshot are used). Pass --include-bger to try.")
+            print(
+                f"{a.name}: skipped (bger.ch refuses non-browser clients; the archived pages in the snapshot are used). Pass --include-bger to try."
+            )
             continue
         try:
             written = a.fetch(window, extras)
@@ -77,7 +79,9 @@ def cmd_build(args) -> int:
     db.migrate(conn)
     # Rulings added by a live ingest are kept by a rebuild, although they may lie outside the window.
     extras = gold_dockets() | ingest.ingested_dockets(conn)
-    run_id = db.start_run(conn, "build", {"window": [window.decision_from, window.decision_to], "extra_dockets": len(extras)})
+    run_id = db.start_run(
+        conn, "build", {"window": [window.decision_from, window.decision_to], "extra_dockets": len(extras)}
+    )
     try:
         # 1. snapshot manifest: what exactly are we building from?
         files = snapshot_files()
@@ -88,7 +92,9 @@ def cmd_build(args) -> int:
             diffs = verify.verify_manifest_files(manifest)
             if diffs:
                 print("Snapshot differs from data/manifest.json:\n  " + "\n  ".join(diffs[:40]), file=sys.stderr)
-                raise SystemExit("refusing to build from a snapshot that does not match the manifest (use --update-manifest if intended)")
+                raise SystemExit(
+                    "refusing to build from a snapshot that does not match the manifest (use --update-manifest if intended)"
+                )
         by_source: dict[str, list[str]] = {}
         for rel, meta in files.items():
             by_source.setdefault(meta["source"], []).append(rel)
@@ -102,15 +108,21 @@ def cmd_build(args) -> int:
             print(f"load {a.name}: {load_counts[a.name]}")
             if a.name == config.BGER_LIST:
                 list_cov = a.coverage(window).as_dict()
-            problems = getattr(a, "problems", None) or getattr(a, "unparsable_dockets", None) or getattr(a, "undetermined", None)
+            problems = (
+                getattr(a, "problems", None)
+                or getattr(a, "unparsable_dockets", None)
+                or getattr(a, "undetermined", None)
+            )
             if problems:
                 load_counts[a.name]["adapter_problems"] = len(problems)
                 print(f"  {a.name}: {len(problems)} record(s) reported as problems by the adapter", file=sys.stderr)
 
         # 3. reconcile (hierarchy of truth)
         report = rec.reconcile(conn, window, extras).as_dict()
-        print(f"reconcile: {report['rulings']} rulings ({report['rulings_in_window']} in window), "
-              f"{report['duplicates']} duplicates collapsed, {report['rulings_without_valid_text']} without valid text")
+        print(
+            f"reconcile: {report['rulings']} rulings ({report['rulings_in_window']} in window), "
+            f"{report['duplicates']} duplicates collapsed, {report['rulings_without_valid_text']} without valid text"
+        )
         n_st = rec.load_statute_refs(conn, SwissCaselawAdapter().parse_statute_refs())
         report["statute_refs"] = n_st
 
@@ -123,26 +135,59 @@ def cmd_build(args) -> int:
         # 5. verify + report + manifest
         inv = verify.check_invariants(conn, expected_gold=len(gold), expected_labels=len(labels.rows), window=window)
         fp = verify.fingerprint(conn)
-        config.QUALITY_REPORT_PATH.write_text(verify.quality_report(conn, inv, fp, load_counts, report, list_cov, labels.dropped), encoding="utf-8")
+        config.QUALITY_REPORT_PATH.write_text(
+            verify.quality_report(conn, inv, fp, load_counts, report, list_cov, labels.dropped), encoding="utf-8"
+        )
         failed = [(n, d) for n, ok, d in inv if not ok]
         for name, ok, detail in inv:
             print(f"  [{'ok' if ok else 'FAIL'}] {name}: {detail}")
         print(f"fingerprint: {fp['dataset']}")
-        if manifest and manifest.get("fingerprint") and manifest["fingerprint"] != fp["dataset"] and not args.update_manifest:
+        if (
+            manifest
+            and manifest.get("fingerprint")
+            and manifest["fingerprint"] != fp["dataset"]
+            and not args.update_manifest
+        ):
             failed.append(("fingerprint equals data/manifest.json", f"{fp['dataset']} != {manifest['fingerprint']}"))
             print("  [FAIL] fingerprint differs from data/manifest.json", file=sys.stderr)
         if not manifest or args.update_manifest:
-            config.MANIFEST_PATH.write_text(json.dumps({
-                "window": {"decision_from": window.decision_from, "decision_to": window.decision_to},
-                "swiss_caselaw": {"repo": config.SWISS_CASELAW_REPO, "revision": config.SWISS_CASELAW_REVISION, "files": config.SWISS_CASELAW_FILES},
-                "fingerprint": fp["dataset"], "fingerprint_tables": fp["tables"],
-                "counts": {"rulings": report["rulings"], "rulings_in_window": report["rulings_in_window"],
-                           "labels": len(labels.rows), "gold_summaries": len(gold)},
-                "files": files,
-                **({"tables": manifest["tables"]} if manifest and manifest.get("tables") and manifest.get("fingerprint") == fp["dataset"] else {}),
-            }, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+            config.MANIFEST_PATH.write_text(
+                json.dumps(
+                    {
+                        "window": {"decision_from": window.decision_from, "decision_to": window.decision_to},
+                        "swiss_caselaw": {
+                            "repo": config.SWISS_CASELAW_REPO,
+                            "revision": config.SWISS_CASELAW_REVISION,
+                            "files": config.SWISS_CASELAW_FILES,
+                        },
+                        "fingerprint": fp["dataset"],
+                        "fingerprint_tables": fp["tables"],
+                        "counts": {
+                            "rulings": report["rulings"],
+                            "rulings_in_window": report["rulings_in_window"],
+                            "labels": len(labels.rows),
+                            "gold_summaries": len(gold),
+                        },
+                        "files": files,
+                        **(
+                            {"tables": manifest["tables"]}
+                            if manifest and manifest.get("tables") and manifest.get("fingerprint") == fp["dataset"]
+                            else {}
+                        ),
+                    },
+                    indent=1,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             print(f"wrote {config.MANIFEST_PATH}")
-        db.finish_run(conn, run_id, "failed" if failed else "ok", {"load": load_counts, "reconcile": report, "fingerprint": fp["dataset"], "failed_checks": failed})
+        db.finish_run(
+            conn,
+            run_id,
+            "failed" if failed else "ok",
+            {"load": load_counts, "reconcile": report, "fingerprint": fp["dataset"], "failed_checks": failed},
+        )
         return 1 if failed else 0
     except BaseException as e:
         db.finish_run(conn, run_id, "failed", {"error": str(e)[:2000]})
@@ -170,10 +215,21 @@ def cmd_dump(args) -> int:
     """pg_dump inside the db container -> gzip (no timestamp in the gzip header, so equal content gives equal bytes)."""
     config.DUMP_DIR.mkdir(parents=True, exist_ok=True)
     out = config.DUMP_DIR / DUMP_NAME
-    cmd = ["docker", "compose", "exec", "-T", "db", "pg_dump", "-U", "suva", "--no-owner", "--no-privileges",
-           "--exclude-table-data=ingest_runs",
-           "--restrict-key=suvadata",  # pg_dump otherwise writes a random key, so equal content would not give equal bytes
-           "suva"]
+    cmd = [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "db",
+        "pg_dump",
+        "-U",
+        "suva",
+        "--no-owner",
+        "--no-privileges",
+        "--exclude-table-data=ingest_runs",
+        "--restrict-key=suvadata",  # pg_dump otherwise writes a random key, so equal content would not give equal bytes
+        "suva",
+    ]
     proc = subprocess.Popen(cmd, cwd=config.REPO, stdout=subprocess.PIPE)
     with out.open("wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0, compresslevel=6) as gz:
         shutil.copyfileobj(proc.stdout, gz, 1 << 20)
@@ -201,9 +257,15 @@ def cmd_ingest(args) -> int:
     bger, mirror, days = report.bger, report.mirror, report.daily["days"]
     by_status = {k: sum(1 for d in days if d["status"] == k) for k in sorted({d["status"] for d in days})}
     print(f"  bger.ch lists: {bger['status']} ({bger['records']} entries for the range)")
-    print(f"  Hugging Face daily files: {report.daily['status']} {by_status}, {report.daily['records']} rulings in the range")
-    print(f"  mirror (entscheidsuche.ch): {mirror['status']}, asked for {mirror['asked']} rulings, found {mirror['found']}")
-    print(f"  added {len(report.new_rulings)} new rulings; {report.known_rulings} were already held and left as they were")
+    print(
+        f"  Hugging Face daily files: {report.daily['status']} {by_status}, {report.daily['records']} rulings in the range"
+    )
+    print(
+        f"  mirror (entscheidsuche.ch): {mirror['status']}, asked for {mirror['asked']} rulings, found {mirror['found']}"
+    )
+    print(
+        f"  added {len(report.new_rulings)} new rulings; {report.known_rulings} were already held and left as they were"
+    )
     print(f"  new rulings with two independent texts: {report.new_with_two_texts} of {len(report.new_rulings)}")
     print(f"  not yet confirmed by a bger.ch list: {report.not_confirmed_by_bger}")
     if report.text_mismatches:
@@ -253,10 +315,16 @@ def cmd_pull(args) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="suva_data", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        prog="suva_data", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = p.add_subparsers(dest="command", required=True)
-    f = sub.add_parser("fetch"); f.add_argument("--include-bger", action="store_true"); f.set_defaults(fn=cmd_fetch)
-    b = sub.add_parser("build"); b.add_argument("--update-manifest", action="store_true"); b.set_defaults(fn=cmd_build)
+    f = sub.add_parser("fetch")
+    f.add_argument("--include-bger", action="store_true")
+    f.set_defaults(fn=cmd_fetch)
+    b = sub.add_parser("build")
+    b.add_argument("--update-manifest", action="store_true")
+    b.set_defaults(fn=cmd_build)
     sub.add_parser("verify").set_defaults(fn=cmd_verify)
     sub.add_parser("dump").set_defaults(fn=cmd_dump)
     sub.add_parser("export").set_defaults(fn=cmd_export)
@@ -265,7 +333,9 @@ def main(argv=None) -> int:
     ing.add_argument("--to", dest="published_to", metavar="YYYY-MM-DD")
     ing.add_argument("--since-last", action="store_true", help="from the last ingest (minus an overlap) to yesterday")
     ing.set_defaults(fn=cmd_ingest)
-    pl = sub.add_parser("pull"); pl.add_argument("--revision"); pl.set_defaults(fn=cmd_pull)
+    pl = sub.add_parser("pull")
+    pl.add_argument("--revision")
+    pl.set_defaults(fn=cmd_pull)
     args = p.parse_args(argv)
     return args.fn(args)
 

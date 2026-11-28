@@ -46,7 +46,9 @@ def _db_session():
             lock_conn = psycopg.connect(test_url, autocommit=True, connect_timeout=3)
         except psycopg.OperationalError:
             # Probably the database does not exist yet: create it via the server's default database.
-            with psycopg.connect(make_conninfo(test_url, dbname="postgres"), autocommit=True, connect_timeout=3) as admin:
+            with psycopg.connect(
+                make_conninfo(test_url, dbname="postgres"), autocommit=True, connect_timeout=3
+            ) as admin:
                 if not admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,)).fetchone():
                     try:
                         admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))

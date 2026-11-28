@@ -33,6 +33,7 @@ _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # --- cleaning ---------------------------------------------------------------------------------------
 
+
 def _clean_str(s: str) -> str:
     """Postgres cannot store NUL; lone surrogates cannot be encoded as UTF-8 at all."""
     if "\x00" in s:
@@ -64,6 +65,7 @@ def _to_json(value) -> str:
 
 
 # --- raw files --------------------------------------------------------------------------------------
+
 
 def _sha256_file(path: Path) -> tuple[str, int]:
     h, n = hashlib.sha256(), 0
@@ -124,6 +126,7 @@ def register_raw_files(
 
 
 # --- source records ---------------------------------------------------------------------------------
+
 
 @dataclass
 class _Row:
@@ -391,7 +394,9 @@ def load_source_records(
     """
     if add_only and kept is None:
         kept = []
-    counts = {k: 0 for k in ("read", "inserted", "updated", "unchanged", "rejected", "not_stored", "texts", "bad_texts")}
+    counts = {
+        k: 0 for k in ("read", "inserted", "updated", "unchanged", "rejected", "not_stored", "texts", "bad_texts")
+    }
     if add_only:
         counts["kept_existing"] = 0
     with conn.transaction():
