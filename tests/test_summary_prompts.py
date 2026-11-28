@@ -1,7 +1,7 @@
 """The fiche prompt loads only the glossary of the ruling's matter."""
 
-from src.summarize.prompts import VERSION, category_of, glossary_block, system_prompt
-from src.summarize.summarize import blocking
+from src.summarize.prompts import VERSION, category_of, glossary_block, qwen_comparison, system_prompt
+from src.summarize.summarize import blocking, write_fiche
 from src.summarize.v1.prompts import VERSION as V1
 from src.summarize.v1.prompts import system_prompt as system_v1
 
@@ -62,6 +62,36 @@ def test_category_reads_the_matter_like_the_gate():
     assert category_of("Assicurazione contro le malattie") == "kv"
     assert category_of("Militärversicherung") == "other"  # no glossary of its own
     assert category_of(None) == "other"
+
+
+def test_qwen_comparison_stays_out_of_the_running_prompt():
+    running = system_prompt("de", "uv") + system_prompt("fr", "iv")
+    for line in qwen_comparison:
+        assert line not in running
+    joined = " ".join(qwen_comparison)
+    assert "article number" in joined
+    assert "operative outcome" in joined
+    assert "offensichtlich" in joined and "manifestement" in joined
+    seen: list[str] = []
+
+    def ask(messages):
+        seen.append(messages[0]["content"])
+        return (
+            "Der Versicherte verlangte eine Rente. Das Bundesgericht hielt die Feststellung für richtig. "
+            "Die Beschwerde wird abgewiesen."
+        )
+
+    target = {
+        "docket": "8C_1/2026",
+        "decision_date": "2026-01-01",
+        "division": "I",
+        "area": "Unfallversicherung",
+        "text": "Demnach erkennt das Bundesgericht: 1. Die Beschwerde wird abgewiesen.",
+    }
+    write_fiche("de", target, [], "uv", ask)
+    assert qwen_comparison[0] not in seen[0]
+    write_fiche("de", target, [], "uv", ask, extras=qwen_comparison)
+    assert qwen_comparison[0] in seen[1]
 
 
 def test_every_glossary_subject_is_read_as_its_own_matter():

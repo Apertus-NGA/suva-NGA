@@ -32,6 +32,8 @@ Each member fills their own rows: tool, every model actually used, and what for.
 
 | Member | Tool | Model(s) and version | Used for |
 |---|---|---|---|
+| summary probe, 28 Nov 2026 | Hugging Face Jobs | `Qwen/Qwen2.5-14B-Instruct-AWQ` (Apache-2.0). A `Qwen/Qwen2.5-32B-Instruct-AWQ` load did not fit a 24 GB GPU and wrote no fiche. | one comparison of the v2 fiche prompt, `docs/SUMMARY_V2.md` §4. Not a runtime model. |
+| summary probe, 28 Nov 2026 | Hugging Face inference router | `Qwen/Qwen3.8-27B` (served id `qwen/qwen3.8-27b`), thinking off | the same ten fiches, `docs/SUMMARY_V2.md` §5, then all 100, §6, then the same 100 after `finish()` with `qwen_comparison` appended, §7. Not a runtime model. |
 | `<handle>` | `<coding assistant>` | `<model, version>` | `<code, research, review…>` |
 | `<handle>` | `<chat assistant>` | `<model, version>` | `<…>` |
 | `<handle>` | `<IDE assistant>` | `<model, version>` | `<…>` |

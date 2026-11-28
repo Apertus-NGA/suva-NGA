@@ -471,13 +471,8 @@ def blocking(language: str, text: str, source: str) -> list[str]:
             found.append("critique: art. 6 condition inverted")
     if re.search(r"art\. 17[^\n]{0,80}statu|statu[^\n]{0,80}art\. 17", low):
         found.append("critique: art. 17 confused with the status quo")
-    if language == "de" and "offensichtlich" in low and "offensichtlich" not in source_low:
-        found.append("critique: manifestly ill-founded copied")
-    if (
-        language == "fr"
-        and "manifestement" in low
-        and "manifestement" not in source_low
-        and "offensichtlich" not in source_low
+    if ("offensichtlich" in low or "manifestement" in low) and not (
+        "offensichtlich" in source_low or "manifestement" in source_low
     ):
         found.append("critique: manifestly ill-founded copied")
     if "demnach erkennt" in low or "par ces motifs" in low or "per questi motivi" in low:
@@ -623,15 +618,25 @@ def _critical(language: str, text: str, source: str, docket: str) -> list[str]:
     return [item for item in blocking(language, text, source) if item.startswith("critique")]
 
 
-def write_fiche(language: str, target: dict, examples: list[dict], category: str, ask=None) -> tuple[str, list[str]]:
+def write_fiche(
+    language: str,
+    target: dict,
+    examples: list[dict],
+    category: str,
+    ask=None,
+    extras: list[str] | None = None,
+) -> tuple[str, list[str]]:
     """One fiche in one language: generate, let the checker ask for up to two repairs, return (text, problems).
 
     `target` is {"docket", "decision_date", "division", "area", "text"}; `examples` are [{"docket", "body"}].
     `ask` sends the messages to the model and returns its text (default: `chat`, the gateway client).
     The prompt is the one of the ruling's matter (`category`), in the fiche's language.
+    `extras` is appended only when given (`qwen_comparison`). The running prompt stays as it is.
     """
     ask = ask or chat
     system = system_prompt(language, category)
+    if extras:
+        system = system + "\n" + "\n".join(extras)
     user = user_prompt(language, examples, target, category)
     text = ask([{"role": "system", "content": system}, {"role": "user", "content": user}])
     forms = required_forms(language, target["text"])

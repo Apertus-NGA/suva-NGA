@@ -180,3 +180,12 @@ def system_prompt(language: str, category: str) -> str:
         parts.append(_REVISION[language])
     parts.append(_CLOSE[language])
     return " ".join(parts)
+
+
+# Comparison only. system_prompt does not include this. Any ruling, either fiche language.
+qwen_comparison = [
+    "Cite an article only when this ruling contains both that article number and that statute. Otherwise cite none.",
+    "Use only the statute abbreviations of the fiche's language.",
+    "End with one sentence that states this ruling's operative outcome: dismissed, admitted, or partly admitted. Do not omit it and do not paste the operative block.",
+    "Do not write that the appeal is manifestly ill-founded, in German or in French, unless this ruling contains offensichtlich or manifestement.",
+]

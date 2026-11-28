@@ -7,7 +7,7 @@ from src.summarize import finish as f
 RULING = (
     "Besetzung\nBundesrichterin Viscione, Präsidentin,\nBundesrichter Maillard, Bundesrichterin Heine,\n"
     "Bundesrichter Métral, Bundesrichterin Scherrer Reber,\nGerichtsschreiber Wüest.\n\n"
-    "Erwägungen:\n\n1.\nEintreten.\n\n4.\n4.1. Text.\n\n4.2. Text.\n\n"
+    "Erwägungen:\n\n1.\nEintreten.\n\n4.\n4.1. Nach Art. 6 Abs. 2 UVG. Text.\n\n4.2. Text.\n\n"
     "Demnach erkennt das Bundesgericht:\n\n1.\nDie Beschwerde wird abgewiesen.\n\n2.\nDie Gerichtskosten werden auferlegt.\n"  # noqa: E501
 )
 SINGLE = "Composition\nMme la Juge fédérale Viscione, Présidente.\nGreffier : M. Ourny.\n\nPar ces motifs, la Présidente prononce :\n\n1.\nLe recours est irrecevable.\n"  # noqa: E501
@@ -119,6 +119,27 @@ def test_finish_puts_it_together():
 def test_finish_is_stable_when_applied_twice():
     once, _ = f.finish("de", "Die Regel gilt (E. 4.1).", RULING, starred=False)
     assert f.finish("de", once, RULING, starred=False)[0] == once
+
+
+def test_an_article_missing_from_the_ruling_is_removed():
+    text, dropped = f.cited_articles_in_the_ruling(
+        "Art. 6 Abs. 2 UVG gilt. Art. 99 ATSG gilt nicht.", RULING
+    )
+    assert text == "Art. 6 Abs. 2 UVG gilt. gilt nicht."
+    assert dropped == ["Art. 99 ATSG"]
+
+
+def test_manifestly_ill_founded_needs_either_language_in_the_ruling():
+    bare = "Die Regel gilt. Die Beschwerde ist offensichtlich unbegründet."
+    french_ruling = "Le recours est manifestement non fondé."
+    kept, dropped = f.grounded_wording_only(bare, french_ruling)
+    assert kept == bare and dropped is False
+    removed, dropped = f.grounded_wording_only(bare, RULING)
+    assert "offensichtlich" not in removed and dropped is True
+    from src.summarize.summarize import blocking
+
+    assert "critique: manifestly ill-founded copied" not in blocking("de", bare, french_ruling)
+    assert "critique: manifestly ill-founded copied" in blocking("fr", "Le recours est manifestement non fondé.", RULING)
 
 
 def test_placeholder_is_reported_not_rewritten():

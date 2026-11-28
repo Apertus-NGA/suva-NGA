@@ -8,7 +8,7 @@ For each ruling D-047 names (while open: our top 10 by score; then every selecte
 ## You own
 `src/summarise/`, `src/verify/` (unless split), `prompts/summary_*`, `docs/GLOSSARY.md`, `docs/summary_style.md`.
 
-A probe of legal errors on fiches already written, and how a counter was made to match a human reading, is in `docs/SUMMARY_MEASUREMENT.md` (v1, one prompt). The v2 prompt, one glossary and one prompt per matter, was run on 50 rulings: `docs/SUMMARY_V2.md`. The scripts are `src/summarize/summarize.py` (generator, through `src/llm/client.py` since `acd3f2d`; v1 is `src/summarize/v1/`, v2 is `src/summarize/v2/`) and `src/summarize/tally.py` (counter). That directory is the probe, not the pipeline package `src/summarise/` above. It is not the hold-out of step 5.
+A probe of legal errors on fiches already written, and how a counter was made to match a human reading, is in `docs/SUMMARY_MEASUREMENT.md` (v1, one prompt). The v2 prompt, one glossary and one prompt per matter, was run on 50 rulings: `docs/SUMMARY_V2.md`. The same prompt on two Qwen models is §4, §5 and §6 of that note. §6 is all 100 fiches. §7 is those 100 after `finish()`, with `qwen_comparison` appended for Qwen only. The scripts are `src/summarize/summarize.py` (generator, through `src/llm/client.py` since `acd3f2d`; v1 is `src/summarize/v1/`, v2 is `src/summarize/v2/`), `src/summarize/tally.py` (counter) and `src/qwen_comparison` (the router probe, `python -m src.qwen_comparison`). That directory is the probe, not the pipeline package `src/summarise/` above. It is not the hold-out of step 5.
 
 ## Inputs
 - Ruling records (considerations pre-split, operative part); triage decision (key statement, supporting considerations).

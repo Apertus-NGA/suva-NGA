@@ -5,14 +5,31 @@ v2  src/summarize/v2/   one glossary and one prompt per matter. This is the one 
 """
 
 if __package__:
-    from .v2.prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from .v2.prompts import (
+        VERSION,
+        category_of,
+        glossary_block,
+        qwen_comparison,
+        sigil_hint,
+        sigils,
+        system_prompt,
+    )
 else:
-    from v2.prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from v2.prompts import (
+        VERSION,
+        category_of,
+        glossary_block,
+        qwen_comparison,
+        sigil_hint,
+        sigils,
+        system_prompt,
+    )
 
 __all__ = [
     "VERSION",
     "category_of",
     "glossary_block",
+    "qwen_comparison",
     "sigil_hint",
     "sigils",
     "system_prompt",

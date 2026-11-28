@@ -3,10 +3,12 @@
 Applied after generation, in this order. Each step is a pure function of the fiche and the ruling text:
 1. strip Markdown the model adds (bold, headings, bullets);
 2. law abbreviations in the fiche's language (a German fiche says UVG, a French one LAA): a one-to-one swap;
-3. consideration references are kept only if that consideration exists in the ruling;
-4. the outcome is stated exactly once: sentences that are nothing but the outcome are removed and the
+3. an article citation is kept only if that article number and that statute are in the ruling;
+4. "offensichtlich unbegründet" / "manifestement non fondé" is kept only if either wording is in the ruling;
+5. consideration references are kept only if that consideration exists in the ruling;
+6. the outcome is stated exactly once: sentences that are nothing but the outcome are removed and the
    outcome read from the operative part is appended, unless the fiche already states it inside a longer sentence;
-5. the note Suva puts under a fiche ("Fünfer-Entscheid, zur Publikation vorgesehen.") is added from facts:
+7. the note Suva puts under a fiche ("Fünfer-Entscheid, zur Publikation vorgesehen.") is added from facts:
    five judges in the heading of the ruling, and the publication mark of the court's list.
 
 What is NOT done here, because code cannot do it safely: choosing the legal point, rewriting a sentence,
@@ -31,6 +33,26 @@ _ARTICLE_WORDS = {
     "de": ((r"\bal\.\s*(?=\d)", "Abs. "), (r"\blet\.\s*(?=[a-z]\b)", "lit. "), (r"\bart\.\s*(?=\d)", "Art. ")),
     "fr": ((r"\bAbs\.\s*(?=\d)", "al. "), (r"\blit\.\s*(?=[a-z]\b)", "let. "), (r"\bArt\.\s*(?=\d)", "art. ")),
 }
+# One statute, both languages. A citation stays only when the ruling names that statute and that article.
+_STATUTE = {
+    "uvg": ("uvg", "laa"),
+    "atsg": ("atsg", "lpga"),
+    "uvv": ("uvv", "olaa"),
+    "atsv": ("atsv", "opga"),
+    "bgg": ("bgg", "ltf"),
+}
+_CANON = {alias: canon for canon, aliases in _STATUTE.items() for alias in aliases}
+_CITE = re.compile(
+    r"\bart\.\s*(\d+[a-z]?)(?:\s*(?:abs|al)\.\s*\d+)?(?:\s*(?:lit|let)\.\s*[a-z])?\s*"
+    r"(uvg|laa|atsg|lpga|uvv|olaa|atsv|opga|bgg|ltf)\b",
+    re.IGNORECASE,
+)
+# The same claim in either language. Present in the ruling in one language, allowed in the fiche in both.
+_EITHER_LANGUAGE = ("offensichtlich", "manifestement")
+_UNGROUNDED_PHRASE = re.compile(
+    r"(?:\s+comme)?\s*(?:offensichtlich unbegründet|manifestement (?:non|mal) fondé)",
+    re.IGNORECASE,
+)
 
 _OUTCOME = {
     "rejected": {"de": "Die Beschwerde wird abgewiesen.", "fr": "Le recours est rejeté."},
@@ -84,6 +106,47 @@ def _has_consideration(number: str, source: str) -> bool:
     return re.search(rf"(?m)^\s*{re.escape(number)}\.?\s", source) is not None or (
         re.search(rf"(?:E\.|consid\.|Erw\.)\s*{re.escape(number)}\b", source) is not None
     )
+
+
+def _flat(source: str) -> str:
+    return re.sub(r"\s+", " ", source).lower()
+
+
+def _article_in_ruling(number: str, sigil: str, source: str) -> bool:
+    aliases = _STATUTE[_CANON[sigil.lower()]]
+    if not any(alias in source for alias in aliases):
+        return False
+    return re.search(rf"art\.\s*{re.escape(number)}\b", source) is not None
+
+
+def cited_articles_in_the_ruling(text: str, source: str) -> tuple[str, list[str]]:
+    """Drop a statute citation whose article is not in the ruling. Any statute, any fiche."""
+    source_low = _flat(source)
+    dropped: list[str] = []
+
+    def keep(match: re.Match) -> str:
+        if _article_in_ruling(match.group(1), match.group(2), source_low):
+            return match.group(0)
+        dropped.append(match.group(0).strip())
+        return ""
+
+    return re.sub(r"[ \t]{2,}", " ", _CITE.sub(keep, text)), dropped
+
+
+def grounded_wording_only(text: str, source: str) -> tuple[str, bool]:
+    """Drop 'manifestly ill-founded' unless the ruling says it in German or in French."""
+    source_low = _flat(source)
+    if any(word in source_low for word in _EITHER_LANGUAGE) or not _UNGROUNDED_PHRASE.search(text):
+        return text, False
+    kept = []
+    for sentence in _SENTENCE_END.split(text.strip()):
+        if not _UNGROUNDED_PHRASE.search(sentence):
+            kept.append(sentence)
+            continue
+        residue = _UNGROUNDED_PHRASE.sub("", sentence).strip(" .;,:")
+        if len(residue) >= 25:
+            kept.append(_UNGROUNDED_PHRASE.sub("", sentence).strip())
+    return " ".join(kept), True
 
 
 def real_considerations_only(text: str, source: str) -> tuple[str, list[str]]:
@@ -178,7 +241,12 @@ def finish(language: str, text: str, source: str, starred: bool | None = None) -
     swapped = own_language_abbreviations(text, language)
     if swapped != text:
         notes.append("abbreviations put in the fiche's language")
-    text, dropped = real_considerations_only(swapped, source)
+    text, absent = cited_articles_in_the_ruling(swapped, source)
+    notes += [f"article not in the ruling removed: {cite}" for cite in absent]
+    text, ungrounded = grounded_wording_only(text, source)
+    if ungrounded:
+        notes.append("ungrounded 'manifestly ill-founded' removed")
+    text, dropped = real_considerations_only(text, source)
     notes += [f"reference not in the ruling removed: {d}" for d in dropped]
     text = outcome_once(_NOTE.sub("", text), language, outcome_kind(source))
     note = bench_note(language, source, starred)

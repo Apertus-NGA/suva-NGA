@@ -25,13 +25,20 @@ def code_files() -> list[Path]:
 
 
 def gateway_access_outside_llm(files: list[Path], root: Path = ROOT) -> list[str]:
-    """G2: only src/llm/ may read the endpoint or the key, call /chat/completions or import an LLM SDK."""
+    """G2: only src/llm/ may read the endpoint or the key, call /chat/completions or import an LLM SDK.
+
+    src/qwen_comparison calls the Hugging Face router, not LLM_BASE_URL. The router path is
+    allowed there. The gateway names are not.
+    """
     hits = []
     for path in files:
         if root / "src" / "llm" in path.parents:
             continue
         text = path.read_text(encoding="utf-8")
-        for needle in ("LLM_BASE_URL", "LLM_API_KEY", "/chat/completions", "/v1/completions"):
+        needles = ("LLM_BASE_URL", "LLM_API_KEY", "/chat/completions", "/v1/completions")
+        if root / "src" / "qwen_comparison" in path.parents:
+            needles = ("LLM_BASE_URL", "LLM_API_KEY")
+        for needle in needles:
             if needle in text:
                 hits.append(f"{path.relative_to(root)}: {needle}")
         tree = ast.parse(text)
@@ -72,6 +79,14 @@ def test_g2_check_goes_red_on_a_violation(tmp_path):
         "src/rogue.py: LLM_BASE_URL",
         "src/rogue.py: /chat/completions",
         "src/rogue.py: imports openai",
+    ]
+    probe = tmp_path / "src" / "qwen_comparison" / "ask.py"
+    probe.parent.mkdir(parents=True)
+    probe.write_text('URL = "https://router.huggingface.co/v1/chat/completions"\n')
+    leaked = tmp_path / "src" / "qwen_comparison" / "leak.py"
+    leaked.write_text('import os\nos.environ["LLM_BASE_URL"]\n')
+    assert gateway_access_outside_llm([probe, leaked], root=tmp_path) == [
+        "src/qwen_comparison/leak.py: LLM_BASE_URL",
     ]
 
 
