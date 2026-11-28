@@ -98,7 +98,7 @@ Not implemented, by lack of time. Effort figures are estimates.
 | 9 | **Every run is marked `git_dirty`**: an untracked file counts (`git status --porcelain`) | the flag says little; the code hash of the step still identifies the code | dirty = changes to tracked files of the run's code paths | 30 min |
 | 10 | **Event times of runs written before PR #48 lie after the run's close** | a time-window query misses them | fixed on `main` @ `3edb722`; measured on the eval run `404d0225…`: 0 of 12 events outside its window | done |
 | 11 | **CI cannot replay real answers** while D-031 is open | CI proves the code (stubbed client, SQL tests), not the scores | a committed replay cache, if D-031 allows it | after D-031 |
-| 12 | **Decisions D-076 to D-080 and D-085 are PROPOSED** | the choices are written and argued, not confirmed by the team | confirmed at a sync (DECIDED) | 10 min |
+| 12 | **Decisions D-076 to D-080 and D-085 were PROPOSED** | the choices were written and argued, not confirmed | DECIDED by the lead on 28 Nov (gate G0) | done |
 | 13 | **407 of 912 texts are cut** (first 12,000 + last 2,000 characters), recorded per ruling | the model did not read the middle of those rulings | a reduction by consideration (V1.1.0, `docs/LAYER2_IMPLEMENTATION_PLANNING.md` FC-2) | half a day plus a measurement |
 
 ## 7. What not to claim
