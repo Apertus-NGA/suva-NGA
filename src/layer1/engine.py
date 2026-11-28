@@ -7,6 +7,11 @@ asserts it): a ruling is kept when its court, letter and matter rubric are in th
 is missing on an allowed court, or when its text names Suva, an accident or military insurance term, or the
 insurance-contract act outside the closed rubrics.
 
+Version V1.2.0 (D-083) appends two keeps after the V1.1.0 ordinals, so the decisive rule of every ruling V1.1.0 keeps
+is unchanged: `text_unavailable` keeps a ruling without text on any court (G5: never dropped on its docket prefix
+alone; the term checks cannot run), and `title_rubric_kept` keeps a ruling on an allowed court and letter whose title
+head, cut at any of `config.title_rubric.cut_at`, is in the court's keep set (audit F-06, F-08).
+
 Every rule of the version is evaluated on every ruling and recorded with what it did (F-01, F-02): `fired`,
 `not_fired`, `not_applicable` (a precondition failed, with why) or `blocked` (true but neutralised by another
 rule), with the field it read and, for text, the character offsets in the stored ruling text. The decision is
@@ -25,6 +30,7 @@ from dataclasses import dataclass, field
 
 from src.layer1.models import (
     Check,
+    CourtKeepSet,
     Effect,
     Evidence,
     Layer1Config,
@@ -47,12 +53,14 @@ CHECK_EFFECT: dict[Check, Effect] = {
     "text_accident_term": "keep",
     "text_contract_term": "keep",
     "text_contract_term_blocked": "flag",
+    "text_unavailable": "keep",
+    "title_rubric_kept": "keep",
 }
 SUBJECT_CHECKS: frozenset[Check] = frozenset(
     {"court_rubric_kept", "court_rubric_missing", "court_not_listed", "letter_not_listed", "court_rubric_out"}
 )
 TEXT_CHECKS: frozenset[Check] = frozenset({"text_accident_term", "text_contract_term", "text_contract_term_blocked"})
-REQUIRED_CHECKS = SUBJECT_CHECKS | TEXT_CHECKS
+REQUIRED_CHECKS = SUBJECT_CHECKS | TEXT_CHECKS  # V1.2.0's text_unavailable and title_rubric_kept are optional
 _APOSTROPHES = {"’": "'", "‘": "'", "ʼ": "'"}
 
 
@@ -106,6 +114,8 @@ class Layer1Engine:
             raise ValueError("two rules of one layer1_filter version share a check")
         if len({r.ordinal for r in rules}) != len(rules) or len({r.rule_code for r in rules}) != len(rules):
             raise ValueError("two rules of one layer1_filter version share an ordinal or a rule code")
+        if "title_rubric_kept" in by_check and config.title_rubric is None:
+            raise ValueError("check title_rubric_kept needs config.title_rubric (the characters that cut the title)")
         self.config = config
         self.rules = by_check
         self._accident = re.compile(config.accident_terms)
@@ -145,6 +155,15 @@ class Layer1Engine:
             head = head.split(stop, 1)[0]
         head = head.strip().rstrip(self.config.title_head.strip_trailing).strip()
         return head or None
+
+    def title_rubric_head(self, gegenstand: object) -> str | None:
+        """The matter at the start of the title for `title_rubric_kept`: cut at the first of `title_rubric.cut_at`."""
+        if not isinstance(gegenstand, str) or self.config.title_rubric is None:
+            return None
+        head = gegenstand.strip()
+        for stop in self.config.title_rubric.cut_at:
+            head = head.split(stop, 1)[0]
+        return head.strip() or None
 
     # --- decision --------------------------------------------------------------------------------------------
 
@@ -192,6 +211,29 @@ class Layer1Engine:
         start = index[found.start()]
         end = index[found.end() - 1] + 1
         return Evidence(field="full_text", start=start, end=end, matched=text[start:end][:300])
+
+    def _title_rubric(
+        self,
+        court: CourtKeepSet | None,
+        letter_ok: bool,
+        gegenstand: object,
+        rubrics_key: str | None,
+        hits: list[RuleHit],
+    ) -> RuleEvaluation:
+        if court is None:
+            return self._not_applicable("title_rubric_kept", "court_not_listed")
+        if not letter_ok:
+            return self._not_applicable("title_rubric_kept", "letter_not_listed")
+        head = self.title_rubric_head(gegenstand)
+        if head is None:
+            return self._not_applicable("title_rubric_kept", "gegenstand_absent")
+        key = self.rubric_key(head)
+        detail = {"pattern": rubrics_key, "rubric_key": key, "cut_at": self.config.title_rubric.cut_at}
+        if key not in court.rubrics:
+            return self._eval("title_rubric_kept", "not_fired", "gegenstand", head, **detail)
+        title = Evidence(field="gegenstand", matched=head[:300])
+        hits.append(self._hit("title_rubric_kept", title))
+        return self._eval("title_rubric_kept", "fired", "gegenstand", head, title, **detail)
 
     def decide(self, docket: str, rubrics: Mapping[str, object], gegenstand: object, text: object) -> Decision:
         hits: list[RuleHit] = []
@@ -280,9 +322,19 @@ class Layer1Engine:
                     evals.append(
                         self._eval(other, "not_fired", rubric_field, rubric, pattern=rubrics_key, rubric_key=key)
                     )
+        if "title_rubric_kept" in self.rules:  # V1.2.0: the title head, cut wider, on an allowed court and letter
+            evals.append(self._title_rubric(court, letter_ok, gegenstand, rubrics_key, hits))
 
         # text decision
-        if not isinstance(text, str) or not text.strip():
+        absent = not isinstance(text, str) or not text.strip()
+        if "text_unavailable" in self.rules:  # V1.2.0: no text, so no term check could keep it (G5)
+            chars = len(text) if isinstance(text, str) else 0
+            if absent:
+                hits.append(self._hit("text_unavailable", Evidence(field="full_text", matched=None)))
+            evals.append(
+                self._eval("text_unavailable", "fired" if absent else "not_fired", "full_text", text_chars=chars)
+            )
+        if absent:
             text_reason = "text_absent"
             evals += [self._not_applicable(c, "text_absent") for c in sorted(TEXT_CHECKS)]
         else:

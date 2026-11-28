@@ -14,9 +14,9 @@ Scope = Literal["potentially", "out_of_scope"]
 Effect = Literal["keep", "drop", "flag", "signal"]
 Outcome = Literal["fired", "not_fired", "not_applicable", "blocked"]
 # Why a rule did not apply (the vocabulary of the traceability plan §2.1, also checked by triage.assessment_reason's
-# trigger). V1.0.0 and V1.1.0 never emit `gegenstand_absent`: their title signal is `not_fired` with
-# detail.rubric_source when the rubric did not come from the title, as the plan's outcome table says. The value is
-# kept for the title check of V1.2.0 (`title_rubric_kept`, plan §2.5), which needs a title to apply.
+# trigger). Only the title check of V1.2.0 (`title_rubric_kept`, plan §2.5, D-083) emits `gegenstand_absent`: it needs
+# a title to apply. The title signal of every version is `not_fired` with detail.rubric_source when the rubric did not
+# come from the title, as the plan's outcome table says.
 NotApplicableWhy = Literal[
     "court_not_listed", "letter_not_listed", "rubric_missing", "text_absent", "gegenstand_absent"
 ]
@@ -31,6 +31,8 @@ Check = Literal[
     "letter_not_listed",
     "court_rubric_out",
     "rubric_from_gegenstand",
+    "text_unavailable",  # V1.2.0 (D-083): no text, kept so that no ruling is dropped on its docket alone (G5)
+    "title_rubric_kept",  # V1.2.0 (D-083): the title head, cut wider than title_head, is in the court's keep set
 ]
 
 
@@ -57,12 +59,22 @@ class TitleHead(Contract):
     strip_trailing: str = ",;"
 
 
+class TitleRubric(Contract):
+    """The title head the `title_rubric_kept` check reads (V1.2.0, D-083): the Gegenstand cut at the first of these
+    characters, stripped. Wider than `title_head` (the rubric source), which cuts at `(` only (audit F-06, F-08)."""
+
+    cut_at: str = Field(min_length=1, description="Characters that end the matter at the start of the title")
+
+
 class Layer1Config(Contract):
     """Configuration of one `layer1_filter` version. V1.0.0 reproduces src/courts.py at 4c246a8 exactly."""
 
     courts: dict[str, CourtKeepSet] = Field(min_length=1, description="Court digit -> letters and rubrics kept")
     rubric_sources: list[RubricSource] = Field(min_length=1, description="Where the rubric is read, first filled wins")
     title_head: TitleHead = TitleHead()
+    title_rubric: TitleRubric | None = Field(
+        default=None, description="Cut of the title-rubric check; set when the version has a title_rubric_kept rule"
+    )
     normalise: Normalisation = Normalisation()
     accident_terms: str = Field(
         min_length=1, description="Regex on the folded text: Suva, its names, accident/military insurance"
@@ -83,11 +95,20 @@ class RuleDefinition(Contract):
 
 
 class Evidence(Contract):
+    """What a fired rule read. `matched` is None only for a rule that fires on a missing text (full_text, no offsets:
+    `text_unavailable`, V1.2.0), as its ledger row is (`triage.assessment_reason`)."""
+
     field: Literal["docket", "rubric", "gegenstand", "full_text"]
     source: str | None = None  # rubric source when field == rubric
     start: int | None = Field(default=None, ge=0)
     end: int | None = Field(default=None, ge=0)
-    matched: str = Field(min_length=1, max_length=300)
+    matched: str | None = Field(min_length=1, max_length=300)
+
+    @model_validator(mode="after")
+    def _missing_text_only(self) -> Evidence:
+        if self.matched is None and (self.field != "full_text" or self.start is not None or self.end is not None):
+            raise ValueError("only a rule that fires on a missing text has no match (full_text, no offsets)")
+        return self
 
 
 class RuleHit(Contract):
@@ -161,7 +182,10 @@ class Layer1DecisionRecord(Contract):
     score_0_100: float | None = Field(default=None, ge=0, le=100)
     rubric: str | None
     rubric_source: RubricSource | None
-    subject: str  # the reason src/courts.py gives (kept_subject, subject_missing, wrong_court, ...)
-    text: str  # kept_text, kept_contract, text_clear, text_absent
+    # The outcomes of the subject and text checks src/courts.py also has (kept_subject, subject_missing, wrong_court,
+    # wrong_letter, subject_out; kept_text, kept_contract, text_clear, text_absent), in every version. A keep those
+    # checks do not know (V1.2.0: L1_KEEP_TITLE_RUBRIC, L1_KEEP_TEXT_UNAVAILABLE) is in reason_code and the ledger.
+    subject: str
+    text: str
     evaluations: list[RuleEvaluation] = Field(min_length=1, description="Every enabled rule, in ordinal order")
     explanation_de: str = Field(min_length=1)

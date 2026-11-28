@@ -2,13 +2,15 @@
 
 1. The run reads the `layer1_filter` version its profile pins, with its configuration and rules (D-064).
 2. It decides every ruling, evaluating every rule of the version (the ledger, F-01), and checks each decision
-   against `src/courts.py` (the reference, parity count).
+   against the frozen reference `src/layer1/reference_courts_4c246a8.py` (parity count): a byte-identical copy of
+   `src/courts.py` at 4c246a8, the code V1.0.0 reproduces (D-073), so parity never moves with the live
+   `src/courts.py`, which its owner keeps changing (L2-F21).
 3. When it covers the whole corpus loaded from the pinned snapshot of `expected/layer1/<version>.json`, it compares
    its decisions with that certified file (`src.layer1.golden`): a difference fails the run (F-09 follow-up, §2.4).
 4. It writes `data/runs/<run_id>/`: `decisions.jsonl` (one Layer1DecisionRecord per ruling, with every rule
    evaluation), `layer1_log.json` (the `layer1-log-1` contract of docs/layer1_log.schema.json, built by
-   `src.courts.build_layer1_log`, with its closure checks, timestamps and input fingerprint) and `manifest.json`
-   (counts, golden status and SHA-256 of both files).
+   `build_layer1_log` of the frozen reference, with its closure checks, timestamps and input fingerprint) and
+   `manifest.json` (counts, parity reference, golden status and SHA-256 of both files).
 5. It loads the same records into the database in one transaction: one span, one assessment and one ledger row
    per rule of the version per ruling (with evidence), events and metrics. The database certifies each row and,
    at commit, each complete ledger (triggers t30_check, t50_ledger). Nothing is written if any row fails.
@@ -27,21 +29,27 @@ from pathlib import Path
 import psycopg
 from pydantic import ValidationError
 
-from src import courts
 from src.db.pg import ROOT, sha256_file, uuid5
 from src.db.registry import pinned_version, profile_version
 from src.db.runs import Run, begin_run, events, fail_run, finish_run, metrics
 from src.layer1 import golden
+from src.layer1 import reference_courts_4c246a8 as reference
 from src.layer1.engine import Decision, Layer1Engine, RuleSpec, fingerprint
 from src.layer1.models import Layer1Config, Layer1DecisionRecord, RuleEvaluation
 
 STEP = "layer1_filter"
+# The parity reference: `git show 4c246a8:src/courts.py`, byte for byte, never edited (tests/test_layer1_reference.py).
+REFERENCE_PATH = "src/layer1/reference_courts_4c246a8.py"
+REFERENCE_SOURCE = "src/courts.py@4c246a8"
 # The code a layer-1 run executes, recorded per run (params.code_sha256, F-09).
-CODE_PATHS = tuple(f"src/layer1/{name}.py" for name in ("engine", "models", "run", "golden", "recall"))
+CODE_PATHS = tuple(
+    f"src/layer1/{name}.py" for name in ("engine", "models", "run", "golden", "recall", "reference_courts_4c246a8")
+)
 OUTCOMES = ("fired", "not_fired", "not_applicable", "blocked")
 _SUBJECT_RULES = frozenset(
     {"L1_KEEP_RUBRIC", "L1_KEEP_RUBRIC_MISSING", "L1_DROP_WRONG_COURT", "L1_DROP_WRONG_LETTER", "L1_DROP_RUBRIC_OUT"}
 )
+_TITLE_RUBRIC_RULE, _TEXT_UNAVAILABLE_RULE = "L1_KEEP_TITLE_RUBRIC", "L1_KEEP_TEXT_UNAVAILABLE"  # V1.2.0 (D-083)
 NO_TEXT = "Kein Urteilstext verfügbar: die Begriffsprüfung war nicht möglich."
 # What a text keep rule that did not fire searched: the term list of its version (detail.pattern), never what the
 # ruling is about. A rule's label states a meaning ("Text nennt die Suva ..."); a ruling can name Suva or accident
@@ -137,16 +145,31 @@ def compose_explanation(
     return text
 
 
-def _courts_row(docket: str, rubric_fields: dict[str, str | None], gegenstand: str | None, text: str | None) -> dict:
-    """The reference decision of src/courts.py on the same inputs (its `area` is the first filled rubric field)."""
+def _reference_row(docket: str, rubric_fields: dict[str, str | None], gegenstand: str | None, text: str | None) -> dict:
+    """The decision of the frozen reference (src/courts.py at 4c246a8) on the same inputs (its `area` is the first
+    filled rubric field)."""
     area = rubric_fields.get("neuheiten") or rubric_fields.get("hf_legal_area")
-    return courts.gate_record(docket, area, gegenstand, text)
+    return reference.gate_record(docket, area, gegenstand, text)
 
 
-def _log_row(reference: dict, decision: Decision) -> dict:
-    """A `layer1-log-1` row for a decision that differs from src/courts.py: reasons and criteria from the rule hits."""
+def _log_row(ref: dict, decision: Decision) -> dict:
+    """A `layer1-log-1` row for a decision that differs from the reference: reasons and criteria from the rule hits.
+
+    The log keeps a ruling when its subject action or its text action passes (its closure checks fail the run
+    otherwise). A V1.2.0 keep the reference does not know (D-083) passes the action it belongs to: the title rubric
+    is a subject pass (`kept_title_rubric`, criterion = the cut title head), the missing text a text pass
+    (`kept_text_unavailable`, criterion `empty_text`)."""
     subject_hit = next(h for h in decision.hits if h.rule_code in _SUBJECT_RULES)
-    text_hit = next((h for h in decision.hits if h.effect == "keep" and h.evidence.field == "full_text"), None)
+    title_hit = next((h for h in decision.hits if h.rule_code == _TITLE_RUBRIC_RULE), None)
+    no_text = any(h.rule_code == _TEXT_UNAVAILABLE_RULE for h in decision.hits)
+    text_hit = next(
+        (
+            h
+            for h in decision.hits
+            if h.effect == "keep" and h.evidence.field == "full_text" and h.rule_code != _TEXT_UNAVAILABLE_RULE
+        ),
+        None,
+    )
     blocked = next((e for e in decision.evaluations if e.outcome == "blocked"), None)
     if text_hit is not None:
         text_criterion = text_hit.evidence.matched.casefold()
@@ -154,15 +177,23 @@ def _log_row(reference: dict, decision: Decision) -> dict:
         text_criterion = str(blocked.detail["closed_rubric_match"])
     else:
         text_criterion = "empty_text" if decision.text == "text_absent" else "no_keep_term"
-    return reference | {
-        "subject": decision.subject,
-        "subject_pass": decision.subject in ("kept_subject", "subject_missing"),
-        "subject_criterion": subject_hit.evidence.matched.casefold(),
-        "text": decision.text,
-        "text_pass": decision.text in ("kept_text", "kept_contract"),
+    subject, subject_criterion = decision.subject, subject_hit.evidence.matched.casefold()
+    subject_pass = decision.subject in ("kept_subject", "subject_missing")
+    if not subject_pass and title_hit is not None:
+        subject, subject_pass, subject_criterion = "kept_title_rubric", True, title_hit.evidence.matched.casefold()
+    text, text_pass = decision.text, decision.text in ("kept_text", "kept_contract")
+    if not text_pass and no_text:
+        text, text_pass = "kept_text_unavailable", True
+    paths = {(True, True): "both", (True, False): "subject_only", (False, True): "text_only"}
+    return ref | {
+        "subject": subject,
+        "subject_pass": subject_pass,
+        "subject_criterion": subject_criterion,
+        "text": text,
+        "text_pass": text_pass,
         "text_criterion": text_criterion,
         "text_blocked_term": blocked.matched_text.casefold() if blocked is not None else None,
-        "path": courts._path(decision.subject, decision.text),
+        "path": paths.get((subject_pass, text_pass), "dropped"),
         "kept": decision.kept,
     }
 
@@ -342,7 +373,7 @@ def run_layer1(
             )
             args = (population,)
         records: list[Layer1DecisionRecord] = []
-        courts_rows: list[dict] = []
+        log_rows: list[dict] = []
         lines: list[str] = []
         parity = Counter()
         mismatches: list[str] = []
@@ -354,8 +385,8 @@ def run_layer1(
             for ruling_id, docket, decided, gegenstand, text_id, text, text_sha, neuheiten, legal_area in cur:
                 rubric_fields = {"neuheiten": neuheiten, "hf_legal_area": legal_area}
                 decision = engine.decide(docket, rubric_fields, gegenstand, text)
-                reference = _courts_row(docket, rubric_fields, gegenstand, text)
-                same = (reference["kept"], reference["subject"], reference["text"]) == (
+                ref = _reference_row(docket, rubric_fields, gegenstand, text)
+                same = (ref["kept"], ref["subject"], ref["text"]) == (
                     decision.kept,
                     decision.subject,
                     decision.text,
@@ -363,7 +394,7 @@ def run_layer1(
                 parity["same" if same else "different"] += 1
                 if not same and len(mismatches) < 50:
                     mismatches.append(docket)
-                courts_rows.append(reference if same else _log_row(reference, decision))
+                log_rows.append(ref if same else _log_row(ref, decision))
                 lines.append(golden.canonical_line(docket, decided, decision))
                 text_bytes += len(text.encode("utf-8")) if isinstance(text, str) else 0
                 records.append(
@@ -395,9 +426,14 @@ def run_layer1(
         with conn.cursor() as cur:
             golden_result = _golden(cur, version, population, lines, kept, by_reason)
         conn.commit()
+        parity_reference = {
+            "path": REFERENCE_PATH,
+            "source": REFERENCE_SOURCE,
+            "sha256": sha256_file(ROOT / REFERENCE_PATH),
+        }
         input_sha = hashlib.sha256("\n".join(sorted(r.input_fingerprint for r in records)).encode()).hexdigest()
-        log = courts.build_layer1_log(
-            courts_rows,
+        log = reference.build_layer1_log(
+            log_rows,
             {
                 "run_id": run.run_id,
                 "phase": "layer1",
@@ -436,6 +472,7 @@ def run_layer1(
                 "ledger_rows": sum(outcomes.values()),
                 "outcomes": {o: outcomes[o] for o in OUTCOMES},
                 "parity_with_courts": dict(parity),
+                "parity_reference": parity_reference,
                 "log_checks_passed": log["quality"]["all_checks_passed"],
                 "golden": golden_result,
             },
@@ -472,8 +509,8 @@ def run_layer1(
                         2,
                         "info" if not mismatches else "warning",
                         "layer1.parity.checked",
-                        "decisions compared with src/courts.py",
-                        {"different": parity["different"], "first": mismatches[:20]},
+                        f"decisions compared with the frozen reference {REFERENCE_SOURCE}",
+                        {"different": parity["different"], "first": mismatches[:20], "reference": parity_reference},
                         None,
                         None,
                     ),

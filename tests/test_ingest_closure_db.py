@@ -227,7 +227,13 @@ def test_the_registry_keeps_a_version_whose_code_changed_but_never_a_changed_app
     seed.write_text(json.dumps(profiles), encoding="utf-8")
     with connect(url, actor="test") as conn, pytest.raises(RegistryConflict, match="an approval is immutable"):
         load_profiles(conn, seed)
-    assert _one(url, "SELECT count(DISTINCT decision_ref) FROM ops.pipeline_profile_version") == (1,)
+    edited_version = (profiles["profiles"][0]["code"], *profiles["profiles"][0]["versions"][0]["version"])
+    assert _one(
+        url,
+        "SELECT decision_ref FROM ops.pipeline_profile_version "
+        "WHERE profile_code = %s AND v_major = %s AND v_minor = %s AND v_patch = %s",
+        edited_version,
+    ) == ("D-073",)  # the refused edit left the stored approval unchanged
 
 
 def test_no_exclusion_names_a_ruling_text(ingested):

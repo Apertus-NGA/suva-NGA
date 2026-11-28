@@ -188,7 +188,7 @@ def test_run_writes_files_and_every_decision(loaded):
     with connect(url, actor="test") as conn:
         out = run_layer1(conn, runs_dir=tmp / "runs", actor="test")
         assert (out["rulings"], out["kept"], out["dropped"]) == (6, 4, 2)
-        assert out["parity"] == {"same": 5, "different": 1}  # V1.1.0 keeps 2C_5/2026, src/courts.py does not
+        assert out["parity"] == {"same": 5, "different": 1}  # V1.1.0 keeps 2C_5/2026, the 4c246a8 reference does not
         assert sum(out["outcomes"].values()) == 6 * RULES  # one evaluation per rule and ruling
         assert out["golden"] == "not_comparable"  # a synthetic corpus is not the pinned snapshot
         run_dir = Path(out["files"])
