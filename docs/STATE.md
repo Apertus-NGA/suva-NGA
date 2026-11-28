@@ -1,6 +1,6 @@
 # STATE: where the project is now
 
-> **Last updated: Friday 27 Nov 2026, 23:55 CET** (layer-1 recall, `docs/LAYER1.md` §5). Previous update: 23:32 CET, layer-1 table. Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
+> **Last updated: Saturday 28 Nov 2026, 02:50 CET** (data layer: D-061 to D-071, `src/db/sql/`, branch `platform/db-ddl`). Previous update: Fri 27 Nov 23:55 CET, layer-1 recall, `docs/LAYER1.md` §5. Owner: `lead`. Update this file at every sync (every 2 hours) and whenever an input arrives. If the time above is more than 3 hours old, ask before trusting it.
 
 ## 1. Build
 
@@ -30,6 +30,7 @@
 - v2 probe, Fri 27 Nov 21:29–21:43 CET, written up in `docs/SUMMARY_V2.md`: 50 rulings that pass `src/courts.py` (16 accident, 16 disability, 8 health, 5 occupational pension, 5 contract), 100 fiches. The checker left 93 with an empty problem list and flagged 7. Eighteen fiches are under 400 characters. Not a seeded draw and not a human reading. The process exited 1 because those 7 critiques are reported as failures; every fiche was stored.
 - JSON tool protocol (tool-calling area, D-058 pending its first PR): handoff committed Fri 27 Nov 21:11 CET in `docs/handoff/json-tool-protocol/` (reference v0.2.1, not implemented yet). Start or resume its agent with `docs/handoff/json-tool-protocol/REONBOARD.md`.
 - Layer-1 gate, written up Fri 27 Nov 23:32 CET in `docs/LAYER1.md`, recall added 23:55 CET: `src/courts.py` writes `data/cache/layer1.json` (`python3 src/courts.py --all`). On the local cache of 6,055 rulings, 993 are kept. The text decision also keeps the insurance-contract act and `Taggeldversicherung` (`kept_contract`); the bare word `Taggeld` does not, so unemployment stays out. `python3 src/courts.py --recall` scores the Suva list at 59/59 and the 23 Q3/2025 summaries at 23/23, all by rubric (`docs/LAYER1.md` §5). The per-docket log is `data/derived/layer1_recall.json` (git-ignored, D-031). The 183 blank rubrics in courts 4, 8 and 9 were looked up in Hugging Face `voilaj/swiss-caselaw`: `legal_area` and `regeste` are empty, and 40 are recovered from the start of `title`. Not a relevance score (D-021). The log is under `data/` and is not committed.
+- Data layer, Sat 28 Nov 02:50 CET (PR from branch `platform/db-ddl`): plan `docs/DB_DDL_PLANNING.md` (Phase 0 closed, every open question settled), decisions D-061 to D-071 in `docs/DECISIONS.md`. PostgreSQL 17 DDL in `src/db/sql/` (15 files: 6 schemas, 56 tables, 43 ENUMs, views, triggers, least-privilege roles, reference seeds), `make db-up`, `make db-deploy`, `make db-reset`, `make db-test`. Tested on the pinned compose image: deploy twice (idempotent), reset, 8 SQL test files green (`tests/sql/`, fixtures on 8C_493/2025 de, 8C_307/2025 fr, 8C_199/2026 it), two deliberate mutations caught; 1 million log events load in 7.4 s, query by ruling 1 ms. `make check`: 92 passed. A CI `db` job is written, not run yet. Nothing writes to the DB yet: loaders and step writers are DB-10 to DB-17 (plan §19.2).
 
 ## 2. Inputs inventory
 
