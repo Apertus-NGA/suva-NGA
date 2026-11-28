@@ -112,3 +112,52 @@ def test_secrets_and_derived_data_never_enter_the_image():
     ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
     for entry in (".env", ".env.*", "data", "tmp", ".git"):
         assert entry in ignored, entry
+
+
+MAKEFILE = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+
+def _recipe(target: str) -> list[str]:
+    block = re.search(rf"^{target}:.*\n((?:\t.*\n)+)", MAKEFILE, re.M)
+    assert block, f"no target {target}"
+    return [line.strip() for line in block.group(1).splitlines()]
+
+
+def _service(name: str) -> str:
+    found = re.search(rf"^  {name}:\n(.*?)(?=^  \w[\w-]*:\n|^\S|\Z)", COMPOSE, re.M | re.S)
+    assert found, f"no service {name}"
+    return found.group(1)
+
+
+def test_bootstrap_guards_the_schema_around_the_deploy():
+    steps = _recipe("bootstrap")
+    assert [s.split()[-1] for s in steps] == ["CMD=check", "db-deploy", "CMD=record", "db-logins"]
+
+
+def test_load_ends_with_the_closure_check():
+    assert _recipe("load")[-1].endswith("ingest-closure")
+    assert _recipe("ingest-closure") == ["$(PY) -m src.ingest closure"]
+
+
+def test_validate_is_an_ops_job_run_by_the_pipeline_login():
+    block = _service("validate")
+    assert 'profiles: ["ops"]' in block and 'command: ["make", "validate"]' in block
+    assert "<<: *pipeline-db" in block and "      - egress" not in block
+
+
+def test_the_api_login_never_takes_the_pipeline_role():
+    block = _service("app")
+    assert "PGUSER: suva_api" in block and 'DB_PIPELINE_ROLE: ""' in block
+
+
+def test_every_job_that_reads_replay_caches_mounts_data_derived():
+    for name in ("load", "pipeline", "app", "validate"):
+        assert "${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived" in _service(name), name
+
+
+def test_the_release_gate_certifies_layer_2_when_its_data_is_mounted():
+    steps = " ".join(_recipe("validate"))
+    assert "layer1-validate" in steps and "layer2-validate" in steps
+    assert "data/derived/finetune/suva-ft-v3" in steps and "SKIPPED layer2-validate" in steps
+    ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert "!experiments/finetune/manifests/**" in ignored  # the certification reads the frozen manifest

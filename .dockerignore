@@ -14,5 +14,7 @@ backups
 # Not needed at runtime: documentation, experiments, the decks and reports (PDF), the UI sources until the
 # UI is built in the image (docs/DEPLOY.md §6).
 docs
-experiments
+experiments/**
 *.pdf
+# Except the frozen benchmark manifests: the layer-2 certification reads them (make layer2-validate).
+!experiments/finetune/manifests/**
