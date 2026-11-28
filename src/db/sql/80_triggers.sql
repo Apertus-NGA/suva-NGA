@@ -8,9 +8,10 @@
 --              judgement against its own call (DDL-1), a
 --              source row either loaded or excluded, serialised per snapshot across sessions, an exclusion's
 --              reason and file kind), version numbering,
---              the rule set of a used or pinned step version sealed, the German + French pair of every summary
---              version and the complete rule ledger of every assessment (both deferred to commit; a ledger is
---              sealed once committed), the release gate, and the audit log.
+--              the rule set, models and prompts of a used or pinned step version sealed (no model or prompt on
+--              a step that runs code only), a run's lifecycle (a closed run never changes), the German + French
+--              pair of every summary version and the complete rule ledger of every assessment (both deferred to
+--              commit; a ledger is sealed once committed), the release gate, and the audit log.
 --              Trigger names start with a number: PostgreSQL fires same-event triggers in name order.
 -- SGBD: PostgreSQL 17
 -- Doc: docs/DB_DDL_PLANNING.md §7.8, §8.3, §9.2, §10.2, §12.2, §13.5, §13.7, §15.7
@@ -168,6 +169,44 @@ END $$;
 CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON ops.component_version_rule
   FOR EACH ROW EXECUTE FUNCTION ops.check_component_version_rule();
 
+-- The models and prompts a step version declares (src/db/llm_registry.py). Only a step that calls an LLM declares
+-- them: ingest, segment, parse, layer1_filter, ranking and export run code only, and a binding there would make a
+-- deterministic, certified version "declare" a model it never calls (ops.v_profile, triage.v_scope_trace). The
+-- bindings of a version are sealed like its rules once an assessment uses it or a profile pins it; reloading an
+-- identical binding passes (integration review, 28 Nov).
+CREATE OR REPLACE FUNCTION ops.check_component_version_resource() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+DECLARE
+  cv ops.component_version%ROWTYPE;
+  is_model boolean := TG_TABLE_NAME = 'component_version_model';
+  same boolean;
+BEGIN
+  SELECT * INTO cv FROM ops.component_version WHERE component_version_id = NEW.component_version_id;
+  IF cv.step IN ('ingest', 'segment', 'parse', 'layer1_filter', 'ranking', 'export') THEN
+    RAISE EXCEPTION '%: % % runs code only and declares no model or prompt', TG_TABLE_NAME, cv.step, cv.version_label;
+  END IF;
+  IF is_model THEN
+    same := EXISTS (SELECT 1 FROM ops.component_version_model b
+                    WHERE b.component_version_id = NEW.component_version_id AND b.model_role = NEW.model_role
+                      AND b.model_id = NEW.model_id);
+  ELSE
+    same := EXISTS (SELECT 1 FROM ops.component_version_prompt b
+                    WHERE b.component_version_id = NEW.component_version_id AND b.prompt_role = NEW.prompt_role
+                      AND b.prompt_version_id = NEW.prompt_version_id);
+  END IF;
+  IF NOT same
+     AND (EXISTS (SELECT 1 FROM triage.assessment a WHERE a.component_version_id = NEW.component_version_id)
+          OR EXISTS (SELECT 1 FROM ops.pipeline_profile_step ps WHERE ps.component_version_id = NEW.component_version_id)) THEN
+    RAISE EXCEPTION 'component version % (%): its % are sealed (used by an assessment or pinned by a profile); a new or changed binding needs a new version',
+      cv.version_label, cv.step, CASE WHEN is_model THEN 'models' ELSE 'prompts' END;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON ops.component_version_model
+  FOR EACH ROW EXECUTE FUNCTION ops.check_component_version_resource();
+CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON ops.component_version_prompt
+  FOR EACH ROW EXECUTE FUNCTION ops.check_component_version_resource();
+
 CREATE OR REPLACE FUNCTION ops.check_profile_step() RETURNS trigger
   LANGUAGE plpgsql AS $$
 DECLARE
@@ -213,6 +252,23 @@ BEGIN
 END $$;
 CREATE OR REPLACE TRIGGER t10_guard BEFORE INSERT OR UPDATE OR DELETE ON ops.span
   FOR EACH ROW EXECUTE FUNCTION ops.check_span();
+
+-- A run's lifecycle, like a span's: running -> succeeded | partial | failed | aborted, once; a closed run never
+-- changes again. The label reads pr.status (DDL-2), so reopening or flipping a closed run would move it. t10_guard
+-- already limits an update to status, finished_at and error_summary (integration review, 28 Nov).
+CREATE OR REPLACE FUNCTION ops.check_pipeline_run() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.status <> 'running' THEN
+    RAISE EXCEPTION 'pipeline run % is already closed (%): a closed run never changes', OLD.run_id, OLD.status;
+  END IF;
+  IF NEW.status = 'running' THEN
+    RAISE EXCEPTION 'pipeline run %: an update must close it (succeeded, partial, failed or aborted)', OLD.run_id;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER t30_check BEFORE UPDATE ON ops.pipeline_run
+  FOR EACH ROW EXECUTE FUNCTION ops.check_pipeline_run();
 
 CREATE OR REPLACE FUNCTION ops.check_llm_call_example() RETURNS trigger
   LANGUAGE plpgsql AS $$

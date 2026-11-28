@@ -96,10 +96,15 @@ def load_prompt(cur: psycopg.Cursor, path: Path) -> str:
 
 
 def _bind(cur: psycopg.Cursor, cvid: str, table: str, key: str, wanted: dict[str, str], what: str) -> None:
+    """The bindings stored for a version must equal the file's, both ways: a file that adds, changes or drops a model
+    or a prompt of an existing version is refused (an empty file entry must match an empty set). A version with no
+    binding yet gets the file's; the database refuses them once the version is pinned or used (t30_check)."""
     value = "model_id" if table == "ops.component_version_model" else "prompt_version_id"
     cur.execute(f"SELECT {key}::text, {value}::text FROM {table} WHERE component_version_id = %s", (cvid,))
     existing = dict(cur.fetchall())
-    if existing and existing != wanted:
+    if existing == wanted:
+        return
+    if existing:
         raise RegistryConflict(f"{what}: its {table} bindings differ from the file; bump the version")
     for role, target in wanted.items():
         cur.execute(
@@ -110,13 +115,12 @@ def _bind(cur: psycopg.Cursor, cvid: str, table: str, key: str, wanted: dict[str
 
 def bind_resources(conn: psycopg.Connection, path: Path) -> list[str]:
     """Models and prompts of every version of one step registry file (loaded before by load_step_registry).
-    Returns the versions bound. A file without `models` or `prompts` binds nothing."""
+    Returns the versions that declare some. Every version is compared, those without `models` or `prompts` too:
+    the database must then hold none for it (integration review, 28 Nov: a dropped entry passed silently)."""
     reg = json.loads(path.read_text(encoding="utf-8"))
     step, bound = reg["step"], []
     with conn.transaction(), conn.cursor() as cur:
         for ver in reg["versions"]:
-            if not (ver.get("models") or ver.get("prompts")):
-                continue
             v = tuple(ver["version"])
             what = f"{step} {label(v)}"
             cvid = uuid5("cv|{}|{}|{}|{}".format(step, *v))
@@ -130,10 +134,9 @@ def bind_resources(conn: psycopg.Connection, path: Path) -> list[str]:
                 if cur.fetchone() is None:
                     raise RegistryConflict(f"{what}: model {gid} is not in MODELS.md's allow-list")
                 models[role] = mid
-            if models:
-                _bind(cur, cvid, "ops.component_version_model", "model_role", models, what)
+            _bind(cur, cvid, "ops.component_version_model", "model_role", models, what)
             prompts = {role: load_prompt(cur, ROOT / rel) for role, rel in (ver.get("prompts") or {}).items()}
-            if prompts:
-                _bind(cur, cvid, "ops.component_version_prompt", "prompt_role", prompts, what)
-            bound.append(label(v))
+            _bind(cur, cvid, "ops.component_version_prompt", "prompt_role", prompts, what)
+            if models or prompts:
+                bound.append(label(v))
     return bound

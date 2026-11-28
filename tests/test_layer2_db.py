@@ -479,3 +479,38 @@ def test_a_validation_or_an_identical_layer1_rerun_keeps_the_layer2_label(db):
     judged = [r for r in before if r[1] == "layer2_judge"]
     assert [r for r in after if r[1] == "layer2_judge"] == judged  # same decisions: their judgements stay the label
     assert [(d, s) for d, s, _ in after] == [(d, s) for d, s, _ in before]  # the drop now shows the rerun's decision
+
+
+def test_model_and_prompt_bindings_are_compared_both_ways_and_never_on_layer1(db, tmp_path):
+    """Integration review, 28 Nov: the binder skipped a version whose file entry had no models or prompts (a dropped
+    binding passed silently), and a layer-1 version could take a model through the step registry. Both are refused
+    now; reloading the shipped files still adds nothing. Edited copies of the registry files, in tmp_path only."""
+    from src.db.llm_registry import bind_resources
+    from src.db.registry import RegistryConflict, load_step_registry
+    from src.ingest.__main__ import REGISTRIES
+
+    url, _ = db
+    root = Path(__file__).resolve().parents[1]
+    layer2 = json.loads((root / "src" / "layer2" / "registry" / "layer2_judge.json").read_text(encoding="utf-8"))
+    count = (
+        "SELECT (SELECT count(*) FROM ops.component_version_model)"
+        " + (SELECT count(*) FROM ops.component_version_prompt)"
+    )
+    before = rows(url, count)
+    with pipeline(url) as conn:
+        assert bind_resources(conn, root / "src" / "layer2" / "registry" / "layer2_judge.json") == ["V1.0.0"]
+        for drop in ("models", "prompts"):
+            edited = json.loads(json.dumps(layer2))
+            edited["versions"][0].pop(drop)
+            path = tmp_path / f"layer2_without_{drop}.json"
+            path.write_text(json.dumps(edited), encoding="utf-8")
+            with pytest.raises(RegistryConflict, match="bindings differ from the file"):
+                bind_resources(conn, path)
+        path_l1, config_model, rule_model, code = next(r for r in REGISTRIES if "layer1_filter" in r[0])
+        layer1 = json.loads((root / path_l1).read_text(encoding="utf-8"))
+        layer1["versions"][1]["models"] = {"judge": JUDGE}
+        path = tmp_path / "layer1_filter.json"
+        path.write_text(json.dumps(layer1), encoding="utf-8")
+        with pytest.raises(RegistryConflict, match="runs code only declares no model or prompt"):
+            load_step_registry(conn, path, config_model, rule_model, code)
+    assert rows(url, count) == before
