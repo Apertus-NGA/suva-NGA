@@ -620,7 +620,6 @@ Both layers are in `main` (PR #44 layer 1, PR #45 layer 2). The layer-1 session 
 | **DDL-2** | `triage.v_scope_pipeline`: outside a release, only `succeeded`/`partial` non-eval runs, and only assessments whose upstream chain reaches the ruling's current layer-1 decision; deterministic tie-break | same test file (failed, aborted, eval ignored; partial counts; stale and rootless judgements ignored); red with the old view. Speed on the dev DB (14,144 assessments): 114 ms (old view 99 ms); two slower forms were measured and rejected: a recursive walk (22 s) and a self-join on a CTE (8 s, re-sorted once per row), replaced by three indexed hops (an upstream is always an earlier step of four) and one window pass |
 | Fixtures | the fixture run is `succeeded` (DDL-2); the layer-2 calls carry their prompt, declared by the layer-2 version (DDL-1) | `tests/sql/_fixtures.sql`; 11/11 SQL test files green |
 
-Decision to confirm (not written in `docs/DECISIONS.md`, per the layer-1 session's rule "tell the lead before taking a
-number"): **D-085 proposed**, refining D-078: in replay mode a missing recorded answer is "not judged in this run", not
-a failure. Also pending with the lead: the Q3/2025 points (audit dossier §11.2).
+Recorded as **D-085** (PROPOSED; the lead agreed on 28 Nov, 11:10 CET, as the layer-1 session asked before a number is
+taken), refining D-078: in replay mode a missing recorded answer is "not judged in this run", not a failure. Also pending with the lead: the Q3/2025 points (audit dossier §11.2).
 

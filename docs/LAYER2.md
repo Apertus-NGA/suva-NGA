@@ -51,7 +51,7 @@ Database, in one transaction: `ops.span` (`layer2.run`, `layer2.judge` per rulin
 
 Outcomes: `ok` (judged); `failed` with `L2_FAILED_CALL` (gateway, served model rejected) or `L2_FAIL_NO_YESNO_TOKEN` (the answer is kept as evidence); `skipped` with `ING_TEXT_MISSING` (no text, no call). All stay `potentially`, never a negative.
 
-**Replay without a recorded answer** (since 28 Nov, refines D-078): in replay mode, a candidate whose request was never answered in the store is **not judged in that run**. No row is written, so an earlier judgement keeps its place in the label. It is listed in `replay_misses.jsonl`, counted in the metric `replay_misses`, reported by the event `layer2.replay.missing`, and the run is `partial`; it is never a failure. A replay where no candidate has an answer fails with a clear message. So `make run` in replay with a partial local cache is green: on 28 Nov, 383 of 935 judged, 552 without a recorded answer, `partial`.
+**Replay without a recorded answer** (D-085, refines D-078): in replay mode, a candidate whose request was never answered in the store is **not judged in that run**. No row is written, so an earlier judgement keeps its place in the label. It is listed in `replay_misses.jsonl`, counted in the metric `replay_misses`, reported by the event `layer2.replay.missing`, and the run is `partial`; it is never a failure. A replay where no candidate has an answer fails with a clear message. So `make run` in replay with a partial local cache is green: on 28 Nov, 383 of 935 judged, 552 without a recorded answer, `partial`.
 
 Why a ruling scored as it did: `SELECT * FROM triage.v_scope_trace WHERE ruling_id = …` (run, versions, served model, call, latency, tokens, cache flag, P(Ja), input text and its HF snapshot).
 
