@@ -6,7 +6,7 @@
 
 - Hacking started Fri 11:30. Allocated challenge: Suva.
 - Repository: <https://github.com/Apertus-NGA/suva-NGA> (in the `Apertus-NGA` GitHub organisation), created from the organisers' Suva template.
-- Visibility: **public** already (GitHub API, Fri 27 Nov 18:12 CET): every push is published at once. Who in `Apertus-NGA` can change it: the organisation admins `TheDiRocco`, `Bananagoo`, `RabahSend` (GitHub API). It must stay public (D-039).
+- Visibility: **public** already (GitHub API, Fri 27 Nov 18:12 CET): every push is published at once. Who in `Apertus-NGA` can change it: the organisation's three admins, who are team members (GitHub API; handles not repeated here, G13). It must stay public (D-039).
 - How the repo was created: with the template's full history (`main` = the template's commit `3359516` of 25 Nov), not through "Use this template": GitHub shows no "generated from" link (`template_repository` is empty). The template asks for "Use this template" (`docs/EVENT.md` §3): raise with the organisers if they check it (Q-22/Q-23 channel).
 - Registered team name (sprintd): `<to fill>`, used in `README.md`, `LICENSE`, the report header and the PDF name.
 - Template: <https://github.com/HackApertus/zurich-suva> (shown as "Public template" on GitHub), read at commit `c6e50ba` (Fri 27 Nov 11:30). Template files, never renamed or moved (D-039); never deleted (our rule, D-044):
