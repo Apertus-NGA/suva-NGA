@@ -19,7 +19,7 @@ from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Skip, Step
 from src.summarize.refine.steps.common import NAME, guarded, polish, with_reference, written_sentence_problems
 
-VERSION = "holding@2"
+VERSION = "holding@3"
 NONE = "none"
 
 SYSTEM = (
@@ -42,6 +42,13 @@ REPAIR = (
     "- b_sentences: one entry per item above, in the same order: the item id and its sentence in {lang}. Restate "
     "each rule in your own words, faithful in content and strength, with the established Swiss legal terms of "
     "{lang}; no article, date or number that is not in the quote; no consideration number (code adds it)."
+)
+
+
+CONFIRM = (
+    'Rule {rid} of the court ({label}):\n"{rule}"\n\nSentence of a summary:\n<sentence>\n{sentence}\n</sentence>\n\n'
+    "- a_states: 'yes' if the sentence states this rule faithfully (the same test, condition or meaning, in any "
+    "wording or language, neither stronger nor weaker), 'no' otherwise."
 )
 
 
@@ -120,9 +127,22 @@ class Holding(Step):
             problems = written_sentence_problems(text, "", ctx, max_words=60 * len(written))
             if problems:
                 return problems
-            again = self._detect(after, rules, answer, ctx, "recheck")
-            still = [rid for rid in missing if again["rules"].get(rid, NONE) == NONE]
-            return [f"re-check: {', '.join(still)} still not found"] if still else []
+            # A targeted question per added rule about the sentence written for it (run r4: searching the whole
+            # summary again missed four inserted rules that state them).
+            still = []
+            for entry, sentence in zip(reply["b_sentences"], written, strict=True):
+                if entry["a_item"] == "A":
+                    continue
+                rule = rules[int(entry["a_item"][1:]) - 1]
+                prompt = CONFIRM.format(rid=entry["a_item"], label=rule["label"],
+                                        rule=evidence.as_data(rule["quote"]), sentence=sentence)  # fmt: skip
+                said = ctx.model.ask(
+                    [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+                    "holding_confirm", obj({"a_states": enum(["yes", "no"])}), f"{VERSION}/confirm", max_tokens=20,
+                )  # fmt: skip
+                if said["a_states"] != "yes":
+                    still.append(entry["a_item"])
+            return [f"re-check: {', '.join(still)} not stated faithfully"] if still else []
 
         return Candidate(
             f"missing: {', '.join(item_ids)}",

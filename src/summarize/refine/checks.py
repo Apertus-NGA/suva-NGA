@@ -88,18 +88,26 @@ def run(text: str, language: str, source: str) -> dict[str, list[str]]:
     return found
 
 
-# Any sentence telling how the appeal ended, in either word order (wider than finish._STATES_OUTCOME).
-_RESTATES_OUTCOME = re.compile(
-    r"(?:Beschwerde|Rechtsmittel)\b[^.]{0,120}?\b(?:abgewiesen|gutgeheissen|abzuweisen|gutzuheissen|nicht eingetreten)"
-    r"|(?:weist|wies|heisst|hiess)\b[^.]{0,60}?\bBeschwerde\b"
-    r"|\brecours\b[^.]{0,120}?\b(?:rejet[ée]|admis|rejette|irrecevable)"
-    r"|\b(?:rejette|rejeta|admet|admit)\b[^.]{0,60}?\brecours\b",
+# How the appeal to the Federal Supreme Court ended. A lower court's or an insurer's decision is a fact of the case,
+# not the outcome (run r4 refused six fact sentences for "die Vorinstanz hiess die Beschwerde gut").
+_FEDERAL = re.compile(r"\b(?:Bundesgericht|BGer|Tribunal fédéral|TF)\b")
+_OUTCOME_WORDS = re.compile(
+    r"\b(?:abgewiesen|gutgeheissen|abzuweisen|gutzuheissen|nicht eingetreten|weist|wies|heisst|hiess"
+    r"|rejet[ée]e?|rejette|rejeta|admis|admet|admit|irrecevable)\b",
+    re.IGNORECASE,
+)
+_CANONICAL = re.compile(
+    r"^(?:Die Beschwerde (?:wird|ist|wurde)\b[^.]{0,40}(?:abgewiesen|gutgeheissen)"
+    r"|Le recours (?:est|a été)\b[^.]{0,40}(?:rejeté|admis))",
     re.IGNORECASE,
 )
 
 
 def restates_outcome(text: str) -> bool:
-    return bool(_RESTATES_OUTCOME.search(text))
+    text = text.strip()
+    if _CANONICAL.search(text):
+        return True
+    return bool(_FEDERAL.search(text) and _OUTCOME_WORDS.search(text) and re.search(r"Beschwerde|recours", text))
 
 
 def failing(found: dict[str, list[str]]) -> dict[str, int]:

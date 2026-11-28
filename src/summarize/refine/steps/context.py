@@ -17,7 +17,7 @@ from src.summarize.refine.steps.common import NAME, guarded, polish, written_sen
 from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
 from src.summarize.refine.steps.facts import judge_sentences
 
-VERSION = "context@2"
+VERSION = "context@3"
 
 TASK = (
     "Task: the {lang} summary below of the ruling above is too short and lacks the facts a lawyer needs to "
@@ -47,8 +47,9 @@ class ContextStep(Step):
         first = draft.sentences[0].text
 
         def check(before: Draft, after: Draft) -> list[str]:
-            problems = [] if found else ["the ruling sentence the new text rests on was not found"]
-            problems += written_sentence_problems(text, "", ctx, max_words=70)
+            # The pointer is evidence when code finds it; the gate is the facts check below (a sentence that sums up
+            # two facts rarely has one ruling sentence it opens with: run r4 lost 8 of 13 additions to that).
+            problems = written_sentence_problems(text, "", ctx, max_words=90)
             if "____" in text:
                 problems.append("placeholder")
             if problems:

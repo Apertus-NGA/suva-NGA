@@ -254,11 +254,8 @@ def test_holding_inserts_each_missing_rule_with_the_reference_added_by_code():
         {"a_item": "R1", "b_text": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus."},
         {"a_item": "A", "b_text": "Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen."},
     ]}  # fmt: skip
-    recheck = {
-        "a_rules": [{"a_rule": "R1", "b_sentence": "s3"}, {"a_rule": "R2", "b_sentence": "s1"}],
-        "b_answer_sentence": "s4",
-    }
-    fake = Fake(**{"holding@2__detect": [detect], "holding@2__repair": [repair], "holding@2__recheck": [recheck]})
+    confirm = {"a_states": "yes"}  # the targeted question about the sentence written for R1
+    fake = Fake(**{"holding@3__detect": [detect], "holding@3__repair": [repair], "holding@3__confirm": [confirm]})
     result = refine(DRAFT, ctx_for(fake, record), [Holding()])
     assert (
         "voraus (E. 2.1). Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen (E. 3)."
@@ -271,11 +268,12 @@ def test_holding_inserts_each_missing_rule_with_the_reference_added_by_code():
 def test_holding_refuses_an_insert_when_the_re_check_still_misses_a_rule():
     detect = {"a_rules": [{"a_rule": "R1", "b_sentence": "none"}], "b_answer_sentence": "s3"}
     repair = {"a_after": "s1", "b_sentences": [{"a_item": "R1", "b_text": "Die Suva muss immer zahlen."}]}
-    recheck = {"a_rules": [{"a_rule": "R1", "b_sentence": "none"}], "b_answer_sentence": "s3"}
-    fake = Fake(**{"holding@2__detect": [detect], "holding@2__repair": [repair], "holding@2__recheck": [recheck]})
+    fake = Fake(
+        **{"holding@3__detect": [detect], "holding@3__repair": [repair], "holding@3__confirm": [{"a_states": "no"}]}
+    )
     result = refine(DRAFT, ctx_for(fake, RECORD), [Holding()])
     assert result.text == Draft.from_text(DRAFT).render()
-    assert "R1 still not found" in result.trace[0].findings[0]["why_not"]
+    assert "R1 not stated faithfully" in result.trace[0].findings[0]["why_not"]
 
 
 def test_holding_is_skipped_without_a_checked_record():
@@ -381,7 +379,7 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
     fake = Fake(**{
         "record@5__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer}],
         "facts@5__detect": [{"items": []}, {"items": []}],
-        "holding@2__detect": [{"a_rules": [{"a_rule": "R1", "b_sentence": "s1"}], "b_answer_sentence": "s1"}] * 2,
+        "holding@3__detect": [{"a_rules": [{"a_rule": "R1", "b_sentence": "s1"}], "b_answer_sentence": "s1"}] * 2,
         "terms@1": [{"items": []}, {"items": []}],
         "language@1__detect": [{"items": []}, {"items": []}],
     })  # fmt: skip
@@ -475,7 +473,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
             }
         ]
     }
-    fake = Fake(**{"context@2": [answer], "facts@5__recheck": [recheck]})
+    fake = Fake(**{"context@3": [answer], "facts@5__recheck": [recheck]})
     result = refine(short, ctx_for(fake), [ContextStep()])
     assert result.text.startswith("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter")
     assert result.trace[0].status == "corrected" and result.trace[0].findings[0]["evidence"] == "facts"
@@ -484,7 +482,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
         "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
         "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe.",
     }
-    refused = refine(short, ctx_for(Fake(**{"context@2": [invented]})), [ContextStep()])
+    refused = refine(short, ctx_for(Fake(**{"context@3": [invented]})), [ContextStep()])
     assert "number 2021 not in the ruling" in refused.trace[0].findings[0]["why_not"]
 
 
@@ -583,3 +581,10 @@ def test_a_rule_without_a_legal_anchor_is_not_a_rule():
     assert anchored("Die Leistungspflicht setzt einen natürlichen Kausalzusammenhang voraus (Art. 6 Abs. 1 UVG).")
     assert anchored("Nach der Rechtsprechung ist der Status quo sine massgebend (BGE 146 V 51 E. 5.1).")
     assert not anchored("Il ricorrente contesta in questa sede unicamente il reddito da valido.")
+
+
+def test_a_lower_courts_decision_is_a_fact_not_the_outcome():
+    assert checks.restates_outcome("Das Bundesgericht wies die Beschwerde ab, weil der Kausalzusammenhang fehlte.")
+    assert checks.restates_outcome("Le recours est rejeté.")
+    assert not checks.restates_outcome("Das kantonale Gericht hiess die Beschwerde des Versicherten gut.")
+    assert not checks.restates_outcome("La cour cantonale a admis le recours de l'assuré.")
