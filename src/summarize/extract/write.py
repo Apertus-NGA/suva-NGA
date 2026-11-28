@@ -29,13 +29,14 @@ from src.summarize.refine import checks, entail, evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 from src.summarize.refine.steps.common import CALQUES, NAME, new_terms, polish
 
-VERSION = "write@5"
+VERSION = "write@6"
 CHECKS_VERSION = "write-checks@2"  # modal strength, quoted foreign words, admissibility variants
 TRIM_VERSION = "trim@1"
 TRIM_SHARE = 0.9  # of the upper end of Suva's band (checks.LENGTH_BAND)
-_KEEP_ORDER = {"fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
+_KEEP_ORDER = {"lower_court": -1, "fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
 FLOW_VERSION = "flow@2"
-FRAME_VERSION = "frame@3"
+FRAME_VERSION = "frame@4"
+POLISH_MAX_FIX = 6  # sentences refine's language step may rewrite in one fiche (refine itself: 3)
 
 SYSTEM = (
     "You write case-law digests of Swiss Federal Supreme Court rulings for the legal department of an accident "
@@ -74,6 +75,14 @@ text, and change nothing else:
 - Keep each sentence's content, articles, references and numbers; keep the order and the ids; no new sentence.
 - a_sentences: every id with its text, changed or not."""
 
+# Suva's own fiches name the Federal Supreme Court as the one that decides ("Das Bundesgericht …", "Le Tribunal
+# fédéral …": 14 times each in the 11 iterate fiches of each language, against once in ours, run x13).
+HOLDING = {
+    "de": "- This sentence gives the Federal Supreme Court's own decision on this case: say so, as a digest does "
+          "(\"Das Bundesgericht hält fest, dass …\", \"Das Bundesgericht bestätigt …\").\n",
+    "fr": "- This sentence gives the Federal Supreme Court's own decision on this case: say so, as a digest does "
+          "(\"Le Tribunal fédéral retient que …\", \"Le Tribunal fédéral confirme …\").\n",
+}  # fmt: skip
 # Who speaks: the court reporting the lower court's reasoning (candidates.py). Run x9: the cantonal judge's
 # conclusion read as the Federal Supreme Court's.
 VOICE = {
@@ -82,7 +91,7 @@ VOICE = {
 }
 ROLES = {
     "de": "der Versicherte or die Versicherte, die Beschwerdeführerin, der Arbeitgeber, die Ärztin, der Gutachter",
-    "fr": "l'assuré or l'assurée, la recourante, l'employeur, le médecin, l'expert",
+    "fr": "la personne assurée, la recourante, l'employeur, le médecin, l'expert",
 }
 # Terms of art the judge failed in run x2 (28 Nov) and the v2 glossary lacks. From the law, not from Suva's texts;
 # kept here so the current pipeline's glossary (src/summarize/v2/glossary.json) stays as it is.
@@ -94,7 +103,7 @@ EXTRA_TERMS = [
 ]
 EXTRA_CALQUES = {
     "de": ["Einsprache (nicht: Einspruch)", "Wagnis (nicht: tollkühne oder temeräre Unternehmung)"],
-    "fr": ["l'assuré (pas: la personne assurée)", "lien de causalité (pas: rapport de causalité)"],
+    "fr": ["lien de causalité (pas: rapport de causalité)"],
 }
 _BRACKETED = re.compile(r"\[[^\]]{1,40}\]")  # "[Betrag]": a placeholder the model invented (run x2, 8C_178)
 MIN_RATIO, MAX_RATIO = 0.35, 1.6  # length of the written sentence against the ruling's (references come out)
@@ -117,6 +126,7 @@ class Written:
     problems: list[str] = field(default_factory=list)
     entailment: float | None = None
     terms: list[str] = field(default_factory=list)
+    voice: str = "court"
 
     def as_dict(self) -> dict:
         return dict(self.__dict__)
@@ -251,7 +261,7 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
                                   parties=who)  # fmt: skip
     messages = [{"role": "system", "content": SYSTEM.format(lang=lang)}, {"role": "user", "content": prompt}]
     written = Written(candidate.id, candidate.label, role, candidate.text, None, "dropped",
-                      terms=[dst for _, dst in terms])  # fmt: skip
+                      terms=[dst for _, dst in terms], voice=candidate.voice)  # fmt: skip
     for attempt in range(2):
         try:
             answer = model.ask(messages, "write", obj({"a_sentence": STRING}), f"{VERSION}/{attempt}", 500)
@@ -383,7 +393,8 @@ def trim(written: list[Written], choice: Choice, language: str) -> tuple[list[Wr
                      and w.source_id != "F"]  # the frame and the court's answer stay  # fmt: skip
         if len(kept) <= 3 or not removable:
             break
-        out = min(removable, key=lambda w: (_KEEP_ORDER.get(w.role, 1), scores.get(w.label, 0.0), -len(w.text)))
+        out = min(removable, key=lambda w: (-1 if w.voice == "lower_court" else _KEEP_ORDER.get(w.role, 1),
+                                            scores.get(w.label, 0.0), -len(w.text)))  # fmt: skip
         kept.remove(out)
         out.status = "trimmed"
         notes.append(f"{out.source_id} left out for length ({out.role}, {out.label})")
@@ -428,13 +439,29 @@ _QUESTION = re.compile(
 )
 
 
-def question(text: str) -> cand.Candidate | None:
+# A question put only in procedural terms: "whether the lower court violated federal law by confirming …". Run
+# x13: 8C_311/2025 opened on it and the reader learnt nothing of the dispute.
+_PROCEDURAL_QUESTION = re.compile(
+    r"Bundesrecht verletzt|bundesrechtswidrig|droit fédéral|violé le droit|viola(?:to)? il diritto federale"
+    r"|diritto federale",
+    re.IGNORECASE,
+)
+
+
+def question(text: str) -> list[cand.Candidate]:
     """The court's first sentence that states what is in dispute, from any consideration (also one the filter
-    leaves out, such as a consideration on procedure that opens with the question)."""
-    for label, sentence in cand.sentences(evidence.passages(text)):
+    leaves out, such as a consideration on procedure that opens with the question). When it puts the question
+    only in procedural terms, the next sentence of the same consideration as well, which names the substance."""
+    every = cand.sentences(evidence.passages(text))
+    for n, (label, sentence) in enumerate(every):
         if label.startswith("E.") and _QUESTION.search(sentence) and len(sentence.split()) >= cand.MIN_WORDS:
-            return cand.Candidate("Q", label, sentence)
-    return None
+            out = [cand.Candidate("Q", label, sentence)]
+            if _PROCEDURAL_QUESTION.search(sentence) and n + 1 < len(every):
+                nxt_label, nxt = every[n + 1]
+                if nxt_label == label and len(nxt.split()) >= cand.MIN_WORDS and not cand._REPORTED.search(nxt):
+                    out.append(cand.Candidate("Q2", label, nxt))
+            return out
+    return []
 
 
 def _premise_for(sentence: str, ruling: dict, asked: cand.Candidate | None, top: int = 4) -> str:
@@ -457,7 +484,7 @@ def frame_from_draft(
     ruling lacks, and it does not state the outcome (code writes that)."""
     from src.summarize.refine.draft import Draft
 
-    asked = question(ruling["text"])
+    asked = next(iter(question(ruling["text"])), None)
     out = []
     for sentence in Draft.from_text(draft).sentences:
         if len(out) >= limit or sentence.locked:
@@ -467,7 +494,9 @@ def frame_from_draft(
             break  # the draft has reached what the court decided: the frame ends here
         if _PLACEHOLDER.search(text):
             same_language = {**ruling, "language": language}  # the draft is in the fiche's language
-            adapted = write_sentence(cand.Candidate("F", "frame", text), "fact", language, same_language, model, "", who)
+            adapted = write_sentence(
+                cand.Candidate("F", "frame", text), "fact", language, same_language, model, "", who
+            )
             if adapted.status != "written":
                 out.append(Written("F", "frame", "fact", text, None, "dropped", adapted.problems))
                 continue
@@ -492,6 +521,48 @@ def _states_court(text: str) -> bool:
     return bool(_COURT.search(text))
 
 
+# The second of two consecutive sentences that open on the lower court: a pronoun and "also" (run x13: "La cour
+# cantonale a retenu" twice in a row). Code changes only the opening words; the rest of the sentence stays.
+_LEAD_IN = {
+    "de": (re.compile(r"^(?:Die Vorinstanz|Das kantonale Gericht) (erwog|hielt fest|stellte fest|verneinte|bejahte)\b"),
+           r"Sie \1 zudem"),
+    "fr": (re.compile(r"^(?:La cour cantonale|La juridiction cantonale|Le tribunal cantonal) a (retenu|considéré|jugé|"
+                      r"estimé|constaté|admis|nié)\b"), r"Elle a en outre \1"),
+}  # fmt: skip
+# The short form of a party's long name after its first mention (Suva's fiches: "die IV-Stelle", "l'office AI").
+_SHORT_NAMES = [
+    (re.compile(r"\bOffice de l'assurance-invalidité (?:pour le|du) canton (?:de |du |d')?[A-ZÉ][\w-]+"), "office AI"),
+    (re.compile(r"\bIV-Stelle des Kantons [A-ZÄÖÜ][\w-]+"), "IV-Stelle"),
+    (re.compile(r"\bCaisse nationale suisse d'assurance en cas d'accidents(?: \(CNA\))?"), "Suva"),
+    (re.compile(r"\bSchweizerische Unfallversicherungsanstalt(?: \(Suva\))?"), "Suva"),
+]
+
+
+def edit(texts: list[str], language: str) -> tuple[list[str], list[str]]:
+    """Code's editing of the assembled sentences: the repeated lead-in, the short name after the first mention."""
+    out, notes = list(texts), []
+    pattern, replacement = _LEAD_IN.get(language, (None, None))
+    if pattern is not None:
+        for n in range(1, len(out)):
+            if pattern.search(out[n - 1]) and pattern.search(out[n]):
+                out[n] = pattern.sub(replacement, out[n], count=1)
+                notes.append(f"sentence {n + 1}: lead-in shortened")
+    for name, short in _SHORT_NAMES:
+        seen = False
+        for n, text in enumerate(out):
+
+            def shorten(match: re.Match, n=n, short=short) -> str:
+                nonlocal seen
+                if not seen:
+                    seen = True
+                    return match.group(0)
+                notes.append(f"sentence {n + 1}: '{match.group(0)}' shortened")
+                return short
+
+            out[n] = name.sub(shorten, text)
+    return out, notes
+
+
 def polish_steps():
     """Refine's own steps for what a single sentence call cannot see: forms, terms of art, grammar and idiom
     (refine/steps; each patch verified there). Run x11: one flow call fixed 9 sentences in 24 fiches."""
@@ -499,7 +570,7 @@ def polish_steps():
     from src.summarize.refine.steps.language import Language
     from src.summarize.refine.steps.terms import Terms
 
-    return [Form("form"), Terms(), Language(), Form("form_final")]
+    return [Form("form"), Terms(), Language(POLISH_MAX_FIX), Form("form_final")]
 
 
 def write_fiche(choice: Choice, language: str, ruling: dict, model: Model, frame: str = "none",
@@ -513,12 +584,10 @@ def write_fiche(choice: Choice, language: str, ruling: dict, model: Model, frame
     written = [write_sentence(c, role, language, ruling, model, previous.get((c.label, c.text), ""), who)
                for c, role in choice.chosen]  # fmt: skip
     opening: list[Written] = []
-    if (
-        frame == "question"
-        and (asked := question(ruling["text"]))
-        and all(c.text != asked.text for c, _ in choice.chosen)
-    ):
-        opening = [write_sentence(asked, "question", language, ruling, model, "", who)]
+    if frame == "question":
+        chosen_texts = {c.text for c, _ in choice.chosen}
+        opening = [write_sentence(q, "question", language, ruling, model, "", who)
+                   for q in question(ruling["text"]) if q.text not in chosen_texts]  # fmt: skip
     elif frame == "v2" and draft:
         opening = frame_from_draft(draft, language, ruling, model, who=who)
     every = [*opening, *written]
@@ -526,6 +595,8 @@ def write_fiche(choice: Choice, language: str, ruling: dict, model: Model, frame
     kept, trimmed = trim(unique, choice, language)
     trimmed = repeated + trimmed
     texts, flow_log = flow([w.text for w in kept], language, ruling, model)
+    texts, edited = edit(texts, language)
+    trimmed = trimmed + edited
     body = " ".join(t if t.endswith((".", "!", "?")) else t + "." for t in texts)
     text, notes = finish.finish(language, body, ruling["text"], ruling.get("starred"))
     text = with_admissibility(text, language, ruling["text"])

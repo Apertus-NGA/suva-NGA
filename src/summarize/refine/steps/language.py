@@ -51,6 +51,9 @@ _PLACEHOLDER = re.compile(checks.PLACEHOLDER)
 class Language(Step):
     id, version, kind = "language", VERSION, "model"
 
+    def __init__(self, max_fix: int = MAX_FIX) -> None:
+        self.max_fix = max_fix  # the extractive writer's polish asks for more (src/summarize/extract/write.py)
+
     def propose(self, draft: Draft, ctx: Context) -> list[Candidate]:
         ids = editable(draft)
         if not ids:
@@ -67,15 +70,18 @@ class Language(Step):
         item = obj({"a_sentence": enum(ids), "b_problem": enum(PROBLEMS), "c_span": STRING})
         messages = [
             {"role": "system", "content": SYSTEM.format(lang=lang)},
-            {"role": "user", "content": DETECT.format(summary=draft.numbered(), lang=lang, max=MAX_FIX)},
+            {"role": "user", "content": DETECT.format(summary=draft.numbered(), lang=lang, max=self.max_fix)},
         ]
-        answer = ctx.model.ask(messages, "language", obj({"items": array(item, MAX_FIX)}), f"{VERSION}/detect", 400)
+        default = self.max_fix == MAX_FIX  # refine's own setting: prompt version and token limit as before
+        version = f"{VERSION}/detect" if default else f"{VERSION}/detect/{self.max_fix}"
+        shape = obj({"items": array(item, self.max_fix)})
+        answer = ctx.model.ask(messages, "language", shape, version, 400 if default else 600)
         for entry in answer["items"]:
             span = entry["c_span"].strip()
             if entry["a_sentence"] not in flagged and span and span in draft.get(entry["a_sentence"]).text:
                 flagged[entry["a_sentence"]] = (entry["b_problem"], span)
         return [self._repair(draft.get(sid).text, problem, span, ctx) for sid, (problem, span) in
-                list(flagged.items())[:MAX_FIX]]  # fmt: skip
+                list(flagged.items())[:self.max_fix]]  # fmt: skip
 
     def _repair(self, sentence: str, problem: str, span: str, ctx: Context) -> Candidate:
         lang = NAME[ctx.language]

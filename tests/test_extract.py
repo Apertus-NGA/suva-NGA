@@ -274,7 +274,10 @@ def test_a_referral_of_the_costs_alone_is_not_a_remand():
     costs_only = INCOME.replace(
         "1. Die Beschwerde wird teilweise gutgeheissen und die Sache wird zu neuer Verfügung an die Suva zurückgewiesen.",
         "1. Die Beschwerde wird abgewiesen.",
-    ).replace("2. Die Gerichtskosten werden der Suva auferlegt.", "2. Die Sache wird zur Neuverlegung der Kosten zurückgewiesen.")
+    ).replace(
+        "2. Die Gerichtskosten werden der Suva auferlegt.",
+        "2. Die Sache wird zur Neuverlegung der Kosten zurückgewiesen.",
+    )
     assert not profiles.remanded(costs_only)
 
 
@@ -306,9 +309,12 @@ def test_the_courts_conclusion_is_added_when_the_choice_has_none():
 def test_a_bracketed_placeholder_is_refused_and_the_outcome_keeps_so_far_as_admissible():
     assert any("brackets" in p for p in write._problems("Der Betrag von [Betrag] Fr. wurde festgelegt und bestätigt.",
                                                         "Le montant de 196 fr. 80 a été fixé et confirmé.", "de", RULING, []))  # fmt: skip
-    source = RULING.replace("1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist.")
+    source = RULING.replace(
+        "1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist."
+    )
     assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith(
-        "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist.")
+        "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist."
+    )
     assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", RULING).endswith("abgewiesen.")
 
 
@@ -317,7 +323,9 @@ def test_trim_leaves_out_facts_then_application_and_keeps_the_answer_and_what_co
     sentences = [write.Written(f"S{n}", label, role, "x", long, "written") for n, (label, role) in enumerate(
         [("facts", "fact"), ("E.3", "rule"), ("E.4", "application"), ("E.5", "application"), ("E.5", "holding"),
          ("E.6", "condition")], 1)]  # fmt: skip
-    choice = choose.Choice("p", (), 0, {}, {"E.3": 0.9, "E.4": 0.2, "E.5": 0.8, "E.6": 0.5}, ["S6 added for income_comparison:deduction"])
+    choice = choose.Choice(
+        "p", (), 0, {}, {"E.3": 0.9, "E.4": 0.2, "E.5": 0.8, "E.6": 0.5}, ["S6 added for income_comparison:deduction"]
+    )
     kept, notes = write.trim(sentences, choice, "de")  # limit 303 words: three sentences of 101 words fit
     assert [w.source_id for w in kept] == ["S2", "S5", "S6"]
     assert [n.split()[0] for n in notes] == ["S1", "S3", "S4"]  # fact, then the lower-read application first
@@ -363,12 +371,16 @@ def test_the_parties_are_read_from_the_heading_not_guessed():
     fr = parties.read(HEAD_FR + RULING)
     assert (fr.insurer, fr.appellant, fr.insured_female) == ("Suva", "insured", False)  # the CNA is the Suva
     line = de.describe("de")
-    assert "die Versicherte (eine Frau)" in line and "HDI Global SE" in line and "Beschwerde führt HDI Global SE" in line
+    assert (
+        "die Versicherte (eine Frau)" in line and "HDI Global SE" in line and "Beschwerde führt HDI Global SE" in line
+    )
 
 
 def test_the_sentence_before_is_given_and_is_part_of_the_entailment_premise():
     before = "Das Valideneinkommen beträgt Fr. 60'000."
-    sentence = cand.Candidate("S5", "E.3", "Dieser Betrag ist der versicherten Person als Valideneinkommen anzurechnen.")
+    sentence = cand.Candidate(
+        "S5", "E.3", "Dieser Betrag ist der versicherten Person als Valideneinkommen anzurechnen."
+    )
     new = "Das Valideneinkommen von Fr. 60'000 ist der Versicherten anzurechnen."
     fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": new}]})
     written = write.write_sentence(sentence, "rule", "de", {"text": INCOME, "language": "de", "category": "uv"},
@@ -381,15 +393,23 @@ def test_the_sentence_before_is_given_and_is_part_of_the_entailment_premise():
 
 
 def test_a_rule_made_stronger_or_weaker_is_refused_by_code():
-    assert write.strength("l'appréciation des juges cantonaux doit être confirmée", "l'appréciation des juges cantonaux peut être confirmée")
+    assert write.strength(
+        "l'appréciation des juges cantonaux doit être confirmée",
+        "l'appréciation des juges cantonaux peut être confirmée",
+    )
     assert write.strength("Die Rente kann gekürzt werden.", "La rente doit être réduite.")
     assert not write.strength("Die Rente muss gekürzt werden.", "Die Rente ist zu kürzen.")
     assert not write.strength("Das Gericht bestätigt die Kürzung.", "Le Tribunal confirme la réduction.")
 
 
 def test_the_admissibility_qualifier_has_its_variants():
-    source = RULING.replace("1. Die Beschwerde wird abgewiesen.", "1. Die Beschwerde wird abgewiesen, soweit darauf eingetreten werden kann.")
-    assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith("soweit darauf einzutreten ist.")
+    source = RULING.replace(
+        "1. Die Beschwerde wird abgewiesen.",
+        "1. Die Beschwerde wird abgewiesen, soweit darauf eingetreten werden kann.",
+    )
+    assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith(
+        "soweit darauf einzutreten ist."
+    )
 
 
 # --- editorial rules ----------------------------------------------------------------------------------------------
@@ -426,17 +446,46 @@ def test_the_writer_is_told_who_speaks_and_the_answer_is_never_the_lower_courts(
 
     found = cand.candidates(LOWER)
     reported = next(c for c in found.kept if c.voice == "lower_court")
-    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": "Die Vorinstanz stellte auf das Gutachten ab, das sie für überzeugend hielt."}]})
-    write.write_sentence(reported, "application", "de", {"text": LOWER, "language": "de", "category": "uv"}, model_for(fake))
+    fake = Fake(
+        **{
+            f"{write.VERSION}/0": [
+                {"a_sentence": "Die Vorinstanz stellte auf das Gutachten ab, das sie für überzeugend hielt."}
+            ]
+        }
+    )
+    write.write_sentence(
+        reported, "application", "de", {"text": LOWER, "language": "de", "category": "uv"}, model_for(fake)
+    )
     assert "reports the lower court's reasoning" in fake.sent[0][1][-1]["content"]
     _, notes = profiles.check(found, [], LOWER, {"E.2": 0.9, "E.3": 0.5})
     assert notes and notes[0].split()[0] == next(c.id for c in found.kept if c.text.startswith("Somit hat"))
 
 
 def test_a_sentence_that_repeats_an_earlier_one_is_left_out():
-    a = write.Written("S1", "E.3", "rule", "x", "Damit der Unfallversicherer Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.", "written")
-    b = write.Written("S2", "E.3", "rule", "x", "Damit die Suva Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.", "written")
-    c = write.Written("S3", "E.4", "holding", "x", "Die Sache geht zur psychiatrischen Begutachtung an die Vorinstanz zurück.", "written")
+    a = write.Written(
+        "S1",
+        "E.3",
+        "rule",
+        "x",
+        "Damit der Unfallversicherer Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.",
+        "written",
+    )
+    b = write.Written(
+        "S2",
+        "E.3",
+        "rule",
+        "x",
+        "Damit die Suva Leistungen erbringt, muss eine psychische Erkrankung nachgewiesen werden.",
+        "written",
+    )
+    c = write.Written(
+        "S3",
+        "E.4",
+        "holding",
+        "x",
+        "Die Sache geht zur psychiatrischen Begutachtung an die Vorinstanz zurück.",
+        "written",
+    )
     kept, notes = write.without_repeats([a, b, c])
     assert [w.source_id for w in kept] == ["S1", "S3"] and b.status == "repeat"
     assert notes == ["S2 left out: it repeats S1"]
@@ -444,7 +493,7 @@ def test_a_sentence_that_repeats_an_earlier_one_is_left_out():
 
 def test_the_question_is_the_courts_own_sentence_and_the_v2_frame_must_be_entailed_by_the_facts():
     asked = write.question(RULING)
-    assert asked is not None and asked.text.startswith("Streitig ist, ob die Suva ihre Leistungen")
+    assert len(asked) == 1 and asked[0].text.startswith("Streitig ist, ob die Suva ihre Leistungen")
     draft = ("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter. Er verlor dabei drei Finger. "
              "Das Bundesgericht bestätigt die Einstellung der Leistungen.\n\nDie Beschwerde wird abgewiesen.")  # fmt: skip
     fake = Fake(**{"entail@1/frame": [0.95, 0.1]})
@@ -453,3 +502,21 @@ def test_the_question_is_the_courts_own_sentence_and_the_v2_frame_must_be_entail
     assert frame[0].text.startswith("Der Versicherte stürzte")  # and the frame stops before the court's holding
     premise = next(m for v, m in fake.sent if v.startswith("entail@1/frame"))[-1]["content"]
     assert "Streitig ist, ob die Suva" in premise
+
+
+def test_a_procedural_question_brings_the_sentence_that_names_the_substance():
+    text = RULING.replace("2. Streitig ist, ob die Suva ihre Leistungen zu Recht per 30. Juni 2023 eingestellt hat.",
+                          "2. Streitig ist, ob die Vorinstanz Bundesrecht verletzte, indem sie den Einspracheentscheid bestätigte. "
+                          "Dabei geht es um die Frage, ob der Status quo sine am 30. Juni 2023 erreicht war.")  # fmt: skip
+    asked = write.question(text)
+    assert [q.id for q in asked] == ["Q", "Q2"] and asked[1].text.startswith("Dabei geht es um die Frage")
+
+
+def test_code_shortens_a_repeated_lead_in_and_a_long_name_after_its_first_mention():
+    texts = ["La cour cantonale a retenu que l'Office de l'assurance-invalidité pour le canton de Vaud n'avait commis aucune faute.",
+             "La cour cantonale a retenu qu'aucun acte illicite n'était imputable à l'Office de l'assurance-invalidité pour le canton de Vaud.",
+             "Le Tribunal fédéral confirme ce point."]  # fmt: skip
+    out, notes = write.edit(texts, "fr")
+    assert out[0] == texts[0]  # the first mention keeps the full name
+    assert out[1] == "Elle a en outre retenu qu'aucun acte illicite n'était imputable à l'office AI."
+    assert len(notes) == 2

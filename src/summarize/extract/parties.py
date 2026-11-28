@@ -58,7 +58,8 @@ class Parties:
                 "insurer": f"Beschwerde führt {insurer}; {person} ist die Gegenpartei",
             }.get(self.appellant or "", "")
         else:
-            person = {True: "l'assurée (une femme)", False: "l'assuré (un homme)"}.get(
+            # Suva's French fiches say "la personne assurée" (7 to 3 against "l'assuré" on the iterate set)
+            person = {True: "la personne assurée (une femme)", False: "la personne assurée (un homme)"}.get(
                 self.insured_female, "la personne assurée"
             )
             insurer = self.insurer or "l'assureur"
