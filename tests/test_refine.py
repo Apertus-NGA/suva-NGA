@@ -208,7 +208,7 @@ def test_facts_rewrites_an_unsupported_sentence_from_a_verified_quote():
               "c_action": "rewrite",
               "d_sentence": "Das Bundesgericht hielt fest, dass die Leistungspflicht einen natürlichen Kausalzusammenhang voraussetzt."}  # fmt: skip
     recheck = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "Die Leistungspflicht des Unfallversicherers setzt einen", "d_verdict": "same"}]}  # fmt: skip
-    fake = Fake(**{"facts@2__detect": [detect], "facts@2__repair": [repair], "facts@2__recheck": [recheck]})
+    fake = Fake(**{"facts@4__detect": [detect], "facts@4__repair": [repair], "facts@4__recheck": [recheck]})
     result = refine(DRAFT, ctx_for(fake), [Facts()])
     assert "ohne Kausalzusammenhang" not in result.text
     assert "natürlichen Kausalzusammenhang voraussetzt" in result.text
@@ -224,7 +224,7 @@ def test_facts_refuses_a_repair_whose_quote_is_invented():
     detect = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "x " * 10, "d_verdict": "not_in_ruling"}]}
     repair = {"a_label": "E.3", "b_opening": "Das Bundesgericht hat dies nie gesagt, aber",
               "c_action": "rewrite", "d_sentence": "Die Leistungspflicht besteht nach Art. 99 UVG immer."}  # fmt: skip
-    fake = Fake(**{"facts@2__detect": [detect], "facts@2__repair": [repair]})
+    fake = Fake(**{"facts@4__detect": [detect], "facts@4__repair": [repair]})
     result = refine(DRAFT, ctx_for(fake), [Facts()])
     assert result.text == Draft.from_text(DRAFT).render()
     why = result.trace[0].findings[0]["why_not"]
@@ -293,7 +293,6 @@ def test_record_moves_a_quote_to_its_real_passage_and_drops_an_invented_one():
         "b_rules": [{"a_label": "E.3", "b_opening": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen", "c_sentences": "2"},
                     {"a_label": "E.2.1", "b_opening": "Ein erfundener Grundsatz, den es nicht gibt", "c_sentences": "1"}],
         "c_answer": {"a_label": "E.3", "b_opening": "Die Vorinstanz hat die Leistungseinstellung daher", "c_sentences": "1"},
-        "d_facts": [],
     }  # fmt: skip
     record = validate(answer, parts, candidates)
     assert record["rules"] == [{
@@ -351,8 +350,8 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
     rule = {"a_label": "E.4.1", "b_opening": "Nach Art. 6 Abs. 1 UVG werden", "c_sentences": "1"}
     answer = {"a_label": "E.4.2", "b_opening": "Hier fehlt der natürliche Kausalzusammenhang", "c_sentences": "1"}
     fake = Fake(**{
-        "record@3__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer, "d_facts": []}],
-        "facts@2__detect": [{"items": []}, {"items": []}],
+        "record@4__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer}],
+        "facts@4__detect": [{"items": []}, {"items": []}],
         "holding@1__detect": [{"a_rule_sentence": "s1", "b_answer_sentence": "s1"}] * 2,
         "terms@1": [{"items": []}, {"items": []}],
         "language@1__detect": [{"items": []}, {"items": []}],
@@ -363,11 +362,11 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
     for language in ("de", "fr"):
         refine = params["refine"][language]
         assert [s["step"] for s in refine["steps"]] == [
-            "form", "facts", "holding", "terms", "language", "length", "form_final",
+            "form", "facts", "holding", "economy", "terms", "language", "length", "form_final",
         ]  # fmt: skip
         assert refine["draft"] and stored[language] == result["languages"][language]["text"]
     assert params["refine"]["record"]["status"] == "ok"
-    assert sum(v.startswith("record@3") for v, _ in fake.sent) == 1  # one shared reading for both languages
+    assert sum(v.startswith("record@4") for v, _ in fake.sent) == 1  # one shared reading for both languages
 
 
 def test_an_injected_ask_without_a_refine_transport_is_refused():
@@ -375,3 +374,54 @@ def test_an_injected_ask_without_a_refine_transport_is_refused():
 
     with pytest.raises(ValueError, match="refine_transport"):
         pipeline.summarise_ruling(None, 1, ask=lambda m: "", refine=True)
+
+
+def test_facts_flags_by_code_a_sentence_naming_suva_when_the_ruling_has_another_insurer():
+    ruling = RULING.replace("Die Suva verneinte", "Die Generali verneinte").replace("ob die Suva", "ob die Generali")
+    draft = "Die Suva verneinte weitere Leistungen. Der Versicherte stürzte von einer Leiter.\n\nDie Beschwerde wird abgewiesen."
+    detect = {"items": []}  # the model sees nothing wrong; code does
+    repair = {
+        "a_label": "facts",
+        "b_opening": "Die Generali verneinte mit Einspracheentscheid vom",
+        "c_action": "rewrite",
+        "d_sentence": "Der Unfallversicherer verneinte weitere Leistungen.",
+    }
+    recheck = {
+        "items": [
+            {
+                "a_sentence": "s1",
+                "b_label": "facts",
+                "c_opening": "Die Generali verneinte mit Einspracheentscheid vom",
+                "d_verdict": "same",
+            }
+        ]
+    }
+    fake = Fake(**{"facts@4__detect": [detect], "facts@4__repair": [repair], "facts@4__recheck": [recheck]})
+    ctx = Context("de", ruling, evidence.passages(ruling), "uv", Model(fake, budget=10), None, "", "de")
+    result = refine(draft, ctx, [Facts()])
+    assert result.text.startswith("Der Unfallversicherer verneinte")
+    assert result.trace[0].findings[0]["detected_by"] == "code"
+    assert "not Suva" in fake.sent[1][1][1]["content"]
+    # both calls share the system message and the ruling, so the gateway's prefix cache reads the ruling once
+    first, second = fake.sent[0][1], fake.sent[1][1]
+    cut = first[1]["content"].index("</ruling>")
+    assert first[0] == second[0] and first[1]["content"][:cut] == second[1]["content"][:cut]
+
+
+def test_economy_takes_a_restated_outcome_out_of_another_sentence():
+    from src.summarize.refine.steps.economy import Economy
+
+    facts = "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter, die Suva stellte ihre Leistungen per 30. Juni 2023 ein. "
+    draft = (
+        facts + "Das Bundesgericht hat die Beschwerde abgewiesen, weil der Kausalzusammenhang fehlte.\n\n"
+        "Die Beschwerde wird abgewiesen."
+    )
+    answer = {"a_action": "rewrite", "b_sentence": "Der natürliche Kausalzusammenhang fehlte."}
+    result = refine(draft, ctx_for(Fake(**{"economy@1": [answer]})), [Economy()])
+    assert result.text == facts + "Der natürliche Kausalzusammenhang fehlte.\n\nDie Beschwerde wird abgewiesen."
+    refused = refine(
+        draft,
+        ctx_for(Fake(**{"economy@1": [{"a_action": "rewrite", "b_sentence": "Die Beschwerde wurde abgewiesen."}]})),
+        [Economy()],
+    )
+    assert "still states the outcome" in refused.trace[0].findings[0]["why_not"]
