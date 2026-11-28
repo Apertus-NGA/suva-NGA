@@ -97,6 +97,9 @@ def evaluate(variant: Variant, table: dict[str, np.ndarray]) -> dict[str, Any]:
             found = int(yt[order[:n]].sum())
             at[f"{share:.2f}"] = {"submitted": n, "found": found}
         per[test_q] = {
+            "_scores": scores,
+            "_y": yt,
+            "_core": ct,
             "relevant": int(yt.sum()),
             "at_share": at,
             "needed_95": needed(scores, yt, 0.95),
@@ -114,8 +117,11 @@ def evaluate(variant: Variant, table: dict[str, np.ndarray]) -> dict[str, Any]:
             "recall": round(tp / total, 3),
             "f2": round(f2(tp, sub - tp, total - tp), 3),
         }
-    primary = per[FOLDS[0][1]]
+    primary = {k: v for k, v in per[FOLDS[0][1]].items() if not k.startswith("_")}
     return {
+        "_folds": {q: {k: per[q][k] for k in ("_scores", "_y", "_core")} for q in per},
+        "mean_found": round(float(np.mean([pooled[k]["found"] for k in pooled])), 2),
+        "mean_f2": round(float(np.mean([pooled[k]["f2"] for k in pooled])), 3),
         "variant": variant.name,
         "columns": list(variant.columns),
         "primary_test": FOLDS[0][1],
@@ -135,3 +141,38 @@ def beats(candidate: dict[str, Any], baseline: dict[str, Any]) -> bool:
         and all(c[k]["found"] >= b[k]["found"] for k in b)
         and candidate["pooled_needed_95"] <= baseline["pooled_needed_95"]
     )
+
+
+def _found(scores: np.ndarray, y: np.ndarray, core: np.ndarray, share: float) -> int:
+    n = max(1, int(round(share * int(core.sum()))))
+    return int(y[np.argsort(-scores, kind="stable")[:n]].sum())
+
+
+def paired_bootstrap(
+    candidate: dict[str, Any], baseline: dict[str, Any], share: float = 0.40, n_boot: int = 2000, seed: int = 0
+) -> dict[str, float]:
+    """Resample the test rulings of each quarter (the same draw for both variants) and count, pooled, how many
+    more relevant rulings the candidate finds at ``share``. Returns the mean difference, its 95% interval and the
+    share of draws in which the candidate finds more."""
+    rng = np.random.default_rng(seed)
+    diffs = np.zeros(n_boot)
+    for q, fold in baseline["_folds"].items():
+        other = candidate["_folds"][q]
+        y, core, n = fold["_y"], fold["_core"], len(fold["_y"])
+        for b in range(n_boot):
+            idx = rng.integers(0, n, n)
+            diffs[b] += _found(other["_scores"][idx], y[idx], core[idx], share) - _found(
+                fold["_scores"][idx], y[idx], core[idx], share
+            )
+    lo, hi = np.percentile(diffs, [2.5, 97.5])
+    return {
+        "mean": round(float(diffs.mean()), 2),
+        "low": float(lo),
+        "high": float(hi),
+        "p_better": round(float((diffs > 0).mean()), 3),
+    }
+
+
+def public(result: dict[str, Any]) -> dict[str, Any]:
+    """The result without its per-ruling arrays (aggregates only, D-031)."""
+    return {k: v for k, v in result.items() if not k.startswith("_")}

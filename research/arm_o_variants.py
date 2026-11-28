@@ -30,6 +30,8 @@ from src.triage import variants as vr  # noqa: E402
 from suva_data import db  # noqa: E402
 
 OUT = ROOT / "research" / "out"
+FEATURES_DIR = ROOT / "data" / "derived" / "triage_features"
+READINGS = ("verdict", "yes_strict", "scale_generic", "scale_area", "scale_headnote", "scale_tail")
 FACTS = sc.FEATURES[:8]
 RUBRIC = [
     "q_rule", "q_new", "q_factual", "q_routine", "q_insurer_lost",
@@ -83,6 +85,9 @@ def build_table(kept: list[dict], extra: pd.DataFrame | None) -> tuple[dict[str,
     df["c_shared_topic_iv"] = df["c_shared_topic"] * np.array(is_iv, dtype=float)
     for i, name in enumerate(sc.FEATURES):
         df[name] = [r["x"][i] for r in rows]
+    for name in READINGS:  # the six relevance readings, None outside the core rulings
+        df[f"r_{name}"] = [(r.get("readings") or {}).get(name) for r in rows]
+    df["area_iv_flag"] = np.array(is_iv, dtype=float)
     df["y"] = [r["y"] for r in rows]
     df["quarter"] = [r["quarter"] for r in rows]
     df["core"] = [r["signals"]["area"] in pipeline.CORE_AREAS for r in rows]
@@ -94,12 +99,24 @@ def build_table(kept: list[dict], extra: pd.DataFrame | None) -> tuple[dict[str,
     # the sprint's composite, signs fixed by meaning (research/arm_g_composite.py), then a logit-scale version
     df["principle"] = (df.q_rule + df.q_new + (1 - df.q_factual) + (1 - df.q_routine)) / 4
     df["principle_logit"] = (logit(df.q_rule) + logit(df.q_new) - logit(df.q_factual) - logit(df.q_routine)) / 4
-    added = ["principle", "principle_logit", *RUBRIC, *MORE]
+    added = ["principle", "principle_logit", *RUBRIC, *MORE, *(f"r_{n}" for n in READINGS)]
     if extra is not None:
         df = df.merge(extra, on="docket", how="left")
         added += [c for c in extra.columns if c.startswith("f_")]
+    for path in sorted(FEATURES_DIR.glob("*_*.parquet")):
+        if path.stem.endswith("_partial"):
+            continue
+        size = path.stem.rsplit("_", 1)[1]
+        new = pd.read_parquet(path)
+        cols = [c for c in new.columns if c.startswith("f_")]
+        new = new[["docket", *cols]].rename(columns={c: f"{c}_{size}" for c in cols})
+        df = df.merge(new, on="docket", how="left")
+        added += [f"{c}_{size}" for c in cols]
     for c in added:  # neutral value for rulings no reading covers: the mean of the rulings read
         df[c] = df[c].fillna(df[c].mean())
+    for c in [c for c in added if c.startswith("f_topic_")]:  # the topic matters inside disability insurance
+        df[f"{c}_iv"] = df[c] * df["area_iv_flag"]
+        added.append(f"{c}_iv")
     return {c: df[c].to_numpy() for c in df.columns}, added
 
 
@@ -112,24 +129,31 @@ def main(argv: list[str] | None = None) -> int:
     table, added = build_table(kept_rows(), extra)
     base_cols = [*FACTS, "consensus"]
     sets = {
+        # raw Apertus, no engineering (principle 9): one reading, or the averaged readings, plus nothing else
+        "Apertus verdict alone": ["r_verdict"],
+        "Apertus consensus alone": ["consensus"],
         "facts8": FACTS,
         "facts8+consensus (baseline)": base_cols,
-        "facts8+principle": [*FACTS, "principle"],
-        "facts8+consensus+principle": [*base_cols, "principle"],
-        "facts8+consensus+principle_logit": [*base_cols, "principle_logit"],
-        "facts8+consensus+rubric9": [*base_cols, *RUBRIC],
-        "facts8+consensus+rule,new,corrects,learn": [*base_cols, "q_rule", "q_new", "q_corrects", "q_learn"],
-        "facts8+consensus+proc": [*base_cols, "c_proc_subject"],
-        "facts8+consensus+shared_iv": [*base_cols, "c_shared_topic_iv"],
-        "facts8+consensus+proc+shared_iv": [*base_cols, "c_proc_subject", "c_shared_topic_iv"],
-        "facts8+proc+shared_iv": [*FACTS, "c_proc_subject", "c_shared_topic_iv"],
+        "facts8+consensus+principle (research)": [*base_cols, "principle"],
+        "facts8+consensus+proc (code)": [*base_cols, "c_proc_subject"],
     }
     new = [c for c in added if c.startswith("f_")]
-    if new:
-        sets["facts8+consensus+new"] = [*base_cols, *new]
-        sets["facts8+new"] = [*FACTS, *new]
-        for c in new:
-            sets[f"facts8+consensus+{c}"] = [*base_cols, c]
+    for size in ("small", "large"):
+        mine = [c for c in new if c.endswith(f"_{size}") or c.endswith(f"_{size}_iv")]
+        if not mine:
+            continue
+        topic_iv = [f"f_topic_{g}_{size}_iv" for g in ("shared", "medical", "iv_only")]
+        stmt = [f"f_stmt_p_{size}", f"f_stmt_verified_{size}", f"f_stmt_own_{size}"]
+        sets[f"facts8+consensus+topic_iv[{size}]"] = [*base_cols, *[c for c in topic_iv if c in new]]
+        sets[f"facts8+consensus+topic_shared_iv[{size}]"] = [*base_cols, f"f_topic_shared_{size}_iv"]
+        for c in stmt:
+            if c in new:
+                sets[f"facts8+consensus+{c}"] = [*base_cols, c]
+        if f"f_stmt_own_{size}" in new:
+            sets[f"facts8+consensus+stmt_own+topic_shared_iv[{size}]"] = [
+                *base_cols, f"f_stmt_own_{size}", f"f_topic_shared_{size}_iv"]
+            sets[f"facts8+stmt_own+topic_shared_iv[{size}] (no consensus)"] = [
+                *FACTS, f"f_stmt_own_{size}", f"f_topic_shared_{size}_iv"]
     variants = []
     for name, cols in sets.items():
         variants.append(vr.Variant(f"LR {name}", cols, vr.logistic))
@@ -138,25 +162,27 @@ def main(argv: list[str] | None = None) -> int:
     base = next(r for r in results if r["variant"] == "LR facts8+consensus (baseline)")
     for r in results:
         r["beats_baseline"] = vr.beats(r, base)
+        r["bootstrap_vs_baseline"] = vr.paired_bootstrap(r, base, n_boot=1000)
     summary = {
         "labelled_kept": int(len(table["y"])),
         "relevant": int(table["y"].sum()),
         "covered_by_research_answers": int(table["in_research"].sum()),
         "relevant_covered": int(table["y"][table["in_research"]].sum()),
-        "results": results,
+        "results": [vr.public(r) for r in results],
     }
     args.out.write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
-    print(f"labelled kept {summary['labelled_kept']}, relevant {summary['relevant']}, "
-          f"research answers on {summary['covered_by_research_answers']} ({summary['relevant_covered']} relevant)")
-    head = "variant".ljust(52) + " ".join(f"@{s:.2f}" for s in vr.SHARES) + "  F2@.40  need95 need100 Q1@.40 beats"
-    print(head)
+    print(f"labelled kept {summary['labelled_kept']}, relevant {summary['relevant']}")
+    head = "variant".ljust(56) + " ".join(f"@{s:.2f}" for s in vr.SHARES)
+    print(head + "  meanF  F2@.4 meanF2 n95 n100 Q1@.4  d@.4 [95% CI] P(>) beats")
     for r in results:
         p = r["pooled"]
         found = " ".join(f"{p[f'{s:.2f}']['found']:>5}" for s in vr.SHARES)
         q1 = r["primary"]["at_share"]["0.40"]["found"]
-        need = f"{r['pooled_needed_95']:>6} {r['pooled_needed_100']:>6}"
-        print(f"{r['variant'][:51].ljust(52)}{found}  {p['0.40']['f2']:.3f}  {need} "
-              f"{q1:>6} {'YES' if r['beats_baseline'] else ''}")
+        b = r["bootstrap_vs_baseline"]
+        need = f"{r['pooled_needed_95']:>3} {r['pooled_needed_100']:>4}"
+        boot = f"{b['mean']:+5.1f} [{b['low']:+.0f},{b['high']:+.0f}] {b['p_better']:.2f}"
+        print(f"{r['variant'][:55].ljust(56)}{found}  {r['mean_found']:5.1f} {p['0.40']['f2']:.3f}  {r['mean_f2']:.3f} "
+              f"{need} {q1:>4}  {boot} {'YES' if r['beats_baseline'] else ''}")
     return 0
 
 
