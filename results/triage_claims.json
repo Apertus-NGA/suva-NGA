@@ -1,0 +1,4759 @@
+{
+ "core_rulings": 298,
+ "relevant": 59,
+ "features": [
+  {
+   "feature": "consensus",
+   "answered": 298,
+   "yes": 40,
+   "yes_relevant": 20,
+   "precision": 0.5,
+   "recall_of_yes": 0.339,
+   "auc_2025 Q4": 0.787,
+   "auc_2026 Q1": 0.773,
+   "auc_iv_only": 0.66
+  },
+  {
+   "feature": "r_yes_strict",
+   "answered": 298,
+   "yes": 30,
+   "yes_relevant": 15,
+   "precision": 0.5,
+   "recall_of_yes": 0.254,
+   "auc_2025 Q4": 0.581,
+   "auc_2026 Q1": 0.593,
+   "auc_iv_only": 0.648
+  },
+  {
+   "feature": "code_practice",
+   "answered": 298,
+   "yes": 94,
+   "yes_relevant": 25,
+   "precision": 0.266,
+   "recall_of_yes": 0.424,
+   "auc_2025 Q4": 0.486,
+   "auc_2026 Q1": 0.638,
+   "auc_iv_only": 0.469
+  },
+  {
+   "feature": "p_practice_zero_small",
+   "answered": 298,
+   "yes": 6,
+   "yes_relevant": 2,
+   "precision": 0.333,
+   "recall_of_yes": 0.034,
+   "auc_2025 Q4": 0.603,
+   "auc_2026 Q1": 0.593,
+   "auc_iv_only": 0.547
+  },
+  {
+   "feature": "p_practice_cited_small",
+   "answered": 297,
+   "yes": 2,
+   "yes_relevant": 2,
+   "precision": 1.0,
+   "recall_of_yes": 0.034,
+   "auc_2025 Q4": 0.753,
+   "auc_2026 Q1": 0.722,
+   "auc_iv_only": 0.667
+  },
+  {
+   "feature": "chk_practice_cited_small",
+   "answered": 297,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": null,
+   "auc_iv_only": null
+  },
+  {
+   "feature": "pchk_practice_cited_small",
+   "answered": 297,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": null,
+   "auc_iv_only": null
+  },
+  {
+   "feature": "p_practice_located_small",
+   "answered": 297,
+   "yes": 2,
+   "yes_relevant": 2,
+   "precision": 1.0,
+   "recall_of_yes": 0.034,
+   "auc_2025 Q4": 0.733,
+   "auc_2026 Q1": 0.693,
+   "auc_iv_only": 0.603
+  },
+  {
+   "feature": "chk_practice_located_small",
+   "answered": 297,
+   "yes": 39,
+   "yes_relevant": 7,
+   "precision": 0.179,
+   "recall_of_yes": 0.119,
+   "auc_2025 Q4": 0.47,
+   "auc_2026 Q1": 0.512,
+   "auc_iv_only": 0.526
+  },
+  {
+   "feature": "pchk_practice_located_small",
+   "answered": 297,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": 0.467,
+   "auc_2026 Q1": 0.527,
+   "auc_iv_only": 0.512
+  },
+  {
+   "feature": "p_practice_zero_large",
+   "answered": 298,
+   "yes": 32,
+   "yes_relevant": 12,
+   "precision": 0.375,
+   "recall_of_yes": 0.203,
+   "auc_2025 Q4": 0.812,
+   "auc_2026 Q1": 0.73,
+   "auc_iv_only": 0.788
+  },
+  {
+   "feature": "p_practice_cited_large",
+   "answered": 297,
+   "yes": 1,
+   "yes_relevant": 1,
+   "precision": 1.0,
+   "recall_of_yes": 0.017,
+   "auc_2025 Q4": 0.646,
+   "auc_2026 Q1": 0.651,
+   "auc_iv_only": 0.684
+  },
+  {
+   "feature": "chk_practice_cited_large",
+   "answered": 297,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": null,
+   "auc_iv_only": null
+  },
+  {
+   "feature": "pchk_practice_cited_large",
+   "answered": 297,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": null,
+   "auc_iv_only": null
+  },
+  {
+   "feature": "p_practice_located_large",
+   "answered": 296,
+   "yes": 5,
+   "yes_relevant": 1,
+   "precision": 0.2,
+   "recall_of_yes": 0.017,
+   "auc_2025 Q4": 0.777,
+   "auc_2026 Q1": 0.696,
+   "auc_iv_only": 0.738
+  },
+  {
+   "feature": "chk_practice_located_large",
+   "answered": 285,
+   "yes": 28,
+   "yes_relevant": 7,
+   "precision": 0.25,
+   "recall_of_yes": 0.119,
+   "auc_2025 Q4": 0.506,
+   "auc_2026 Q1": 0.525,
+   "auc_iv_only": 0.557
+  },
+  {
+   "feature": "pchk_practice_located_large",
+   "answered": 285,
+   "yes": 0,
+   "yes_relevant": 0,
+   "precision": null,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": 0.52,
+   "auc_2026 Q1": 0.542,
+   "auc_iv_only": 0.581
+  },
+  {
+   "feature": "code_legal_error",
+   "answered": 298,
+   "yes": 188,
+   "yes_relevant": 46,
+   "precision": 0.245,
+   "recall_of_yes": 0.78,
+   "auc_2025 Q4": 0.555,
+   "auc_2026 Q1": 0.626,
+   "auc_iv_only": 0.607
+  },
+  {
+   "feature": "p_legal_error_zero_small",
+   "answered": 298,
+   "yes": 55,
+   "yes_relevant": 21,
+   "precision": 0.382,
+   "recall_of_yes": 0.356,
+   "auc_2025 Q4": 0.819,
+   "auc_2026 Q1": 0.715,
+   "auc_iv_only": 0.682
+  },
+  {
+   "feature": "p_legal_error_cited_small",
+   "answered": 297,
+   "yes": 17,
+   "yes_relevant": 8,
+   "precision": 0.471,
+   "recall_of_yes": 0.136,
+   "auc_2025 Q4": 0.815,
+   "auc_2026 Q1": 0.759,
+   "auc_iv_only": 0.702
+  },
+  {
+   "feature": "chk_legal_error_cited_small",
+   "answered": 297,
+   "yes": 3,
+   "yes_relevant": 0,
+   "precision": 0.0,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": 0.489,
+   "auc_iv_only": 0.492
+  },
+  {
+   "feature": "pchk_legal_error_cited_small",
+   "answered": 297,
+   "yes": 3,
+   "yes_relevant": 0,
+   "precision": 0.0,
+   "recall_of_yes": 0.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": 0.489,
+   "auc_iv_only": 0.492
+  },
+  {
+   "feature": "p_legal_error_located_small",
+   "answered": 297,
+   "yes": 11,
+   "yes_relevant": 6,
+   "precision": 0.545,
+   "recall_of_yes": 0.102,
+   "auc_2025 Q4": 0.792,
+   "auc_2026 Q1": 0.754,
+   "auc_iv_only": 0.713
+  },
+  {
+   "feature": "chk_legal_error_located_small",
+   "answered": 297,
+   "yes": 78,
+   "yes_relevant": 17,
+   "precision": 0.218,
+   "recall_of_yes": 0.288,
+   "auc_2025 Q4": 0.529,
+   "auc_2026 Q1": 0.504,
+   "auc_iv_only": 0.633
+  },
+  {
+   "feature": "pchk_legal_error_located_small",
+   "answered": 297,
+   "yes": 3,
+   "yes_relevant": 1,
+   "precision": 0.333,
+   "recall_of_yes": 0.017,
+   "auc_2025 Q4": 0.558,
+   "auc_2026 Q1": 0.517,
+   "auc_iv_only": 0.678
+  },
+  {
+   "feature": "p_legal_error_zero_large",
+   "answered": 298,
+   "yes": 56,
+   "yes_relevant": 21,
+   "precision": 0.375,
+   "recall_of_yes": 0.356,
+   "auc_2025 Q4": 0.76,
+   "auc_2026 Q1": 0.675,
+   "auc_iv_only": 0.709
+  },
+  {
+   "feature": "p_legal_error_cited_large",
+   "answered": 297,
+   "yes": 42,
+   "yes_relevant": 16,
+   "precision": 0.381,
+   "recall_of_yes": 0.271,
+   "auc_2025 Q4": 0.613,
+   "auc_2026 Q1": 0.641,
+   "auc_iv_only": 0.66
+  },
+  {
+   "feature": "chk_legal_error_cited_large",
+   "answered": 297,
+   "yes": 8,
+   "yes_relevant": 3,
+   "precision": 0.375,
+   "recall_of_yes": 0.051,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": 0.529,
+   "auc_iv_only": 0.552
+  },
+  {
+   "feature": "pchk_legal_error_cited_large",
+   "answered": 297,
+   "yes": 8,
+   "yes_relevant": 3,
+   "precision": 0.375,
+   "recall_of_yes": 0.051,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": 0.529,
+   "auc_iv_only": 0.551
+  },
+  {
+   "feature": "p_legal_error_located_large",
+   "answered": 286,
+   "yes": 46,
+   "yes_relevant": 16,
+   "precision": 0.348,
+   "recall_of_yes": 0.271,
+   "auc_2025 Q4": 0.731,
+   "auc_2026 Q1": 0.677,
+   "auc_iv_only": 0.703
+  },
+  {
+   "feature": "chk_legal_error_located_large",
+   "answered": 286,
+   "yes": 63,
+   "yes_relevant": 12,
+   "precision": 0.19,
+   "recall_of_yes": 0.203,
+   "auc_2025 Q4": 0.443,
+   "auc_2026 Q1": 0.539,
+   "auc_iv_only": 0.544
+  },
+  {
+   "feature": "pchk_legal_error_located_large",
+   "answered": 286,
+   "yes": 8,
+   "yes_relevant": 3,
+   "precision": 0.375,
+   "recall_of_yes": 0.051,
+   "auc_2025 Q4": 0.49,
+   "auc_2026 Q1": 0.562,
+   "auc_iv_only": 0.576
+  },
+  {
+   "feature": "code_transfer",
+   "answered": 298,
+   "yes": 249,
+   "yes_relevant": 59,
+   "precision": 0.237,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.627,
+   "auc_2026 Q1": 0.583,
+   "auc_iv_only": 0.608
+  },
+  {
+   "feature": "p_transfer_zero_small",
+   "answered": 298,
+   "yes": 298,
+   "yes_relevant": 59,
+   "precision": 0.198,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.754,
+   "auc_2026 Q1": 0.752,
+   "auc_iv_only": 0.485
+  },
+  {
+   "feature": "p_transfer_cited_small",
+   "answered": 297,
+   "yes": 270,
+   "yes_relevant": 57,
+   "precision": 0.211,
+   "recall_of_yes": 0.966,
+   "auc_2025 Q4": 0.714,
+   "auc_2026 Q1": 0.721,
+   "auc_iv_only": 0.549
+  },
+  {
+   "feature": "chk_transfer_cited_small",
+   "answered": 297,
+   "yes": 175,
+   "yes_relevant": 49,
+   "precision": 0.28,
+   "recall_of_yes": 0.831,
+   "auc_2025 Q4": 0.662,
+   "auc_2026 Q1": 0.644,
+   "auc_iv_only": 0.592
+  },
+  {
+   "feature": "pchk_transfer_cited_small",
+   "answered": 297,
+   "yes": 175,
+   "yes_relevant": 49,
+   "precision": 0.28,
+   "recall_of_yes": 0.831,
+   "auc_2025 Q4": 0.706,
+   "auc_2026 Q1": 0.72,
+   "auc_iv_only": 0.597
+  },
+  {
+   "feature": "p_transfer_located_small",
+   "answered": 297,
+   "yes": 267,
+   "yes_relevant": 58,
+   "precision": 0.217,
+   "recall_of_yes": 0.983,
+   "auc_2025 Q4": 0.684,
+   "auc_2026 Q1": 0.664,
+   "auc_iv_only": 0.574
+  },
+  {
+   "feature": "chk_transfer_located_small",
+   "answered": 297,
+   "yes": 182,
+   "yes_relevant": 52,
+   "precision": 0.286,
+   "recall_of_yes": 0.881,
+   "auc_2025 Q4": 0.688,
+   "auc_2026 Q1": 0.652,
+   "auc_iv_only": 0.649
+  },
+  {
+   "feature": "pchk_transfer_located_small",
+   "answered": 297,
+   "yes": 182,
+   "yes_relevant": 52,
+   "precision": 0.286,
+   "recall_of_yes": 0.881,
+   "auc_2025 Q4": 0.713,
+   "auc_2026 Q1": 0.704,
+   "auc_iv_only": 0.67
+  },
+  {
+   "feature": "p_transfer_zero_large",
+   "answered": 298,
+   "yes": 259,
+   "yes_relevant": 58,
+   "precision": 0.224,
+   "recall_of_yes": 0.983,
+   "auc_2025 Q4": 0.616,
+   "auc_2026 Q1": 0.627,
+   "auc_iv_only": 0.555
+  },
+  {
+   "feature": "p_transfer_cited_large",
+   "answered": 287,
+   "yes": 234,
+   "yes_relevant": 55,
+   "precision": 0.235,
+   "recall_of_yes": 0.932,
+   "auc_2025 Q4": 0.683,
+   "auc_2026 Q1": 0.701,
+   "auc_iv_only": 0.625
+  },
+  {
+   "feature": "chk_transfer_cited_large",
+   "answered": 287,
+   "yes": 150,
+   "yes_relevant": 42,
+   "precision": 0.28,
+   "recall_of_yes": 0.712,
+   "auc_2025 Q4": 0.622,
+   "auc_2026 Q1": 0.645,
+   "auc_iv_only": 0.528
+  },
+  {
+   "feature": "pchk_transfer_cited_large",
+   "answered": 287,
+   "yes": 150,
+   "yes_relevant": 42,
+   "precision": 0.28,
+   "recall_of_yes": 0.712,
+   "auc_2025 Q4": 0.632,
+   "auc_2026 Q1": 0.68,
+   "auc_iv_only": 0.548
+  },
+  {
+   "feature": "p_transfer_located_large",
+   "answered": 297,
+   "yes": 247,
+   "yes_relevant": 57,
+   "precision": 0.231,
+   "recall_of_yes": 0.966,
+   "auc_2025 Q4": 0.661,
+   "auc_2026 Q1": 0.691,
+   "auc_iv_only": 0.594
+  },
+  {
+   "feature": "chk_transfer_located_large",
+   "answered": 292,
+   "yes": 143,
+   "yes_relevant": 42,
+   "precision": 0.294,
+   "recall_of_yes": 0.712,
+   "auc_2025 Q4": 0.66,
+   "auc_2026 Q1": 0.651,
+   "auc_iv_only": 0.495
+  },
+  {
+   "feature": "pchk_transfer_located_large",
+   "answered": 292,
+   "yes": 139,
+   "yes_relevant": 41,
+   "precision": 0.295,
+   "recall_of_yes": 0.695,
+   "auc_2025 Q4": 0.671,
+   "auc_2026 Q1": 0.687,
+   "auc_iv_only": 0.515
+  },
+  {
+   "feature": "code_m_practice",
+   "answered": 298,
+   "yes": 94,
+   "yes_relevant": 25,
+   "precision": 0.266,
+   "recall_of_yes": 0.424,
+   "auc_2025 Q4": 0.486,
+   "auc_2026 Q1": 0.638,
+   "auc_iv_only": 0.469
+  },
+  {
+   "feature": "code_m_error",
+   "answered": 298,
+   "yes": 188,
+   "yes_relevant": 46,
+   "precision": 0.245,
+   "recall_of_yes": 0.78,
+   "auc_2025 Q4": 0.555,
+   "auc_2026 Q1": 0.626,
+   "auc_iv_only": 0.607
+  },
+  {
+   "feature": "code_m_case_law",
+   "answered": 298,
+   "yes": 277,
+   "yes_relevant": 59,
+   "precision": 0.213,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.581,
+   "auc_2026 Q1": 0.684,
+   "auc_iv_only": 0.629
+  },
+  {
+   "feature": "code_m_shared_law",
+   "answered": 298,
+   "yes": 203,
+   "yes_relevant": 54,
+   "precision": 0.266,
+   "recall_of_yes": 0.915,
+   "auc_2025 Q4": 0.655,
+   "auc_2026 Q1": 0.642,
+   "auc_iv_only": 0.646
+  },
+  {
+   "feature": "code_m_length",
+   "answered": 298,
+   "yes": 298,
+   "yes_relevant": 59,
+   "precision": 0.198,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.721,
+   "auc_2026 Q1": 0.699,
+   "auc_iv_only": 0.628
+  },
+  {
+   "feature": "code_m_share",
+   "answered": 298,
+   "yes": 298,
+   "yes_relevant": 59,
+   "precision": 0.198,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": null,
+   "auc_2026 Q1": null,
+   "auc_iv_only": null
+  },
+  {
+   "feature": "code_article_shared",
+   "answered": 298,
+   "yes": 55,
+   "yes_relevant": 21,
+   "precision": 0.382,
+   "recall_of_yes": 0.356,
+   "auc_2025 Q4": 0.627,
+   "auc_2026 Q1": 0.591,
+   "auc_iv_only": 0.498
+  },
+  {
+   "feature": "loc_practice_small",
+   "answered": 297,
+   "yes": 33,
+   "yes_relevant": 6,
+   "precision": 0.182,
+   "recall_of_yes": 0.102,
+   "auc_2025 Q4": 0.47,
+   "auc_2026 Q1": 0.515,
+   "auc_iv_only": 0.474
+  },
+  {
+   "feature": "loc_error_small",
+   "answered": 297,
+   "yes": 89,
+   "yes_relevant": 19,
+   "precision": 0.213,
+   "recall_of_yes": 0.322,
+   "auc_2025 Q4": 0.537,
+   "auc_2026 Q1": 0.494,
+   "auc_iv_only": 0.645
+  },
+  {
+   "feature": "loc_case_law_small",
+   "answered": 297,
+   "yes": 153,
+   "yes_relevant": 32,
+   "precision": 0.209,
+   "recall_of_yes": 0.542,
+   "auc_2025 Q4": 0.557,
+   "auc_2026 Q1": 0.5,
+   "auc_iv_only": 0.589
+  },
+  {
+   "feature": "loc_shared_law_small",
+   "answered": 297,
+   "yes": 70,
+   "yes_relevant": 17,
+   "precision": 0.243,
+   "recall_of_yes": 0.288,
+   "auc_2025 Q4": 0.599,
+   "auc_2026 Q1": 0.478,
+   "auc_iv_only": 0.525
+  },
+  {
+   "feature": "loc_length_small",
+   "answered": 297,
+   "yes": 297,
+   "yes_relevant": 59,
+   "precision": 0.199,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.617,
+   "auc_2026 Q1": 0.516,
+   "auc_iv_only": 0.672
+  },
+  {
+   "feature": "loc_share_small",
+   "answered": 297,
+   "yes": 47,
+   "yes_relevant": 9,
+   "precision": 0.191,
+   "recall_of_yes": 0.153,
+   "auc_2025 Q4": 0.492,
+   "auc_2026 Q1": 0.399,
+   "auc_iv_only": 0.589
+  },
+  {
+   "feature": "art_shared_zero_small",
+   "answered": 293,
+   "yes": 142,
+   "yes_relevant": 49,
+   "precision": 0.345,
+   "recall_of_yes": 0.831,
+   "auc_2025 Q4": 0.736,
+   "auc_2026 Q1": 0.717,
+   "auc_iv_only": 0.596
+  },
+  {
+   "feature": "art_inruling_zero_small",
+   "answered": 293,
+   "yes": 247,
+   "yes_relevant": 51,
+   "precision": 0.206,
+   "recall_of_yes": 0.864,
+   "auc_2025 Q4": 0.492,
+   "auc_2026 Q1": 0.548,
+   "auc_iv_only": 0.541
+  },
+  {
+   "feature": "art_shared_cited_small",
+   "answered": 295,
+   "yes": 56,
+   "yes_relevant": 21,
+   "precision": 0.375,
+   "recall_of_yes": 0.356,
+   "auc_2025 Q4": 0.653,
+   "auc_2026 Q1": 0.563,
+   "auc_iv_only": 0.5
+  },
+  {
+   "feature": "art_inruling_cited_small",
+   "answered": 295,
+   "yes": 251,
+   "yes_relevant": 53,
+   "precision": 0.211,
+   "recall_of_yes": 0.898,
+   "auc_2025 Q4": 0.501,
+   "auc_2026 Q1": 0.555,
+   "auc_iv_only": 0.54
+  },
+  {
+   "feature": "art_check_small",
+   "answered": 295,
+   "yes": 78,
+   "yes_relevant": 21,
+   "precision": 0.269,
+   "recall_of_yes": 0.356,
+   "auc_2025 Q4": 0.62,
+   "auc_2026 Q1": 0.506,
+   "auc_iv_only": 0.442
+  },
+  {
+   "feature": "loc_practice_large",
+   "answered": 297,
+   "yes": 20,
+   "yes_relevant": 6,
+   "precision": 0.3,
+   "recall_of_yes": 0.102,
+   "auc_2025 Q4": 0.503,
+   "auc_2026 Q1": 0.538,
+   "auc_iv_only": 0.533
+  },
+  {
+   "feature": "loc_error_large",
+   "answered": 297,
+   "yes": 48,
+   "yes_relevant": 11,
+   "precision": 0.229,
+   "recall_of_yes": 0.186,
+   "auc_2025 Q4": 0.477,
+   "auc_2026 Q1": 0.549,
+   "auc_iv_only": 0.507
+  },
+  {
+   "feature": "loc_case_law_large",
+   "answered": 297,
+   "yes": 105,
+   "yes_relevant": 27,
+   "precision": 0.257,
+   "recall_of_yes": 0.458,
+   "auc_2025 Q4": 0.559,
+   "auc_2026 Q1": 0.579,
+   "auc_iv_only": 0.609
+  },
+  {
+   "feature": "loc_shared_law_large",
+   "answered": 297,
+   "yes": 43,
+   "yes_relevant": 15,
+   "precision": 0.349,
+   "recall_of_yes": 0.254,
+   "auc_2025 Q4": 0.597,
+   "auc_2026 Q1": 0.546,
+   "auc_iv_only": 0.54
+  },
+  {
+   "feature": "loc_length_large",
+   "answered": 297,
+   "yes": 297,
+   "yes_relevant": 59,
+   "precision": 0.199,
+   "recall_of_yes": 1.0,
+   "auc_2025 Q4": 0.64,
+   "auc_2026 Q1": 0.623,
+   "auc_iv_only": 0.633
+  },
+  {
+   "feature": "loc_share_large",
+   "answered": 297,
+   "yes": 5,
+   "yes_relevant": 2,
+   "precision": 0.4,
+   "recall_of_yes": 0.034,
+   "auc_2025 Q4": 0.51,
+   "auc_2026 Q1": 0.508,
+   "auc_iv_only": 0.568
+  },
+  {
+   "feature": "art_shared_zero_large",
+   "answered": 298,
+   "yes": 159,
+   "yes_relevant": 52,
+   "precision": 0.327,
+   "recall_of_yes": 0.881,
+   "auc_2025 Q4": 0.761,
+   "auc_2026 Q1": 0.679,
+   "auc_iv_only": 0.6
+  },
+  {
+   "feature": "art_inruling_zero_large",
+   "answered": 298,
+   "yes": 256,
+   "yes_relevant": 51,
+   "precision": 0.199,
+   "recall_of_yes": 0.864,
+   "auc_2025 Q4": 0.481,
+   "auc_2026 Q1": 0.523,
+   "auc_iv_only": 0.533
+  },
+  {
+   "feature": "art_shared_cited_large",
+   "answered": 297,
+   "yes": 42,
+   "yes_relevant": 14,
+   "precision": 0.333,
+   "recall_of_yes": 0.237,
+   "auc_2025 Q4": 0.596,
+   "auc_2026 Q1": 0.529,
+   "auc_iv_only": 0.503
+  },
+  {
+   "feature": "art_inruling_cited_large",
+   "answered": 297,
+   "yes": 246,
+   "yes_relevant": 50,
+   "precision": 0.203,
+   "recall_of_yes": 0.847,
+   "auc_2025 Q4": 0.514,
+   "auc_2026 Q1": 0.511,
+   "auc_iv_only": 0.516
+  },
+  {
+   "feature": "art_check_large",
+   "answered": 297,
+   "yes": 80,
+   "yes_relevant": 15,
+   "precision": 0.188,
+   "recall_of_yes": 0.254,
+   "auc_2025 Q4": 0.557,
+   "auc_2026 Q1": 0.434,
+   "auc_iv_only": 0.461
+  }
+ ],
+ "models": [
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "baseline",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 200,
+   "relevant_total": 59,
+   "vs_baseline": null,
+   "passes": null
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.708,
+   "variant": "practice | code only",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_practice"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 26
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 75,
+    "needed_100": 100
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.73
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.753
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 166,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -2.24,
+    "low": -7.0,
+    "high": 2.0,
+    "p_better": 0.123
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.6,
+   "mean_f2": 0.699,
+   "variant": "practice | before (zero-shot) 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 26
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 29
+     }
+    },
+    "needed_95": 121,
+    "needed_100": 280
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.64
+    }
+   },
+   "pooled_needed_95": 172,
+   "pooled_needed_100": 356,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.52,
+    "low": -5.0,
+    "high": 2.0,
+    "p_better": 0.08
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "practice | cited 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 201,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.09,
+    "low": 0.0,
+    "high": 1.0,
+    "p_better": 0.069
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "practice | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 201,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.06,
+    "low": 0.0,
+    "high": 1.0,
+    "p_better": 0.046
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "practice | located + code check 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_located_small",
+    "chk_practice_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 80,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 148,
+   "pooled_needed_100": 199,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.68,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.167
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 52.2,
+   "mean_f2": 0.681,
+   "variant": "practice | before (zero-shot) 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 26
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 27
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 105,
+    "needed_100": 118
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 50,
+     "recall": 0.847,
+     "f2": 0.702
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.675
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.652
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 190,
+   "pooled_needed_100": 204,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -3.61,
+    "low": -9.0,
+    "high": 1.0,
+    "p_better": 0.055
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.8,
+   "mean_f2": 0.715,
+   "variant": "practice | cited 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 126
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 133,
+   "pooled_needed_100": 202,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.12,
+    "low": -2.0,
+    "high": 3.0,
+    "p_better": 0.264
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.71,
+   "variant": "practice | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 104,
+    "needed_100": 138
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 156,
+   "pooled_needed_100": 215,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.75,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.211
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.707,
+   "variant": "practice | located + code check 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_located_large",
+    "chk_practice_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 103,
+    "needed_100": 138
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 162,
+   "pooled_needed_100": 208,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.28,
+    "low": -5.0,
+    "high": 2.0,
+    "p_better": 0.165
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "legal_error | code only",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_legal_error"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 80,
+    "needed_100": 114
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 148,
+   "pooled_needed_100": 204,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.0,
+    "low": -3.0,
+    "high": 4.0,
+    "p_better": 0.247
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.708,
+   "variant": "legal_error | before (zero-shot) 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_zero_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 26
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 28
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 109,
+    "needed_100": 133
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 48,
+     "recall": 0.814,
+     "f2": 0.738
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.676
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 161,
+   "pooled_needed_100": 210,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.05,
+    "low": -5.0,
+    "high": 3.0,
+    "p_better": 0.184
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "legal_error | cited 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 133,
+   "pooled_needed_100": 200,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.69,
+    "low": -1.0,
+    "high": 4.0,
+    "p_better": 0.403
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "legal_error | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 133,
+   "pooled_needed_100": 199,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.59,
+    "low": -0.02499999999999858,
+    "high": 3.0,
+    "p_better": 0.369
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 55.2,
+   "mean_f2": 0.72,
+   "variant": "legal_error | located + code check 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_small",
+    "chk_legal_error_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 68,
+    "needed_100": 89
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 48,
+     "recall": 0.814,
+     "f2": 0.738
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.74
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.713
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 159,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.79,
+    "low": -6.0,
+    "high": 5.0,
+    "p_better": 0.294
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 55.0,
+   "mean_f2": 0.718,
+   "variant": "legal_error | before (zero-shot) 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_zero_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 26
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 80,
+    "needed_100": 133
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 48,
+     "recall": 0.814,
+     "f2": 0.738
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.74
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 132,
+   "pooled_needed_100": 210,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.6,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.255
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.8,
+   "mean_f2": 0.716,
+   "variant": "legal_error | cited 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 27
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 98,
+    "needed_100": 133
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 49,
+     "recall": 0.831,
+     "f2": 0.754
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 150,
+   "pooled_needed_100": 210,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.74,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.23
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 55.0,
+   "mean_f2": 0.718,
+   "variant": "legal_error | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 27
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 95,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 49,
+     "recall": 0.831,
+     "f2": 0.754
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 147,
+   "pooled_needed_100": 187,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.67,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.243
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.6,
+   "mean_f2": 0.7,
+   "variant": "legal_error | located + code check 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_large",
+    "chk_legal_error_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 26
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 28
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 109,
+    "needed_100": 135
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 49,
+     "recall": 0.831,
+     "f2": 0.754
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 50,
+     "recall": 0.847,
+     "f2": 0.702
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.676
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 174,
+   "pooled_needed_100": 208,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -3.04,
+    "low": -8.0,
+    "high": 2.0,
+    "p_better": 0.083
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "transfer | code only",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_transfer"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 121
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 134,
+   "pooled_needed_100": 197,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.06,
+    "low": -1.0,
+    "high": 2.0,
+    "p_better": 0.141
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.6,
+   "mean_f2": 0.711,
+   "variant": "transfer | before (zero-shot) 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_zero_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 82,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.74
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 134,
+   "pooled_needed_100": 200,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.12,
+    "low": 0.0,
+    "high": 1.0,
+    "p_better": 0.099
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.6,
+   "mean_f2": 0.698,
+   "variant": "transfer | cited 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_cited_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 22
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 29
+     }
+    },
+    "needed_95": 116,
+    "needed_100": 142
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 44,
+     "recall": 0.746,
+     "f2": 0.677
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.64
+    }
+   },
+   "pooled_needed_95": 168,
+   "pooled_needed_100": 221,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.02,
+    "low": -4.0,
+    "high": 2.0,
+    "p_better": 0.153
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.8,
+   "mean_f2": 0.701,
+   "variant": "transfer | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 22
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 29
+     }
+    },
+    "needed_95": 116,
+    "needed_100": 126
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 44,
+     "recall": 0.746,
+     "f2": 0.677
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.64
+    }
+   },
+   "pooled_needed_95": 168,
+   "pooled_needed_100": 202,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.44,
+    "low": -3.0,
+    "high": 2.0,
+    "p_better": 0.184
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 55.4,
+   "mean_f2": 0.724,
+   "variant": "transfer | located + code check 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_located_small",
+    "chk_transfer_located_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 26
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 86,
+    "needed_100": 103
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 51,
+     "recall": 0.864,
+     "f2": 0.785
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 145,
+   "pooled_needed_100": 173,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.69,
+    "low": -5.0,
+    "high": 5.0,
+    "p_better": 0.287
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.8,
+   "mean_f2": 0.714,
+   "variant": "transfer | before (zero-shot) 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_zero_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 29
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 80,
+    "needed_100": 90
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 151,
+   "pooled_needed_100": 172,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.19,
+    "low": -3.0,
+    "high": 4.0,
+    "p_better": 0.297
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.706,
+   "variant": "transfer | cited 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_cited_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 85,
+    "needed_100": 90
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.73
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 157,
+   "pooled_needed_100": 179,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -2.12,
+    "low": -6.0,
+    "high": 2.0,
+    "p_better": 0.099
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.708,
+   "variant": "transfer | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 26
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 79,
+    "needed_100": 87
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.73
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.713
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 151,
+   "pooled_needed_100": 167,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.58,
+    "low": -6.0,
+    "high": 3.0,
+    "p_better": 0.159
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 52.8,
+   "mean_f2": 0.686,
+   "variant": "transfer | located + code check 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_transfer_located_large",
+    "chk_transfer_located_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 22
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 24
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 84,
+    "needed_100": 88
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.66
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 160,
+   "pooled_needed_100": 176,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -4.96,
+    "low": -11.0,
+    "high": 0.0,
+    "p_better": 0.022
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.708,
+   "variant": "deciding consideration: practice | code only (whole ruling)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_m_practice"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 26
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 75,
+    "needed_100": 100
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.73
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.753
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 135,
+   "pooled_needed_100": 166,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -2.24,
+    "low": -7.0,
+    "high": 2.0,
+    "p_better": 0.123
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.707,
+   "variant": "deciding consideration: practice | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_practice_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 109,
+    "needed_100": 116
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 160,
+   "pooled_needed_100": 184,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.73,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.224
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.6,
+   "mean_f2": 0.712,
+   "variant": "deciding consideration: practice | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_practice_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 84,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 137,
+   "pooled_needed_100": 203,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.04,
+    "low": -1.0,
+    "high": 0.024999999999863576,
+    "p_better": 0.025
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "deciding consideration: error | code only (whole ruling)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_m_error"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 80,
+    "needed_100": 114
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 148,
+   "pooled_needed_100": 204,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.0,
+    "low": -3.0,
+    "high": 4.0,
+    "p_better": 0.247
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 55.6,
+   "mean_f2": 0.726,
+   "variant": "deciding consideration: error | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_error_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 31
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 31
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 77,
+    "needed_100": 82
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 49,
+     "recall": 0.831,
+     "f2": 0.754
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.74
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.713
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 147,
+   "pooled_needed_100": 157,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.19,
+    "low": -6.0,
+    "high": 5.0,
+    "p_better": 0.246
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 52.8,
+   "mean_f2": 0.689,
+   "variant": "deciding consideration: error | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_error_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 28
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 28
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 29
+     }
+    },
+    "needed_95": 124,
+    "needed_100": 145
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 50,
+     "recall": 0.847,
+     "f2": 0.702
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.664
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.64
+    }
+   },
+   "pooled_needed_95": 189,
+   "pooled_needed_100": 229,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -3.33,
+    "low": -8.0,
+    "high": 1.0,
+    "p_better": 0.028
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.4,
+   "mean_f2": 0.709,
+   "variant": "deciding consideration: case_law | code only (whole ruling)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_m_case_law"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 136,
+   "pooled_needed_100": 199,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.39,
+    "low": -2.0,
+    "high": 0.0,
+    "p_better": 0.001
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.8,
+   "mean_f2": 0.714,
+   "variant": "deciding consideration: case_law | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_case_law_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 31
+     }
+    },
+    "needed_95": 81,
+    "needed_100": 103
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.753
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 59,
+     "recall": 1.0,
+     "f2": 0.663
+    }
+   },
+   "pooled_needed_95": 143,
+   "pooled_needed_100": 166,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.38,
+    "low": -5.0,
+    "high": 2.0,
+    "p_better": 0.114
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.705,
+   "variant": "deciding consideration: case_law | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_case_law_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 76,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 52,
+     "recall": 0.881,
+     "f2": 0.73
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.753
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 136,
+   "pooled_needed_100": 187,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.71,
+    "low": -6.0,
+    "high": 2.0,
+    "p_better": 0.14
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.706,
+   "variant": "deciding consideration: shared_law | code only (whole ruling)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_m_shared_law"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 132,
+   "pooled_needed_100": 215,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": 0.54,
+    "low": 0.0,
+    "high": 3.0,
+    "p_better": 0.292
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.0,
+   "mean_f2": 0.703,
+   "variant": "deciding consideration: shared_law | located 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_shared_law_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 30
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 81,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 151,
+   "pooled_needed_100": 205,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.4,
+    "low": -3.0,
+    "high": 3.0,
+    "p_better": 0.178
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.0,
+   "mean_f2": 0.704,
+   "variant": "deciding consideration: shared_law | located 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "loc_shared_law_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 24
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 29
+     }
+    },
+    "needed_95": 119,
+    "needed_100": 136
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 46,
+     "recall": 0.78,
+     "f2": 0.708
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.64
+    }
+   },
+   "pooled_needed_95": 172,
+   "pooled_needed_100": 213,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.79,
+    "low": -4.0,
+    "high": 1.0,
+    "p_better": 0.071
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.706,
+   "variant": "article shared | code only (most cited)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "code_article_shared"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 29
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 115,
+    "needed_100": 119
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.772
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 172,
+   "pooled_needed_100": 196,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.68,
+    "low": -5.0,
+    "high": 3.0,
+    "p_better": 0.251
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.6,
+   "mean_f2": 0.698,
+   "variant": "article shared | before (zero-shot) 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "art_shared_zero_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 85,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 53,
+     "recall": 0.898,
+     "f2": 0.744
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 153,
+   "pooled_needed_100": 206,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -1.11,
+    "low": -4.0,
+    "high": 3.0,
+    "p_better": 0.116
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.2,
+   "mean_f2": 0.706,
+   "variant": "article shared | cited + checked 8B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "art_shared_cited_small"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 84,
+    "needed_100": 124
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 56,
+     "recall": 0.949,
+     "f2": 0.727
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.7
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 139,
+   "pooled_needed_100": 199,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.32,
+    "low": -2.0249999999999986,
+    "high": 1.0,
+    "p_better": 0.062
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 54.6,
+   "mean_f2": 0.712,
+   "variant": "article shared | before (zero-shot) 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "art_shared_zero_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 25
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 27
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 29
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 99,
+    "needed_100": 126
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 47,
+     "recall": 0.797,
+     "f2": 0.723
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.74
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 150,
+   "pooled_needed_100": 192,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.71,
+    "low": -3.0,
+    "high": 2.0,
+    "p_better": 0.1
+   },
+   "passes": false
+  },
+  {
+   "mean_found": 53.8,
+   "mean_f2": 0.701,
+   "variant": "article shared | cited + checked 70B",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "art_shared_cited_large"
+   ],
+   "primary_test": "2026 Q1",
+   "primary": {
+    "relevant": 31,
+    "at_share": {
+     "0.30": {
+      "submitted": 49,
+      "found": 23
+     },
+     "0.40": {
+      "submitted": 66,
+      "found": 28
+     },
+     "0.50": {
+      "submitted": 82,
+      "found": 29
+     },
+     "0.60": {
+      "submitted": 98,
+      "found": 30
+     },
+     "0.70": {
+      "submitted": 115,
+      "found": 30
+     }
+    },
+    "needed_95": 83,
+    "needed_100": 123
+   },
+   "pooled": {
+    "0.30": {
+     "submitted": 89,
+     "found": 45,
+     "recall": 0.763,
+     "f2": 0.692
+    },
+    "0.40": {
+     "submitted": 120,
+     "found": 54,
+     "recall": 0.915,
+     "f2": 0.758
+    },
+    "0.50": {
+     "submitted": 149,
+     "found": 55,
+     "recall": 0.932,
+     "f2": 0.714
+    },
+    "0.60": {
+     "submitted": 178,
+     "found": 57,
+     "recall": 0.966,
+     "f2": 0.688
+    },
+    "0.70": {
+     "submitted": 209,
+     "found": 58,
+     "recall": 0.983,
+     "f2": 0.652
+    }
+   },
+   "pooled_needed_95": 153,
+   "pooled_needed_100": 204,
+   "relevant_total": 59,
+   "vs_baseline": {
+    "mean": -0.56,
+    "low": -3.0,
+    "high": 2.0,
+    "p_better": 0.144
+   },
+   "passes": false
+  }
+ ]
+}

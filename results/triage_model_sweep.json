@@ -1,0 +1,1944 @@
+{
+ "relevant": 59,
+ "kept": 646,
+ "results": [
+  {
+   "features": "8 facts (no Apertus)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 48,
+    "0.40": 52,
+    "0.50": 57,
+    "need95": 151,
+    "need100": 176,
+    "f2_40": 0.73,
+    "q1_40": 28
+   },
+   "cv_found_40": [
+    51,
+    55,
+    55,
+    55,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 54.0,
+    "0.50": 56.4,
+    "need95": 150.4,
+    "need100": 150.4
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     12
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l2\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "current: 8 facts + consensus",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 53,
+    "0.50": 56,
+    "need95": 156,
+    "need100": 192,
+    "f2_40": 0.744,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    54,
+    52,
+    53,
+    54,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.6,
+    "0.40": 53.2,
+    "0.50": 56.8,
+    "need95": 149.8,
+    "need100": 149.8
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     9
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ before: 3 zero-shot readings (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_small",
+    "l_legal_error_zero_small",
+    "l_transfer_zero_small"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 53,
+    "0.50": 53,
+    "need95": 181,
+    "need100": 358,
+    "f2_40": 0.744,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    52,
+    52,
+    53,
+    54,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 47.4,
+    "0.40": 52.8,
+    "0.50": 55.6,
+    "need95": 161.6,
+    "need100": 161.6
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: 3 cited readings (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "l_transfer_cited_small"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 53,
+    "0.50": 54,
+    "need95": 153,
+    "need100": 211,
+    "f2_40": 0.744,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    52,
+    52,
+    53,
+    51,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 46.8,
+    "0.40": 52.4,
+    "0.50": 56.8,
+    "need95": 155.2,
+    "need100": 155.2
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     11
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     10
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "+ after: practice, legal error cited (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 54,
+    "0.50": 56,
+    "need95": 149,
+    "need100": 185,
+    "f2_40": 0.758,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    54,
+    52,
+    54,
+    51,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 47.2,
+    "0.40": 53.0,
+    "0.50": 57.2,
+    "need95": 151.2,
+    "need100": 151.2
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     12
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     9
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error cited (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_small"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 55,
+    "0.50": 56,
+    "need95": 133,
+    "need100": 168,
+    "f2_40": 0.772,
+    "q1_40": 28
+   },
+   "cv_found_40": [
+    54,
+    53,
+    52,
+    52,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 47.6,
+    "0.40": 53.0,
+    "0.50": 57.0,
+    "need95": 151.4,
+    "need100": 151.4
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     11
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     2
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error located + check (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_small",
+    "chk_legal_error_located_small"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 49,
+    "0.40": 53,
+    "0.50": 58,
+    "need95": 143,
+    "need100": 149,
+    "f2_40": 0.744,
+    "q1_40": 28
+   },
+   "cv_found_40": [
+    53,
+    54,
+    51,
+    53,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.6,
+    "0.40": 52.8,
+    "0.50": 57.0,
+    "need95": 143.0,
+    "need100": 143.0
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: cited readings + statement (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 55,
+    "0.50": 56,
+    "need95": 136,
+    "need100": 184,
+    "f2_40": 0.772,
+    "q1_40": 28
+   },
+   "cv_found_40": [
+    54,
+    52,
+    54,
+    52,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 47.6,
+    "0.40": 53.2,
+    "0.50": 56.6,
+    "need95": 156.8,
+    "need100": 156.8
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     12
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     2
+    ]
+   ]
+  },
+  {
+   "features": "+ statement with evidence (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 56,
+    "0.50": 56,
+    "need95": 140,
+    "need100": 184,
+    "f2_40": 0.787,
+    "q1_40": 29
+   },
+   "cv_found_40": [
+    55,
+    53,
+    54,
+    55,
+    52
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 53.8,
+    "0.50": 57.2,
+    "need95": 150.0,
+    "need100": 150.0
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "8 facts + after: cited readings + statement, no consensus (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 52,
+    "0.50": 56,
+    "need95": 167,
+    "need100": 197,
+    "f2_40": 0.73,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    53,
+    54,
+    55,
+    55,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 54.2,
+    "0.50": 55.8,
+    "need95": 156.6,
+    "need100": 156.6
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     13
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ before: 3 zero-shot readings (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_large",
+    "l_legal_error_zero_large",
+    "l_transfer_zero_large"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 44,
+    "0.40": 51,
+    "0.50": 53,
+    "need95": 161,
+    "need100": 186,
+    "f2_40": 0.716,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    51,
+    50,
+    53,
+    54,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 47.4,
+    "0.40": 51.8,
+    "0.50": 54.2,
+    "need95": 183.0,
+    "need100": 183.0
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l2\"}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "+ after: 3 cited readings (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "l_transfer_cited_large"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 52,
+    "0.50": 55,
+    "need95": 161,
+    "need100": 193,
+    "f2_40": 0.73,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    52,
+    50,
+    52,
+    54,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 47.0,
+    "0.40": 52.2,
+    "0.50": 55.0,
+    "need95": 164.4,
+    "need100": 164.4
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: practice, legal error cited (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 54,
+    "0.50": 56,
+    "need95": 149,
+    "need100": 185,
+    "f2_40": 0.758,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    53,
+    52,
+    53,
+    54,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 48.6,
+    "0.40": 53.2,
+    "0.50": 56.0,
+    "need95": 161.2,
+    "need100": 161.2
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     10
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error cited (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_large"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 50,
+    "0.50": 50,
+    "need95": 186,
+    "need100": 219,
+    "f2_40": 0.702,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    52,
+    51,
+    54,
+    52,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.2,
+    "0.40": 52.4,
+    "0.50": 56.0,
+    "need95": 162.8,
+    "need100": 162.8
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     9
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error located + check (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_large",
+    "chk_legal_error_located_large"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 51,
+    "0.50": 56,
+    "need95": 150,
+    "need100": 163,
+    "f2_40": 0.716,
+    "q1_40": 28
+   },
+   "cv_found_40": [
+    51,
+    52,
+    52,
+    53,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 47.6,
+    "0.40": 51.8,
+    "0.50": 55.0,
+    "need95": 165.6,
+    "need100": 165.6
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     9
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     7
+    ],
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: cited readings + statement (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 51,
+    "0.50": 52,
+    "need95": 184,
+    "need100": 237,
+    "f2_40": 0.716,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    52,
+    50,
+    50,
+    53,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 48.2,
+    "0.40": 51.8,
+    "0.50": 55.6,
+    "need95": 159.8,
+    "need100": 159.8
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     10
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     9
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l2\"}",
+     2
+    ]
+   ]
+  },
+  {
+   "features": "+ statement with evidence (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 43,
+    "0.40": 50,
+    "0.50": 53,
+    "need95": 194,
+    "need100": 227,
+    "f2_40": 0.702,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    54,
+    51,
+    54,
+    53,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.8,
+    "0.40": 53.0,
+    "0.50": 56.4,
+    "need95": 150.2,
+    "need100": 150.2
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     14
+    ],
+    [
+     "{\"logisticregression__C\": 3.0, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "8 facts + after: cited readings + statement, no consensus (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "logistic regression",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 50,
+    "0.50": 52,
+    "need95": 198,
+    "need100": 203,
+    "f2_40": 0.702,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    51,
+    49,
+    53,
+    52,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.0,
+    "0.40": 51.6,
+    "0.50": 54.6,
+    "need95": 179.0,
+    "need100": 179.0
+   },
+   "chosen": [
+    [
+     "{\"logisticregression__C\": 1.0, \"logisticregression__penalty\": \"l1\"}",
+     8
+    ],
+    [
+     "{\"logisticregression__C\": 0.3, \"logisticregression__penalty\": \"l1\"}",
+     6
+    ],
+    [
+     "{\"logisticregression__C\": 0.1, \"logisticregression__penalty\": \"l1\"}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "8 facts (no Apertus)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 48,
+    "0.50": 52,
+    "need95": 183,
+    "need100": 209,
+    "f2_40": 0.674,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    52,
+    52,
+    53,
+    55,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 53.0,
+    "0.50": 55.8,
+    "need95": 150.2,
+    "need100": 150.2
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     12
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     4
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "current: 8 facts + consensus",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 47,
+    "0.50": 50,
+    "need95": 213,
+    "need100": 257,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    52,
+    52,
+    51,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 47.4,
+    "0.40": 51.4,
+    "0.50": 54.4,
+    "need95": 187.4,
+    "need100": 187.4
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     9
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ before: 3 zero-shot readings (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_small",
+    "l_legal_error_zero_small",
+    "l_transfer_zero_small"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 46,
+    "0.50": 52,
+    "need95": 191,
+    "need100": 238,
+    "f2_40": 0.646,
+    "q1_40": 24
+   },
+   "cv_found_40": [
+    54,
+    49,
+    54,
+    51,
+    49
+   ],
+   "cv_mean": {
+    "0.30": 47.4,
+    "0.40": 51.4,
+    "0.50": 54.2,
+    "need95": 172.0,
+    "need100": 172.0
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     7
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 3, \"n_estimators\": 300}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: 3 cited readings (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "l_transfer_cited_small"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 47,
+    "0.50": 54,
+    "need95": 220,
+    "need100": 234,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    51,
+    52,
+    50,
+    52
+   ],
+   "cv_mean": {
+    "0.30": 46.2,
+    "0.40": 51.2,
+    "0.50": 54.8,
+    "need95": 196.6,
+    "need100": 196.6
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     11
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: practice, legal error cited (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 49,
+    "0.50": 55,
+    "need95": 198,
+    "need100": 243,
+    "f2_40": 0.688,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    51,
+    53,
+    53,
+    52,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 47.2,
+    "0.40": 52.0,
+    "0.50": 55.0,
+    "need95": 175.2,
+    "need100": 175.2
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     12
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 3, \"n_estimators\": 300}",
+     3
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error cited (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_small"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 47,
+    "0.50": 51,
+    "need95": 176,
+    "need100": 243,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    53,
+    52,
+    52,
+    52
+   ],
+   "cv_mean": {
+    "0.30": 47.2,
+    "0.40": 52.0,
+    "0.50": 55.2,
+    "need95": 179.6,
+    "need100": 179.6
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     10
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     4
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error located + check (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_small",
+    "chk_legal_error_located_small"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 51,
+    "0.50": 54,
+    "need95": 184,
+    "need100": 204,
+    "f2_40": 0.716,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    53,
+    53,
+    53,
+    53,
+    50
+   ],
+   "cv_mean": {
+    "0.30": 48.0,
+    "0.40": 52.4,
+    "0.50": 54.8,
+    "need95": 171.4,
+    "need100": 171.4
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 3, \"n_estimators\": 100}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: cited readings + statement (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 49,
+    "0.50": 54,
+    "need95": 207,
+    "need100": 242,
+    "f2_40": 0.688,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    53,
+    53,
+    52,
+    52,
+    52
+   ],
+   "cv_mean": {
+    "0.30": 47.0,
+    "0.40": 52.4,
+    "0.50": 55.4,
+    "need95": 167.2,
+    "need100": 167.2
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     12
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 3, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     2
+    ]
+   ]
+  },
+  {
+   "features": "+ statement with evidence (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 47,
+    "0.50": 53,
+    "need95": 206,
+    "need100": 239,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    53,
+    51,
+    53,
+    52,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 52.0,
+    "0.50": 55.0,
+    "need95": 170.4,
+    "need100": 170.4
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     2
+    ]
+   ]
+  },
+  {
+   "features": "8 facts + after: cited readings + statement, no consensus (small)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "l_practice_cited_small",
+    "l_legal_error_cited_small",
+    "f_stmt_p_small_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 50,
+    "0.50": 54,
+    "need95": 179,
+    "need100": 202,
+    "f2_40": 0.702,
+    "q1_40": 27
+   },
+   "cv_found_40": [
+    52,
+    53,
+    53,
+    55,
+    54
+   ],
+   "cv_mean": {
+    "0.30": 48.4,
+    "0.40": 53.4,
+    "0.50": 55.4,
+    "need95": 166.8,
+    "need100": 166.8
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     9
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ before: 3 zero-shot readings (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_zero_large",
+    "l_legal_error_zero_large",
+    "l_transfer_zero_large"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 44,
+    "0.40": 48,
+    "0.50": 51,
+    "need95": 239,
+    "need100": 249,
+    "f2_40": 0.674,
+    "q1_40": 24
+   },
+   "cv_found_40": [
+    52,
+    51,
+    50,
+    52,
+    50
+   ],
+   "cv_mean": {
+    "0.30": 46.6,
+    "0.40": 51.0,
+    "0.50": 53.4,
+    "need95": 196.8,
+    "need100": 196.8
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     11
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     7
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: 3 cited readings (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "l_transfer_cited_large"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 50,
+    "0.50": 52,
+    "need95": 236,
+    "need100": 247,
+    "f2_40": 0.702,
+    "q1_40": 26
+   },
+   "cv_found_40": [
+    54,
+    50,
+    51,
+    53,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 47.2,
+    "0.40": 51.8,
+    "0.50": 53.4,
+    "need95": 177.0,
+    "need100": 177.0
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     8
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     5
+    ]
+   ]
+  },
+  {
+   "features": "+ after: practice, legal error cited (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 47,
+    "0.50": 52,
+    "need95": 208,
+    "need100": 233,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    53,
+    52,
+    52,
+    52,
+    50
+   ],
+   "cv_mean": {
+    "0.30": 47.0,
+    "0.40": 51.8,
+    "0.50": 54.8,
+    "need95": 185.4,
+    "need100": 185.4
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     4
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 3, \"n_estimators\": 300}",
+     4
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error cited (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_cited_large"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 47,
+    "0.50": 56,
+    "need95": 164,
+    "need100": 232,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    52,
+    53,
+    53,
+    50,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 48.8,
+    "0.40": 51.8,
+    "0.50": 54.8,
+    "need95": 177.8,
+    "need100": 177.8
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     8
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     4
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: legal error located + check (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_legal_error_located_large",
+    "chk_legal_error_located_large"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 48,
+    "0.50": 51,
+    "need95": 217,
+    "need100": 255,
+    "f2_40": 0.674,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    51,
+    51,
+    50,
+    50
+   ],
+   "cv_mean": {
+    "0.30": 46.8,
+    "0.40": 50.6,
+    "0.50": 53.6,
+    "need95": 217.8,
+    "need100": 217.8
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     7
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 3, \"n_estimators\": 300}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ after: cited readings + statement (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 45,
+    "0.40": 49,
+    "0.50": 52,
+    "need95": 216,
+    "need100": 239,
+    "f2_40": 0.688,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    52,
+    53,
+    53,
+    51
+   ],
+   "cv_mean": {
+    "0.30": 46.8,
+    "0.40": 52.0,
+    "0.50": 54.4,
+    "need95": 177.8,
+    "need100": 177.8
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     4
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "+ statement with evidence (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "consensus",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 46,
+    "0.40": 47,
+    "0.50": 52,
+    "need95": 218,
+    "need100": 254,
+    "f2_40": 0.66,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    52,
+    50,
+    51,
+    51,
+    50
+   ],
+   "cv_mean": {
+    "0.30": 46.4,
+    "0.40": 50.8,
+    "0.50": 54.4,
+    "need95": 176.6,
+    "need100": 176.6
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     9
+    ],
+    [
+     "{\"learning_rate\": 0.1, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     6
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     3
+    ]
+   ]
+  },
+  {
+   "features": "8 facts + after: cited readings + statement, no consensus (large)",
+   "columns": [
+    "area_uvmv",
+    "area_iv",
+    "appeal_by_institution",
+    "five_judges",
+    "publication",
+    "manifestly_unfounded",
+    "suva_party",
+    "single_judge",
+    "l_practice_cited_large",
+    "l_legal_error_cited_large",
+    "f_stmt_p_large_logit"
+   ],
+   "model": "xgboost",
+   "out_of_quarter": {
+    "0.30": 47,
+    "0.40": 50,
+    "0.50": 54,
+    "need95": 207,
+    "need100": 237,
+    "f2_40": 0.702,
+    "q1_40": 25
+   },
+   "cv_found_40": [
+    51,
+    52,
+    51,
+    52,
+    53
+   ],
+   "cv_mean": {
+    "0.30": 47.0,
+    "0.40": 51.8,
+    "0.50": 55.0,
+    "need95": 175.2,
+    "need100": 175.2
+   },
+   "chosen": [
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 1, \"min_child_weight\": 1, \"n_estimators\": 300}",
+     7
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 2, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     5
+    ],
+    [
+     "{\"learning_rate\": 0.03, \"max_depth\": 3, \"min_child_weight\": 1, \"n_estimators\": 100}",
+     4
+    ]
+   ]
+  }
+ ]
+}
