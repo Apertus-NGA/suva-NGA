@@ -1,0 +1,109 @@
+{
+  "common": {
+    "laws": [
+      {"de": "ATSG", "fr": "LPGA"}
+    ],
+    "phrases": [
+      {"de": "Einspracheentscheid", "fr": "décision sur opposition"},
+      {"de": "Rückweisung", "fr": "renvoi"},
+      {"de": "neue Entscheidung", "fr": "nouvelle décision"},
+      {"de": "ergänzende Abklärung", "fr": "instruction complémentaire"}
+    ]
+  },
+  "uv": {
+    "subjects": [
+      "unfallversicherung",
+      "assurance-accidents",
+      "assicurazione contro gli infortuni"
+    ],
+    "laws": [
+      {"de": "UVG", "fr": "LAA"},
+      {"de": "UVV", "fr": "OLAA"}
+    ],
+    "phrases": [
+      {"de": "natürlicher Kausalzusammenhang", "fr": "lien de causalité naturelle"},
+      {"de": "adäquater Kausalzusammenhang", "fr": "lien de causalité adéquate"},
+      {"de": "Listenverletzung", "fr": "lésion corporelle assimilée à un accident"},
+      {"de": "unfallähnliche Körperschädigung", "fr": "lésion corporelle assimilée à un accident"},
+      {"de": "Status quo sine vel ante", "fr": "statu quo sine vel ante"},
+      {"de": "Integritätsentschädigung", "fr": "indemnité pour atteinte à l'intégrité"},
+      {"de": "Taggeld", "fr": "indemnité journalière"},
+      {"de": "Heilbehandlung", "fr": "traitement médical"},
+      {"de": "Pflegeleistung", "fr": "prestation de soins"},
+      {"de": "Berufskrankheit", "fr": "maladie professionnelle"},
+      {"de": "Schleudertrauma", "fr": "coup du lapin"},
+      {"de": "überwiegende Wahrscheinlichkeit", "fr": "vraisemblance prépondérante"}
+    ]
+  },
+  "iv": {
+    "subjects": [
+      "invalidenversicherung",
+      "assurance-invalidité",
+      "assicurazione per l'invalidità"
+    ],
+    "laws": [
+      {"de": "IVG", "fr": "LAI"},
+      {"de": "IVV", "fr": "RAI"}
+    ],
+    "phrases": [
+      {"de": "Invalidenrente", "fr": "rente d'invalidité"},
+      {"de": "Invaliditätsgrad", "fr": "taux d'invalidité"},
+      {"de": "Hilflosenentschädigung", "fr": "allocation pour impotent"},
+      {"de": "Valideneinkommen", "fr": "revenu sans invalidité"},
+      {"de": "Invalideneinkommen", "fr": "revenu d'invalide"},
+      {"de": "Versicherungsmedizin", "fr": "médecine d'assurance"},
+      {"de": "Arbeitsunfähigkeit", "fr": "incapacité de travail"},
+      {"de": "überwiegende Wahrscheinlichkeit", "fr": "vraisemblance prépondérante"}
+    ]
+  },
+  "kv": {
+    "subjects": [
+      "krankenversicherung",
+      "assurance-maladie",
+      "assicurazione malattie"
+    ],
+    "laws": [
+      {"de": "KVG", "fr": "LAMal"}
+    ],
+    "phrases": [
+      {"de": "Pflichtleistung", "fr": "prestation obligatoire"},
+      {"de": "Wirtschaftlichkeit", "fr": "caractère économique"},
+      {"de": "Wirksamkeit", "fr": "caractère efficace"},
+      {"de": "Zweckmässigkeit", "fr": "caractère adéquat"},
+      {"de": "Heilbehandlung", "fr": "traitement médical"}
+    ]
+  },
+  "bv": {
+    "subjects": [
+      "berufliche vorsorge",
+      "prévoyance professionnelle",
+      "previdenza professionale",
+      "previdenza professionnale"
+    ],
+    "laws": [
+      {"de": "BVG", "fr": "LPP"}
+    ],
+    "phrases": [
+      {"de": "Altersrente", "fr": "rente de vieillesse"},
+      {"de": "Invalidenrente", "fr": "rente d'invalidité"},
+      {"de": "Hinterlassenenrente", "fr": "rente de survivant"},
+      {"de": "Freizügigkeitsleistung", "fr": "prestation de libre passage"},
+      {"de": "Vorsorgefall", "fr": "cas de prévoyance"}
+    ]
+  },
+  "vvg": {
+    "subjects": [
+      "vertragsrecht",
+      "droit des contrats",
+      "diritto contrattuale"
+    ],
+    "laws": [
+      {"de": "VVG", "fr": "LCA"}
+    ],
+    "phrases": [
+      {"de": "Versicherungsvertrag", "fr": "contrat d'assurance"},
+      {"de": "Taggeldversicherung", "fr": "assurance d'une indemnité journalière"},
+      {"de": "Überversicherung", "fr": "surassurance"}
+    ]
+  }
+}

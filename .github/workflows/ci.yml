@@ -25,3 +25,38 @@ jobs:
       - name: make run replay with Suva-derived artefacts (blocked by D-031)
         if: ${{ false }}
         run: SERVE=0 MODE=replay make run
+
+  # Data layer (docs/DB_DDL_PLANNING.md §15.9, D-071): fresh deploy of src/db/sql on the pinned image, a second
+  # deploy to prove idempotence, then the SQL tests of tests/sql (each rolled back). Throwaway database, reachable
+  # only from this job: trust authentication, no password stored anywhere.
+  db:
+    runs-on: ubuntu-latest  # linux/amd64
+    services:
+      db:
+        image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+        env:
+          POSTGRES_DB: suva
+          POSTGRES_USER: suva
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U suva -d suva"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://suva@localhost:5432/suva
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.4.0
+      - name: Install
+        run: uv sync --frozen
+      - name: psql client
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Fresh deploy, then a second deploy (idempotence)
+        run: make db-reset && make db-deploy
+      - name: SQL tests
+        run: make db-test
+      - name: Python tests against PostgreSQL (layer 1 end to end, throwaway database)
+        run: uv run --frozen pytest -m db

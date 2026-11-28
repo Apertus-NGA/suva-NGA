@@ -1,0 +1,630 @@
+{
+  "name": "layer-1 trace",
+  "measured": "2026-11-28T00:05+01:00",
+  "source": "data/cache/rulings.parquet",
+  "gate": "src/courts.py decide",
+  "unit": "one row of the cache. 7B_1356/2025 is two rows: two decisions, same docket.",
+  "rows": 6055,
+  "distinct_dockets": 6054,
+  "rule": "A row is kept when the subject decision is kept_subject or subject_missing, or when the text decision is kept_text or kept_contract. Otherwise it is dropped.",
+  "checks": {
+    "subject_reasons_sum_to_rows": true,
+    "text_reasons_sum_to_rows": true,
+    "paths_sum_to_rows": true,
+    "kept_plus_dropped": true
+  },
+  "funnel": [
+    {
+      "step": 0,
+      "name": "cache",
+      "rows": 6055,
+      "pass": 6055,
+      "fail": 0
+    },
+    {
+      "step": 1,
+      "name": "subject",
+      "question": "Is the court digit 4, 8 or 9, the letter allowed, and the rubric in the list (or missing)?",
+      "rows_in": 6055,
+      "pass": 946,
+      "fail": 5109,
+      "pass_reasons": {
+        "kept_subject": 941,
+        "subject_missing": 5
+      },
+      "fail_reasons": {
+        "wrong_court": 4096,
+        "wrong_letter": 0,
+        "subject_out": 1013
+      }
+    },
+    {
+      "step": 2,
+      "name": "text rescue of the subject failures",
+      "question": "Does the text name Suva, an accident or military insurer or statute, or the insurance-contract act?",
+      "rows_in": 5109,
+      "rescued": 47,
+      "still_dropped": 5062,
+      "rescued_by": {
+        "kept_text": 39,
+        "kept_contract": 8
+      }
+    }
+  ],
+  "outcome": {
+    "kept": {
+      "rows": 993,
+      "paths": {
+        "subject_only": {
+          "rows": 698,
+          "why": "Subject decision keeps the row. Text decision does not.",
+          "of_which": {
+            "kept_subject_and_text_clear": 693,
+            "subject_missing_and_text_clear": 5
+          }
+        },
+        "both": {
+          "rows": 248,
+          "why": "Subject decision keeps the row, and the text also matches.",
+          "of_which": {
+            "kept_subject_and_kept_text": 224,
+            "kept_subject_and_kept_contract": 24
+          }
+        },
+        "text_only": {
+          "rows": 47,
+          "why": "Subject decision drops the row. Text decision keeps it.",
+          "by_prefix": [
+            {
+              "text": "kept_contract",
+              "prefix": "2C",
+              "rows": 2
+            },
+            {
+              "text": "kept_contract",
+              "prefix": "5A",
+              "rows": 3
+            },
+            {
+              "text": "kept_contract",
+              "prefix": "6B",
+              "rows": 2
+            },
+            {
+              "text": "kept_contract",
+              "prefix": "7B",
+              "rows": 1
+            },
+            {
+              "text": "kept_text",
+              "prefix": "2C",
+              "rows": 5
+            },
+            {
+              "text": "kept_text",
+              "prefix": "4A",
+              "rows": 5
+            },
+            {
+              "text": "kept_text",
+              "prefix": "5A",
+              "rows": 5
+            },
+            {
+              "text": "kept_text",
+              "prefix": "6B",
+              "rows": 14
+            },
+            {
+              "text": "kept_text",
+              "prefix": "7B",
+              "rows": 3
+            },
+            {
+              "text": "kept_text",
+              "prefix": "8C",
+              "rows": 5
+            },
+            {
+              "text": "kept_text",
+              "prefix": "8F",
+              "rows": 1
+            },
+            {
+              "text": "kept_text",
+              "prefix": "9C",
+              "rows": 1
+            }
+          ]
+        }
+      }
+    },
+    "dropped": {
+      "rows": 5062,
+      "why": "Subject decision failed and the text decision is text_clear. No row is dropped on an empty text alone when the subject passed: the 5 missing subjects have a text and it is clear.",
+      "by_subject_reason": {
+        "wrong_court_and_text_clear": {
+          "rows": 4061,
+          "why": "Court digit is not 4, 8 or 9 (or the prefix is not two characters), and the text names neither an accident term nor the insurance-contract act.",
+          "by_digit": {
+            "7": 1150,
+            "5": 987,
+            "6": 758,
+            "2": 595,
+            "1": 571
+          }
+        },
+        "subject_out_and_text_clear": {
+          "rows": 1001,
+          "why": "Court and letter are allowed, the rubric is not in the keep list, and the text does not rescue the row.",
+          "by_family": {
+            "tax": 257,
+            "debt_enforcement": 233,
+            "unemployment": 95,
+            "health_administration": 72,
+            "supplementary_benefits": 71,
+            "old_age": 49,
+            "obligations_general": 44,
+            "arbitration": 40,
+            "other": 37,
+            "company_law": 31,
+            "intellectual_property": 15,
+            "employment_contract": 12,
+            "rent": 12,
+            "social_assistance": 12,
+            "civil_procedure": 9,
+            "family_allowances": 9,
+            "loss_of_earnings": 2,
+            "health_insurance_spelling": 1
+          },
+          "other_rubrics": {
+            "assistance judiciaire": 2,
+            "contrat bancaire": 2,
+            "contrat d'entreprise": 2,
+            "aktienkaufvertrag; feststellungsklage; vertragsauslegung": 1,
+            "architekturvertrag, vorausgesetzte eigenschaft": 1,
+            "assicurazione sociale cantonale": 1,
+            "aufschub der vollstreckbarkeit, ausweisung": 1,
+            "bankvertrag; ukraine-verordnung": 1,
+            "condition de recevabilité": 1,
+            "contrat d'entreprise; retrait du": 1,
+            "contrat de vente; recevabilité de l'appel": 1,
+            "contrats de prêt; validité": 1,
+            "droit aux renseignements et à la consultation": 1,
+            "einstellung der vollstreckung": 1,
+            "entraide judiciaire internationale en matière civile": 1,
+            "erlass von verfahrenskosten": 1,
+            "fonction publique": 1,
+            "forderung aus unerlaubter handlung": 1,
+            "litispendance internationale, procédure en cas clair": 1,
+            "ordnungsbusse": 1,
+            "prolongation, resp. restitution de délai": 1,
+            "protection des données; droit d'accès": 1,
+            "rechtsschutz in klaren fällen": 1,
+            "remboursement de dépenses": 1,
+            "responsabilité de l'architecte": 1,
+            "restitution": 1,
+            "restitution de délai": 1,
+            "risarcimento danni; assistenza giudiziaria": 1,
+            "spese giudiziarie; stralcio": 1,
+            "vertragsauslegung": 1,
+            "vertragsqualifikation": 1,
+            "vorsorgliche beweisführung; zwischenentscheid": 1,
+            "zustellung der kündigung des schuldbriefs und der schuldbriefforderung": 1,
+            "zuständigkeit des tas": 1
+          }
+        },
+        "wrong_letter": {
+          "rows": 0,
+          "why": "No row in this cache has digit 4, 8 or 9 with a letter outside the allowed set."
+        }
+      }
+    }
+  },
+  "subject_pass_detail": {
+    "kept_subject": {
+      "rows": 941,
+      "why": "Digit, letter and rubric all match the keep list.",
+      "by_matter": {
+        "disability": 334,
+        "contract": 326,
+        "accident": 169,
+        "health": 63,
+        "occupational_pension": 24,
+        "liability": 21,
+        "military": 4
+      }
+    },
+    "subject_missing": {
+      "rows": 5,
+      "why": "Digit and letter are allowed, and both the rubric and the title are empty. A blank field is not a drop.",
+      "dockets": [
+        "4A_156/2025",
+        "4A_206/2026",
+        "4A_285/2026",
+        "4A_355/2025",
+        "4D_9/2026"
+      ]
+    }
+  },
+  "subject_fail_detail": {
+    "wrong_court": {
+      "rows": 4096,
+      "then_rescued": 35,
+      "then_dropped": 4061,
+      "by_digit_before_text": {
+        "7": 1154,
+        "5": 995,
+        "6": 774,
+        "2": 602,
+        "1": 571
+      },
+      "special_files_inside_digit_1": {
+        "11Z": 1,
+        "12T": 3,
+        "why": "Prefixes of length other than 2. Counted in digit 1 above. Both dropped."
+      }
+    },
+    "subject_out": {
+      "rows": 1013,
+      "then_rescued_by_kept_text": 12,
+      "then_dropped": 1001,
+      "by_family_before_text": {
+        "tax": 257,
+        "debt_enforcement": 234,
+        "unemployment": 97,
+        "health_administration": 74,
+        "supplementary_benefits": 73,
+        "old_age": 50,
+        "obligations_general": 45,
+        "arbitration": 41,
+        "other": 38,
+        "company_law": 31,
+        "intellectual_property": 15,
+        "employment_contract": 13,
+        "rent": 12,
+        "social_assistance": 12,
+        "civil_procedure": 9,
+        "family_allowances": 9,
+        "loss_of_earnings": 2,
+        "health_insurance_spelling": 1
+      },
+      "rescued_families": {
+        "health_administration": 2,
+        "supplementary_benefits": 2,
+        "unemployment": 2,
+        "old_age": 1,
+        "obligations_general": 1,
+        "debt_enforcement": 1,
+        "arbitration": 1,
+        "employment_contract": 1,
+        "other": 1
+      },
+      "spelling_not_in_the_list": {
+        "rows": 1,
+        "rubric": "assicurazione contro le malattie",
+        "kept_list_has": "assicurazione malattie",
+        "result": "subject_out, text_clear, dropped",
+        "docket": "9C_636/2025"
+      }
+    }
+  },
+  "blank_rubric": {
+    "rows": 444,
+    "why": "legal_area empty. The gate reads the matter at the start of the title. 183 of these are courts 4, 8 and 9; the other 261 are other courts.",
+    "by_subject_after_title": {
+      "wrong_court": 261,
+      "subject_out": 138,
+      "kept_subject": 40,
+      "subject_missing": 5
+    },
+    "courts_4_8_9": {
+      "kept_subject": 40,
+      "subject_out": 138,
+      "subject_missing": 5,
+      "rows": 183
+    }
+  },
+  "by_quarter": [
+    {
+      "quarter": "2025 Q3",
+      "rows": 23,
+      "kept": 23,
+      "dropped": 0,
+      "population": "only the 23 summarised rulings, not the quarter"
+    },
+    {
+      "quarter": "2025 Q4",
+      "rows": 1931,
+      "kept": 295,
+      "dropped": 1636,
+      "population": "full decision-date quarter"
+    },
+    {
+      "quarter": "2026 Q1",
+      "rows": 2005,
+      "kept": 349,
+      "dropped": 1656,
+      "population": "full decision-date quarter"
+    },
+    {
+      "quarter": "2026 Q2",
+      "rows": 2096,
+      "kept": 326,
+      "dropped": 1770,
+      "population": "full decision-date quarter"
+    }
+  ],
+  "by_language": [
+    {
+      "language": "de",
+      "rows": 3747,
+      "kept": 604,
+      "dropped": 3143
+    },
+    {
+      "language": "fr",
+      "rows": 2004,
+      "kept": 355,
+      "dropped": 1649
+    },
+    {
+      "language": "it",
+      "rows": 304,
+      "kept": 34,
+      "dropped": 270
+    }
+  ],
+  "by_prefix": [
+    {
+      "prefix": "7B",
+      "rows": 1107,
+      "kept": 4,
+      "dropped": 1103
+    },
+    {
+      "prefix": "5A",
+      "rows": 896,
+      "kept": 8,
+      "dropped": 888
+    },
+    {
+      "prefix": "6B",
+      "rows": 749,
+      "kept": 16,
+      "dropped": 733
+    },
+    {
+      "prefix": "8C",
+      "rows": 624,
+      "kept": 373,
+      "dropped": 251
+    },
+    {
+      "prefix": "2C",
+      "rows": 545,
+      "kept": 7,
+      "dropped": 538
+    },
+    {
+      "prefix": "1C",
+      "rows": 542,
+      "kept": 0,
+      "dropped": 542
+    },
+    {
+      "prefix": "4A",
+      "rows": 542,
+      "kept": 298,
+      "dropped": 244
+    },
+    {
+      "prefix": "9C",
+      "rows": 483,
+      "kept": 210,
+      "dropped": 273
+    },
+    {
+      "prefix": "4D",
+      "rows": 198,
+      "kept": 52,
+      "dropped": 146
+    },
+    {
+      "prefix": "5F",
+      "rows": 51,
+      "kept": 0,
+      "dropped": 51
+    },
+    {
+      "prefix": "5D",
+      "rows": 47,
+      "kept": 0,
+      "dropped": 47
+    },
+    {
+      "prefix": "4F",
+      "rows": 46,
+      "kept": 7,
+      "dropped": 39
+    },
+    {
+      "prefix": "7F",
+      "rows": 43,
+      "kept": 0,
+      "dropped": 43
+    },
+    {
+      "prefix": "2D",
+      "rows": 27,
+      "kept": 0,
+      "dropped": 27
+    },
+    {
+      "prefix": "9F",
+      "rows": 27,
+      "kept": 7,
+      "dropped": 20
+    },
+    {
+      "prefix": "2F",
+      "rows": 25,
+      "kept": 0,
+      "dropped": 25
+    },
+    {
+      "prefix": "6F",
+      "rows": 22,
+      "kept": 0,
+      "dropped": 22
+    },
+    {
+      "prefix": "8F",
+      "rows": 18,
+      "kept": 10,
+      "dropped": 8
+    },
+    {
+      "prefix": "9D",
+      "rows": 17,
+      "kept": 0,
+      "dropped": 17
+    },
+    {
+      "prefix": "1F",
+      "rows": 14,
+      "kept": 0,
+      "dropped": 14
+    },
+    {
+      "prefix": "1D",
+      "rows": 10,
+      "kept": 0,
+      "dropped": 10
+    },
+    {
+      "prefix": "7G",
+      "rows": 4,
+      "kept": 0,
+      "dropped": 4
+    },
+    {
+      "prefix": "12T",
+      "rows": 3,
+      "kept": 0,
+      "dropped": 3
+    },
+    {
+      "prefix": "2E",
+      "rows": 3,
+      "kept": 0,
+      "dropped": 3
+    },
+    {
+      "prefix": "6G",
+      "rows": 3,
+      "kept": 0,
+      "dropped": 3
+    },
+    {
+      "prefix": "2G",
+      "rows": 2,
+      "kept": 0,
+      "dropped": 2
+    },
+    {
+      "prefix": "9G",
+      "rows": 2,
+      "kept": 1,
+      "dropped": 1
+    },
+    {
+      "prefix": "11Z",
+      "rows": 1,
+      "kept": 0,
+      "dropped": 1
+    },
+    {
+      "prefix": "1G",
+      "rows": 1,
+      "kept": 0,
+      "dropped": 1
+    },
+    {
+      "prefix": "4G",
+      "rows": 1,
+      "kept": 0,
+      "dropped": 1
+    },
+    {
+      "prefix": "5G",
+      "rows": 1,
+      "kept": 0,
+      "dropped": 1
+    },
+    {
+      "prefix": "8G",
+      "rows": 1,
+      "kept": 0,
+      "dropped": 1
+    }
+  ],
+  "known_positives": {
+    "note": "Subset of the 6055. Do not add these rows to the funnel.",
+    "cohorts": [
+      {
+        "cohort": "suva_list",
+        "dockets": 59,
+        "rows_in_cache": 59,
+        "kept": 59,
+        "dropped": 0,
+        "by_subject_and_text": [
+          {
+            "subject": "kept_subject",
+            "text": "kept_contract",
+            "rows": 3
+          },
+          {
+            "subject": "kept_subject",
+            "text": "kept_text",
+            "rows": 45
+          },
+          {
+            "subject": "kept_subject",
+            "text": "text_clear",
+            "rows": 11
+          }
+        ]
+      },
+      {
+        "cohort": "q3_summary",
+        "dockets": 23,
+        "rows_in_cache": 23,
+        "kept": 23,
+        "dropped": 0,
+        "by_subject_and_text": [
+          {
+            "subject": "kept_subject",
+            "text": "kept_contract",
+            "rows": 1
+          },
+          {
+            "subject": "kept_subject",
+            "text": "kept_text",
+            "rows": 17
+          },
+          {
+            "subject": "kept_subject",
+            "text": "text_clear",
+            "rows": 5
+          }
+        ]
+      }
+    ]
+  },
+  "duplicate_docket": {
+    "docket": "7B_1356/2025",
+    "rows": 2,
+    "why": "Two decisions under one docket. Both are court 7, text_clear, dropped."
+  }
+}

@@ -1,7 +1,7 @@
-"""Rédige une fiche Suva en allemand et en français, chacune à part.
+"""Write a Suva fiche in German and in French, each on its own.
 
-Lit le cache local data/cache. N'écrit rien sur Hugging Face.
-La clé reste dans .env et n'est pas affichée.
+Reads the local cache data/cache. Writes nothing to Hugging Face.
+The key stays in .env and is never printed.
 """
 
 from __future__ import annotations
@@ -13,11 +13,15 @@ import re
 import sys
 from pathlib import Path
 
+if __package__:
+    from .prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+else:
+    from prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "data" / "cache"
-GLOSSARY = json.loads((Path(__file__).parent / "glossary.json").read_text(encoding="utf-8"))
-# Ton seulement : une fiche courte (renvoi) et une fiche de rejet.
-# Le texte de ces arrêts n'est pas mis dans le prompt : il déteignait sur le dispositif.
+# Tone only: one short fiche (remand) and one dismissal.
+# The text of those rulings is not put in the prompt: it leaked into the outcome.
 FEW_SHOT = ("8C_177/2025", "8C_224/2025")
 EXCLUDED = frozenset({"8C_21/2025", "8C_44/2025", "8C_455/2025"})
 ORDER_MARKERS = (
@@ -27,14 +31,15 @@ ORDER_MARKERS = (
 )
 
 
-def _court_passes(docket: str, area: str) -> bool:
-    """Le script est lancé depuis src/summarize : courts.py vit dans src/."""
+def _gate(docket: str, area: object, text: str, title: object = None):
+    """The script is launched from src/summarize: courts.py lives in src/."""
     src = str(ROOT / "src")
     if src not in sys.path:
         sys.path.insert(0, src)
-    from courts import passes
+    from courts import area_for_gate, decide
 
-    return passes(docket, area)
+    filled = area_for_gate(area, title)
+    return decide(docket, filled, text), filled
 
 
 def load_env() -> None:
@@ -52,22 +57,6 @@ def clean(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
-
-
-def glossary_block(language: str) -> str:
-    lines = ["Lois (ne pas traduire le sigle, employer celui de la langue de la fiche) :"]
-    for law in GLOSSARY["laws"]:
-        if language == "de":
-            lines.append(f"- {law['de']} (français : {law['fr']})")
-        else:
-            lines.append(f"- {law['fr']} (allemand : {law['de']})")
-    lines.append("Articles : citer la forme de la langue de la fiche.")
-    for art in GLOSSARY["articles"]:
-        lines.append(f"- {art['de']} = {art['fr']}")
-    lines.append("Tournures :")
-    for phrase in GLOSSARY["phrases"]:
-        lines.append(f"- {phrase['de']} = {phrase['fr']}")
-    return "\n".join(lines)
 
 
 OPERATIVE = (
@@ -88,7 +77,7 @@ def flat(text: str) -> str:
 
 
 def anchors(text: str) -> str:
-    """Extraits courts autour des règles que cet arrêt applique."""
+    """Short extracts around the rules this ruling applies."""
     norm = flat(text)
     windows = []
     for needle in (
@@ -110,7 +99,7 @@ def anchors(text: str) -> str:
 
 
 def directions(language: str, text: str) -> list[str]:
-    """Sens des règles de cet arrêt. Empêche d'inverser un seuil ou un article."""
+    """Direction of this ruling's rules. Stops a threshold or an article being reversed."""
     norm = flat(text)
     lines = []
     if "zu mehr als 50 %" in norm and "Abnützung" in norm:
@@ -118,8 +107,9 @@ def directions(language: str, text: str) -> list[str]:
             "Die Sehnenläsion ist zu mehr als 50 % auf Abnützung oder Erkrankung zurückzuführen. "
             "Der Schwellenwert ist erreicht. Schreibe nicht, er sei nicht erreicht."
             if language == "de"
-            else "La lésion tendineuse est due à plus de 50 % à l'usure ou à une maladie. "
-            "Le seuil est atteint. N'écris pas qu'il n'est pas atteint."
+            else "The tendon lesion is due more than 50% to wear or disease. "
+            "The threshold is met. Do not write that it is not met. "
+            "In the French fiche use: lésion, usure, plus de 50 %."
         )
     if "Vermutung der Leistungspflicht gemäss Art. 6 Abs. 2 UVG" in norm:
         lines.append(
@@ -128,17 +118,17 @@ def directions(language: str, text: str) -> list[str]:
             "Schreibe nicht, die Leistungspflicht bestehe nur bei Abnützung. "
             "Art. 4 ATSG bezeichnet den natürlichen Kausalzusammenhang, nicht diese Vermutung."
             if language == "de"
-            else "L'art. 6 al. 2 LAA présume l'obligation de prester. Elle est renversée parce que la lésion "
-            "est due à plus de 50 % à l'usure. N'écris pas que l'obligation n'existe qu'en cas d'usure. "
-            "L'art. 4 LPGA désigne le lien de causalité naturelle, pas cette présomption."
+            else "art. 6 al. 2 LAA presumes the duty to pay. It is rebutted because the lesion "
+            "is due more than 50% to wear. Do not write that the duty exists only in case of wear. "
+            "art. 4 LPGA is natural causation, not this presumption."
         )
     if "15. Februar 2023" in norm:
         lines.append(
             "Der erste Absatz nennt beide Ereignisse, darunter den Sturz vom 15. Februar 2023 "
             "beim Aussteigen auf gefrorenem Asphalt, ohne erneute Läsion."
             if language == "de"
-            else "Le premier paragraphe nomme les deux événements, dont la chute du 15 février 2023 "
-            "en descendant du véhicule sur l'asphalte gelé, sans nouvelle lésion."
+            else "The first paragraph names both events, including the fall of 15 February 2023 "
+            "while getting out of the vehicle on frozen asphalt, with no new lesion."
         )
     if "keine auch nur geringe Teilursache" in norm:
         lines.append(
@@ -146,29 +136,29 @@ def directions(language: str, text: str) -> list[str]:
             "Die Frage ist die Unfallkausalität, nicht eine richtungsgebende Verschlimmerung "
             "und nicht der Status quo sine vel ante."
             if language == "de"
-            else "Les deux événements ne sont pas une cause partielle, même minime, des lésions. "
-            "La question est la causalité de l'accident, pas une aggravation déterminante "
-            "et pas le statu quo sine vel ante."
+            else "Neither event is even a minor partial cause of the findings. "
+            "The question is accident causation, not a decisive aggravation "
+            "and not the statu quo sine vel ante."
         )
     if "peut demeurer ouverte" in norm or "offen bleiben" in norm or "kann offenbleiben" in norm:
         lines.append(
             "Eine Frage, die der Entscheid offen lässt, bleibt offen. Triff sie nicht."
             if language == "de"
-            else "Une question que l'arrêt laisse ouverte le reste. Ne la tranche pas."
+            else "A question the ruling leaves open stays open. Do not decide it."
         )
     if "mois qui suit" in norm or "Monats nach" in norm:
         lines.append(
             "Die Einstellung wirkt ab dem Tag des Monats, der auf die Inhaftierung folgt, "
             "nicht ab dem ersten Tag der Haft, und nur wenn die Haft länger als drei Monate dauert."
             if language == "de"
-            else "La suspension prend effet le jour du mois qui suit l'incarcération, "
-            "pas le premier jour de la détention, et seulement si la détention a duré plus de trois mois."
+            else "The suspension takes effect on the day of the month that follows the imprisonment, "
+            "not on the first day of detention, and only if the detention lasted more than three months."
         )
     if "offensichtlich unbegründet" in norm:
         lines.append(
             "Die Beschwerde ist offensichtlich unbegründet."
             if language == "de"
-            else "Le recours est rejeté comme manifestement non fondé."
+            else "Write the outcome as: Le recours est rejeté comme manifestement non fondé."
         )
     if "art. 56" in norm.lower() and "fbis" in norm.lower():
         lines.append(
@@ -177,18 +167,18 @@ def directions(language: str, text: str) -> list[str]:
             "Art. 56 Abs. 2 ATSG verlangt eine Entscheidung innert angemessener Frist. "
             "Art. 61 lit. fbis ATSG betrifft nur Streitigkeiten über Leistungen."
             if language == "de"
-            else "Un recours pour déni de justice n'est pas un litige de prestations. "
-            "Aucun frais judiciaire cantonal ne peut être perçu. "
-            "L'art. 56 al. 2 LPGA impose une décision dans un délai raisonnable. "
-            "L'art. 61 let. fbis LPGA ne vise que les contestations de prestations."
+            else "An appeal for denial of justice is not a dispute about benefits. "
+            "No cantonal court costs may be charged. "
+            "art. 56 al. 2 LPGA requires a decision within a reasonable time. "
+            "art. 61 let. fbis LPGA covers only disputes about benefits."
         )
     if "sein Einverständnis" in norm and "unterzeichnen" in norm.lower():
         lines.append(
             "Der fallführende Arzt hätte die ergänzenden Stellungnahmen unterzeichnen "
             "oder sein Einverständnis erklären müssen. Schreibe nicht, ein unabhängiger Arzt sei beauftragt."
             if language == "de"
-            else "Le médecin en charge aurait dû signer les prises de position complémentaires "
-            "ou donner son accord. N'écris pas qu'un médecin indépendant est commis."
+            else "The treating doctor should have signed the further opinions "
+            "or given his agreement. Do not write that an independent doctor is appointed."
         )
     if "erübrigt sich" in norm and "Art. 4 ATSG" in norm:
         lines.append(
@@ -196,15 +186,15 @@ def directions(language: str, text: str) -> list[str]:
             "erübrigt sich die Prüfung nach Art. 6 Abs. 2 UVG. "
             "Art. 4 ATSG muss im Text stehen."
             if language == "de"
-            else "Sans lien de causalité naturelle selon l'art. 4 LPGA, l'examen de l'art. 6 al. 2 LAA est superflu. "
-            "N'écris pas « causalité adéquate » : l'arrêt ne tranche pas ce point. "
-            "L'art. 4 LPGA doit figurer dans le texte."
+            else "Without natural causation under art. 4 LPGA, the review of art. 6 al. 2 LAA is unnecessary. "
+            "Do not write 'adequate causation': the ruling does not decide that point. "
+            "art. 4 LPGA must appear in the text."
         )
     return lines
 
 
 def required_forms(language: str, text: str) -> list[str]:
-    """Formes à faire apparaître, déduites de cet arrêt seulement."""
+    """Wordings that must appear, taken from this ruling only."""
     norm = flat(text)
     forms = []
     if "Art. 6 Abs. 2 UVG" in norm or "art. 6 al. 2 LAA" in norm.lower():
@@ -217,13 +207,13 @@ def required_forms(language: str, text: str) -> list[str]:
         forms.append(
             "kein Untersuchungsmangel, die Kosten des privaten Gutachters trägt die Suva nicht"
             if language == "de"
-            else "pas de lacune d'instruction : les frais de l'expert privé ne sont pas mis à la charge de la Suva"
+            else "no gap in the investigation: the private expert's fees are not charged to Suva"
         )
     return forms
 
 
 def order_of(text: str) -> str:
-    """Une phrase du dispositif, pas le bloc de signature."""
+    """One sentence of the outcome, not the signature block."""
     for sentence in OPERATIVE:
         if sentence in text:
             return sentence + "."
@@ -234,54 +224,21 @@ def order_of(text: str) -> str:
     return ""
 
 
-def system_prompt(language: str) -> str:
-    if language == "de":
-        return (
-            "Du schreibst ein Suva-Merkblatt auf Deutsch, in zwei bis vier Absätzen, "
-            "ohne Titel, ohne Aufzählung, ohne Rubriken. "
-            "Absatz 1: was geschehen ist, in einem Zug, ohne medizinische Details. "
-            "Absatz 2: die Regel, die das Bundesgericht für diesen Fall ausspricht. "
-            "Letzter Satz: das Dispositiv in einem Satz. "
-            "Kopiere nicht den Block «Demnach erkennt», keine Gerichtskosten, "
-            "keine Unterschriften, kein Ort und kein Datum der Ausfertigung. "
-            "Die Beispiele zeigen nur Länge und Ton. Ihre Sachverhalte und ihre Ausgänge "
-            "gehören zu anderen Fällen. "
-            "Zitiere nur Artikel, die dieser Entscheid anwendet, in deutscher Form "
-            "(UVG, ATSG, UVV). Art. 17 ATSG ist die Revision, nicht der Status quo. "
-            "Nichts erfinden. Antworte nur mit dem Merkblatt."
-        )
-    return (
-        "Tu rédiges une fiche Suva en français, en deux à quatre paragraphes, "
-        "sans titre, sans liste à puces, sans rubriques. "
-        "Premier paragraphe : ce qui s'est passé, en une fois, sans détail médical. "
-        "Deuxième : la règle que le Tribunal fédéral pose pour cet arrêt. "
-        "Dernière phrase : le dispositif en une phrase, dans ta langue. "
-        "Ne recopie pas le bloc du jugement, ni les frais de justice, ni les signatures, ni le lieu. "
-        "S'il y a deux événements, les deux figurent dans le premier paragraphe. "
-        "Si l'arrêt applique l'Art. 4 ATSG, écris art. 4 LPGA. "
-        "Les exemples montrent seulement la longueur et le ton. "
-        "Leurs faits et leur issue sont ceux d'autres affaires. "
-        "Ne cite qu'un article que cet arrêt applique, dans la forme française "
-        "(LAA, LPGA, OLAA). L'art. 17 LPGA est la révision, pas le statu quo. "
-        "N'invente rien. Réponds uniquement par la fiche."
-    )
-
-
-def user_prompt(language: str, examples: list[dict], target: dict) -> str:
+def user_prompt(language: str, examples: list[dict], target: dict, category: str) -> str:
     label = "Merkblatt" if language == "de" else "Fiche"
     chunks = [
-        glossary_block(language),
+        glossary_block(language, category),
         "",
-        "Exemples de ton seulement. N'en reprends ni les faits ni l'issue.",
+        "Tone examples only. Do not reuse their facts or their outcome.",
         "",
     ]
     for example in examples:
-        chunks.append(f"{label} d'un autre arrêt ({example['docket']}) :")
+        chunks.append(f"{label} of another ruling ({example['docket']}):")
         chunks.append(example["body"])
         chunks.append("")
-    chunks.append("Arrêt à résumer, et seulement celui-ci :")
+    chunks.append("Ruling to summarise, and only this one:")
     chunks.append(
-        f"{target['docket']} du {target['decision_date']}, cour {target['division']}, matière {target['area']}."
+        f"{target['docket']} of {target['decision_date']}, court {target['division']}, matter {target['area']}."
     )
     chunks.append(target["text"])
     chunks.append("")
@@ -294,9 +251,9 @@ def user_prompt(language: str, examples: list[dict], target: dict) -> str:
             )
         else:
             chunks.append(
-                "Ces phrases de cet arrêt figurent dans la fiche, en prose française, "
-                "avec les sigles français du glossaire (UVG devient LAA, ATSG devient LPGA). "
-                "Ne pas les omettre, ne pas les coller en allemand:"
+                "These sentences of this ruling belong in the fiche, in French prose, "
+                f"with the French sigils of this matter ({sigil_hint(category)}). "
+                "Do not drop them, and do not paste them in German:"
             )
         chunks.append(held)
         chunks.append("")
@@ -306,14 +263,14 @@ def user_prompt(language: str, examples: list[dict], target: dict) -> str:
         if language == "de":
             chunks.append(f"Der Text enthält diese Formulierungen, im Satz und nur einmal: {joined}.")
         else:
-            chunks.append(f"Le texte contient ces formulations, dans la phrase et une seule fois : {joined}.")
+            chunks.append(f"The text contains these wordings, inside a sentence and only once: {joined}.")
         chunks.append("")
     held_sense = directions(language, target["text"])
     if held_sense:
         if language == "de":
             chunks.append("Richtung, die dieser Entscheid vorgibt. Nicht umkehren:")
         else:
-            chunks.append("Sens que cet arrêt impose. Ne pas l'inverser :")
+            chunks.append("Direction this ruling imposes. Do not reverse it:")
         chunks.extend(held_sense)
         chunks.append("")
     order = order_of(target["text"])
@@ -322,12 +279,12 @@ def user_prompt(language: str, examples: list[dict], target: dict) -> str:
         if language == "de":
             chunks.append(f"Ausgang dieses Entscheids, auf Deutsch, in einem Satz und nur einmal: {sentence}")
         else:
-            chunks.append(f"Issue de cet arrêt, en français, en une phrase et une seule fois : {sentence}")
+            chunks.append(f"Outcome of this ruling, in French, in one sentence and only once: {sentence}")
         chunks.append("")
     if language == "de":
         chunks.append("Schreibe ausschliesslich Deutsch, auch wenn der Entscheid französisch oder italienisch ist.")
     else:
-        chunks.append("Écris exclusivement en français, même si l'arrêt est allemand ou italien.")
+        chunks.append("Write in French only, even if the ruling is in German or Italian.")
     chunks.append(f"{label} :")
     return "\n".join(chunks)
 
@@ -338,25 +295,29 @@ def repair_prompt(
     forms: list[str],
     issue: list[str],
     sense: list[str],
+    category: str,
 ) -> str:
     must = " ; ".join(forms)
     wrong = ", ".join(issue)
     way = " ".join(sense)
+    laws = sigils(language, category)
     if language == "de":
         return (
             "Überarbeite das Merkblatt. Keine Aufzählung, kein kopierter Urteilsblock, "
             "das Dispositiv nur im letzten Satz. "
+            f"Siglen dieser Materie: {laws}. "
             f"Zu beheben: {wrong}. "
             f"Richtung: {way} "
             f"Diese Formulierungen müssen im Text stehen: {must}.\n\n"
             f"{draft}"
         )
     return (
-        "Réécris la fiche. Pas de liste, pas de bloc d'arrêt collé, "
-        "le dispositif seulement dans la dernière phrase. "
-        f"À corriger : {wrong}. "
-        f"Sens : {way} "
-        f"Ces formulations doivent figurer dans le texte : {must}.\n\n"
+        "Rewrite the fiche. No list, no pasted operative block, "
+        "the outcome only in the last sentence. "
+        f"Sigils of this matter: {laws}. "
+        f"Fix: {wrong}. "
+        f"Direction: {way} "
+        f"These wordings must appear in the text: {must}.\n\n"
         f"{draft}"
     )
 
@@ -368,9 +329,9 @@ def chat(messages: list[dict]) -> str:
 
     client = client_from_env("live")
     try:
-        return client.chat(messages, max_tokens=1200, prompt_version="summarize-probe").content
+        return client.chat(messages, max_tokens=1200, prompt_version=VERSION).content
     except LLMError as exc:
-        raise SystemExit(f"passerelle: {exc}") from exc
+        raise SystemExit(f"gateway: {exc}") from exc
     finally:
         client.close()
 
@@ -381,7 +342,7 @@ def load_tables():
     rulings_path = CACHE / "rulings.parquet"
     gold_path = CACHE / "gold_summaries.parquet"
     if not rulings_path.exists() or not gold_path.exists():
-        raise SystemExit(f"cache local absent : {CACHE}")
+        raise SystemExit(f"local cache missing: {CACHE}")
     rulings = pd.read_parquet(rulings_path)
     gold = pd.read_parquet(gold_path)
     gold = gold[gold.is_current]
@@ -391,13 +352,14 @@ def load_tables():
 def row_for(rulings, docket: str) -> dict:
     found = rulings[rulings.docket == docket]
     if found.empty:
-        raise SystemExit(f"arrêt absent du cache : {docket}")
+        raise SystemExit(f"ruling missing from the cache: {docket}")
     row = found.iloc[0]
     return {
         "docket": row.docket,
         "decision_date": str(row.decision_date)[:10],
         "division": row.division,
-        "area": row.area,
+        "area": row.area if isinstance(row.area, str) and row.area.strip() else None,
+        "title": row.subject if isinstance(row.subject, str) and row.subject.strip() else None,
         "text": clean(row.text),
     }
 
@@ -439,7 +401,7 @@ TO_CANON = {
 
 
 def outcome_sentence(language: str, order: str) -> str:
-    """Le dispositif, dans la langue de la fiche, sans recopier la langue de l'arrêt."""
+    """The outcome, in the fiche language, without copying the ruling's language."""
     kind = outcome_of(order)
     sentences = {
         "de": {
@@ -477,47 +439,70 @@ def _article_in_source(number: str, law: str, source: str) -> bool:
     return re.search(rf"art\.\s*{re.escape(number)}\b", source) is not None
 
 
+_OUTCOME = re.compile(
+    r"die beschwerde wird (?:teilweise )?gutgeheissen"
+    r"|die beschwerde wird abgewiesen(?:, soweit darauf eingetreten wird)?"
+    r"|auf die beschwerde wird nicht eingetreten"
+    r"|le recours est partiellement admis"
+    r"|le recours est admis"
+    r"|le recours est rejeté(?: dans la mesure où il est recevable)?"
+    r"|le recours (?:est|doit être déclaré) irrecevable"
+    r"|le recours est irrecevable"
+    r"|il ricorso è parzialmente accolto"
+    r"|il ricorso è accolto"
+    r"|il ricorso è respinto",
+    re.IGNORECASE,
+)
+
+
+def operative_only(text: str) -> bool:
+    """True when nothing remains once the outcome sentences are removed."""
+    residue = _OUTCOME.sub(" ", text)
+    residue = re.sub(r"\s+", " ", residue).strip(" .")
+    return len(residue) < 80
+
+
 def blocking(language: str, text: str, source: str) -> list[str]:
-    """Contrôles bloquants déduits de cet arrêt. Vrais pour n'importe quel dossier."""
+    """Blocking checks taken from this ruling. They hold for every docket."""
     low = text.lower()
     source_low = flat(source).lower()
     found: list[str] = []
     if re.search(r"(?m)^\s*[-•]", text):
-        found.append("mineure: liste à puces")
+        found.append("minor: bullet list")
     kind = outcome_of(order_of(source))
     parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text.strip()) if part.strip()]
     tail = parts[-1].lower() if parts else ""
     if language == "de":
         if re.search(r"\b(laa|lpga|olaa|opga)\b", low):
-            found.append("critique: sigle français")
+            found.append("critique: French sigil")
         if kind == "rejected":
             if "abgewiesen" not in tail:
-                found.append("critique: dispositif, rejet absent")
+                found.append("critique: outcome, dismissal missing")
             if "gutgeheissen" in tail and "abgewiesen" not in tail:
-                found.append("critique: dispositif inversé")
+                found.append("critique: outcome inverted")
         elif kind == "admitted":
             if "gutgeheissen" not in tail:
-                found.append("critique: dispositif, admission absente")
+                found.append("critique: outcome, admission missing")
             if "abgewiesen" in tail:
-                found.append("critique: dispositif inversé")
+                found.append("critique: outcome inverted")
         elif kind == "partial" and "teilweise" not in low and "zurückgewies" not in low:
-            found.append("critique: admission partielle absente")
+            found.append("critique: partial admission missing")
         cites = CITE_DE.findall(text)
     else:
         if re.search(r"\b(uvg|atsg|uvv|atsv)\b", low):
-            found.append("critique: sigle allemand")
+            found.append("critique: German sigil")
         if kind == "rejected":
             if "rejet" not in tail:
-                found.append("critique: dispositif, rejet absent")
+                found.append("critique: outcome, dismissal missing")
             if re.search(r"\badmis\b", tail) and "rejet" not in tail:
-                found.append("critique: dispositif inversé")
+                found.append("critique: outcome inverted")
         elif kind == "admitted":
             if not re.search(r"\badmis\b", tail):
-                found.append("critique: dispositif, admission absente")
+                found.append("critique: outcome, admission missing")
             if "rejet" in tail:
-                found.append("critique: dispositif inversé")
+                found.append("critique: outcome inverted")
         elif kind == "partial" and "partiellement" not in low and "renvoy" not in low:
-            found.append("critique: admission partielle absente")
+            found.append("critique: partial admission missing")
         cites = CITE_FR.findall(text)
     invented = []
     for number, sigil in cites:
@@ -526,149 +511,151 @@ def blocking(language: str, text: str, source: str) -> list[str]:
             invented.append(f"art. {number} {sigil}")
     if invented:
         unique = list(dict.fromkeys(invented))
-        found.append("critique: article absent de l'arrêt (" + ", ".join(unique) + ")")
+        found.append("critique: article missing from the ruling (" + ", ".join(unique) + ")")
     if "zu mehr als 50" in source_low and "abnützung" in source_low:
         if language == "de":
             if re.search(r"nicht erreicht|weniger als 50|unter 50", low):
-                found.append("critique: seuil de 50 % inversé")
+                found.append("critique: 50% threshold inverted")
             if re.search(r"leistungspflicht nur.{0,220}abnützung", low):
-                found.append("critique: condition de l'art. 6 inversée")
+                found.append("critique: art. 6 condition inverted")
         elif re.search(r"pas atteint|non atteint|moins de 50|inférieur à 50", low):
-            found.append("critique: seuil de 50 % inversé")
+            found.append("critique: 50% threshold inverted")
         elif re.search(r"obligation[^.]{0,80}seulement[^.]{0,80}usure|n'existe qu", low):
-            found.append("critique: condition de l'art. 6 inversée")
+            found.append("critique: art. 6 condition inverted")
     if re.search(r"art\. 17[^\n]{0,80}statu|statu[^\n]{0,80}art\. 17", low):
-        found.append("critique: art. 17 confondu avec le statu quo")
+        found.append("critique: art. 17 confused with the status quo")
     if language == "de" and "offensichtlich" in low and "offensichtlich" not in source_low:
-        found.append("critique: manifestement infondé recopié")
+        found.append("critique: manifestly ill-founded copied")
     if (
         language == "fr"
         and "manifestement" in low
         and "manifestement" not in source_low
         and "offensichtlich" not in source_low
     ):
-        found.append("critique: manifestement infondé recopié")
+        found.append("critique: manifestly ill-founded copied")
     if "demnach erkennt" in low or "par ces motifs" in low or "per questi motivi" in low:
-        found.append("critique: bloc du jugement collé")
+        found.append("critique: operative block pasted")
     if language == "de" and ("le recours" in low or "l'assuré" in low or "l’assuré" in low):
-        found.append("critique: fiche en français")
+        found.append("critique: fiche written in French")
     if language == "fr" and ("die beschwerde" in low or "il ricorso" in low):
-        found.append("critique: fiche dans une autre langue")
+        found.append("critique: fiche in another language")
     foreign_notions = (
         (
             ("causalité adéquate", "adäquater kausal", "kausalzusammenhang adäquat"),
             ("adéquate", "adäquat", "adeguat"),
-            "causalité adéquate absente de l'arrêt",
+            "adequate causation absent from the ruling",
         ),
         (
             ("lésion assimilée", "listenverletzung", "unfallähnliche"),
             ("assimil", "listenverletzung", "unfallähnlich"),
-            "lésion assimilée absente de l'arrêt",
+            "assimilated injury absent from the ruling",
         ),
     )
     for fiche_forms, source_forms, label in foreign_notions:
         if any(form in low for form in fiche_forms) and not any(form in source_low for form in source_forms):
             found.append(f"critique: {label}")
     if "unabhängigen arzt" in low and "unabhäng" not in source_low:
-        found.append("critique: médecin indépendant absent de l'arrêt")
+        found.append("critique: independent doctor absent from the ruling")
     if "peut demeurer ouverte" in source_low:
         if language == "de" and not re.search(r"psychisch[^.]{0,120}offen|offen[^.]{0,120}psychisch", low):
-            found.append("critique: question laissée ouverte tranchée")
+            found.append("critique: open question decided")
         if language == "fr" and not re.search(r"psychique[^.]{0,160}ouverte|ouverte[^.]{0,160}psychique", low):
-            found.append("critique: question laissée ouverte tranchée")
+            found.append("critique: open question decided")
     if "suva" in low and "suva" not in source_low and "cna" not in source_low:
-        found.append("critique: Suva absente de l'arrêt")
+        found.append("critique: Suva absent from the ruling")
     if "rixe" in low and "rixe" not in source_low:
-        found.append("critique: mot dénué de sens")
+        found.append("critique: meaningless word")
+    if operative_only(text):
+        found.append("critique: fiche is only the operative sentence")
     return found
 
 
 def problems(language: str, text: str) -> list[str]:
-    """Écarts nets avec la fiche de 8C_78/2025. Sert à l'essai, pas au score."""
+    """Clear gaps against the 8C_78/2025 fiche. Used for the trial, not for the score."""
     low = text.lower()
     found: list[str] = []
     if re.search(r"(?m)^\s*[-•]", text):
-        found.append("liste à puces")
+        found.append("bullet list")
     if language == "de":
         if "abgewiesen" not in low:
-            found.append("recours non rejeté")
+            found.append("appeal not dismissed")
         if "zurückverwies" in low or "zurückgewies" in low:
-            found.append("renvoi recopié")
+            found.append("remand copied")
         if "uvg" not in low:
             found.append("UVG absent")
         if "atsg" not in low:
             found.append("ATSG absent")
         if "offensichtlich" in low:
-            found.append("rejet manifestement infondé recopié")
+            found.append("manifestly ill-founded dismissal copied")
         if re.search(r"\b(laa|lpga|olaa)\b", low):
-            found.append("sigle français dans la fiche allemande")
+            found.append("French sigil in the German fiche")
         if "art. 6 abs. 2" not in low:
             found.append("art. 6 al. 2 absent")
         if "sagittal" in low or "ischio" in low or "hamstring" in low:
-            found.append("fait d'un autre arrêt")
+            found.append("fact from another ruling")
         if "mehr als 50" not in low or "abnützung" not in low:
-            found.append("seuil de 50 % absent")
+            found.append("50% threshold missing")
         if re.search(r"nicht erreicht|nicht überschritten|weniger als 50|unter 50", low):
-            found.append("seuil de 50 % inversé")
+            found.append("50% threshold inverted")
         if re.search(r"leistungspflicht nur.{0,220}abnützung", low):
-            found.append("condition de l'art. 6 inversée")
+            found.append("art. 6 condition inverted")
         if re.search(r"vermutung[^.]{0,100}art\. 4", low):
-            found.append("présomption rattachée à l'art. 4")
+            found.append("presumption tied to art. 4")
         if not re.search(r"februar|15\.", low):
-            found.append("seconde chute absente")
+            found.append("second fall missing")
         if "richtungsgebende" in low:
-            found.append("mauvaise question juridique")
+            found.append("wrong legal question")
         if low.count("beschwerde wird abgewiesen") > 1:
-            found.append("dispositif répété")
+            found.append("outcome repeated")
         if "suva" not in low:
-            found.append("médecin Suva absent")
+            found.append("Suva doctor missing")
         if "demnach erkennt" in low or "viscione" in low or "gerichtskosten" in low:
-            found.append("bloc du jugement collé")
+            found.append("operative block pasted")
     else:
         if "rejet" not in low:
-            found.append("recours non rejeté")
+            found.append("appeal not dismissed")
         if "renvoy" in low:
-            found.append("renvoi recopié")
+            found.append("remand copied")
         if "laa" not in low:
             found.append("LAA absent")
         if "lpga" not in low:
             found.append("LPGA absent")
         if "manifestement" in low:
-            found.append("rejet manifestement infondé recopié")
+            found.append("manifestly ill-founded dismissal copied")
         if low.count("recours est rejeté") > 1:
-            found.append("dispositif répété")
+            found.append("outcome repeated")
         if re.search(r"\b(uvg|atsg|uvv)\b", low):
-            found.append("sigle allemand dans la fiche française")
+            found.append("German sigil in the French fiche")
         if "art. 6 al. 2" not in low:
             found.append("art. 6 al. 2 absent")
         if "art. 4" not in low:
             found.append("art. 4 absent")
         if "bandelette" in low or "ischio" in low:
-            found.append("fait d'un autre arrêt")
+            found.append("fact from another ruling")
         if "plus de 50" not in low or "usure" not in low:
-            found.append("seuil de 50 % absent")
+            found.append("50% threshold missing")
         if re.search(r"pas atteint|non atteint|moins de 50|inférieur à 50", low):
-            found.append("seuil de 50 % inversé")
+            found.append("50% threshold inverted")
         if re.search(r"pr[ée]somption[^.]{0,80}art\. 4", low):
-            found.append("présomption rattachée à l'art. 4")
+            found.append("presumption tied to art. 4")
         if "suva" not in low:
-            found.append("médecin Suva absent")
+            found.append("Suva doctor missing")
         if "expert" not in low:
-            found.append("expert privé absent")
+            found.append("private expert missing")
         if not re.search(r"deux|second|autre chute|février|fevrier", low):
-            found.append("seconde chute absente")
+            found.append("second fall missing")
         if "demnach" in low or "viscione" in low or "polla" in low:
-            found.append("bloc du jugement collé")
+            found.append("operative block pasted")
         if re.search(r"art\. 17[^\n]{0,80}statu|statu[^\n]{0,80}art\. 17", low):
-            found.append("art. 17 confondu avec le statu quo")
+            found.append("art. 17 confused with the status quo")
         if "adéquate" in low or "adequate" in low:
-            found.append("causalité adéquate inventée")
+            found.append("adequate causation invented")
         if "arrondissement" in low:
-            found.append("médecin d'arrondissement inventé")
+            found.append("district doctor invented")
         if "ouvrier" in low:
-            found.append("métier inventé")
+            found.append("occupation invented")
         if re.search(r"obligation[^.]{0,80}seulement[^.]{0,80}usure|n'existe qu", low):
-            found.append("condition de l'art. 6 inversée")
+            found.append("art. 6 condition inverted")
     if len(text) > 2500:
         found.append(f"trop long ({len(text)})")
     if len(text) < 400:
@@ -693,21 +680,27 @@ def summarize(docket: str) -> dict:
     rulings, gold = load_tables()
     target = row_for(rulings, docket)
     if docket in FEW_SHOT or docket in EXCLUDED:
-        raise SystemExit(f"{docket} sert d'exemple ou est écarté du few-shot")
-    if not _court_passes(target["docket"], target["area"]):
-        raise SystemExit(f"{docket} ne passe pas le filtre ({target['division']}, {target['area']})")
+        raise SystemExit(f"{docket} is a few-shot example or is excluded from it")
+    decision, filled = _gate(target["docket"], target["area"], target["text"], target["title"])
+    if not decision.kept:
+        raise SystemExit(
+            f"{docket} does not pass the filter ({target['division']}, {filled}, {decision.subject}, {decision.text})"
+        )
+    category = category_of(filled if isinstance(filled, str) else None)
     out = {
         "docket": docket,
         "model": os.environ["LLM_NAME"],
-        "filter": True,
+        "filter": {"kept": decision.kept, "subject": decision.subject, "text": decision.text},
+        "prompt": VERSION,
+        "category": category,
         "languages": {},
     }
     for language in ("de", "fr"):
         examples = [{"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT]
         text = chat(
             [
-                {"role": "system", "content": system_prompt(language)},
-                {"role": "user", "content": user_prompt(language, examples, target)},
+                {"role": "system", "content": system_prompt(language, category)},
+                {"role": "user", "content": user_prompt(language, examples, target, category)},
             ]
         )
         forms = required_forms(language, target["text"])
@@ -718,10 +711,10 @@ def summarize(docket: str) -> dict:
                 break
             revised = chat(
                 [
-                    {"role": "system", "content": system_prompt(language)},
+                    {"role": "system", "content": system_prompt(language, category)},
                     {
                         "role": "user",
-                        "content": repair_prompt(language, text, forms, issue, sense),
+                        "content": repair_prompt(language, text, forms, issue, sense, category),
                     },
                 ]
             )
@@ -734,7 +727,7 @@ def summarize(docket: str) -> dict:
             "gold": gold_body(gold, docket, language),
             "problems": issue,
         }
-        print(f"{language} {len(text)} caractères {issue or 'ok'}", flush=True)
+        print(f"{language} {len(text)} characters {issue or 'ok'}", flush=True)
     return out
 
 
@@ -750,14 +743,14 @@ def main() -> None:
     for index, docket in enumerate(dockets, start=1):
         path = dest / (docket.replace("/", "_") + ".json")
         if path.exists():
-            print(f"{index}/{len(dockets)} {docket} déjà écrit", flush=True)
+            print(f"{index}/{len(dockets)} {docket} already written", flush=True)
             continue
         print(f"{index}/{len(dockets)} {docket}", flush=True)
         try:
             result = summarize(docket)
         except (SystemExit, TimeoutError) as exc:
             failed.append(f"{docket}: {exc}")
-            print(f"échec {docket}: {exc}", flush=True)
+            print(f"failed {docket}: {exc}", flush=True)
             continue
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(path, flush=True)

@@ -1,6 +1,6 @@
 # Layer 2 — Apertus relevance benchmark and (later) fine-tuning
 
-> **Status: EXPERIMENTAL, 27 Nov 2026. Baseline settled 28 Nov (D-060):** the §6 benchmark of standard Apertus is the reference for every later layer-2 change. Owner: `<handle>` (layer 2). This work does not change the delivered pipeline until a measured gain is shown (see §7, decision rule). `docs/ARCHITECTURE.md` currently lists fine-tuning under "Not doing" (PROPOSED); this document is the evidence base for revisiting that line, not a decision.
+> **Status: EXPERIMENTAL, 27 Nov 2026. Baseline settled 28 Nov (D-074):** the §6 benchmark of standard Apertus is the reference for every later layer-2 change. Owner: `<handle>` (layer 2). This work does not change the delivered pipeline until a measured gain is shown (see §7, decision rule). `docs/ARCHITECTURE.md` currently lists fine-tuning under "Not doing" (PROPOSED); this document is the evidence base for revisiting that line, not a decision.
 > Read `AGENTS.md`, `docs/CHALLENGE.md`, `docs/DATA.md` §6 and `docs/agents/finetune.md` first.
 
 ## 1. What layer 2 is
@@ -98,7 +98,7 @@ Hygiene: store `logprob(Ja)`, `logprob(Nein)` and the logit, not only the normal
 - Bootstrap: 1,000 resamples, seed `20261127`, with replacement inside each quarter × stratum (positive, hard, easy); every system on the same resamples (paired); thresholds re-learnt on every resample, so the CI includes threshold selection. Percentile CI.
 - Tests: `uv run --frozen pytest experiments/finetune/tests` (15 tests; the data-dependent ones skip without `data/derived/finetune/`). They go red on a mutant that takes the highest tied threshold and on one that ignores layer 1.
 
-## 6. Baseline benchmark of standard Apertus (DONE, settled as the baseline: D-060)
+## 6. Baseline benchmark of standard Apertus (DONE, settled as the baseline: D-074)
 
 Systems side by side: (a) 3-signal rule, (b) Apertus 8B zero-shot, (c) Apertus 70B zero-shot.
 

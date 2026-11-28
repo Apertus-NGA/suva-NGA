@@ -28,6 +28,7 @@ build/
 
 # --- Added by the team (D-044). The template's lines above stay unchanged. ---
 # Suva material received outside the template (D-019) and artefacts derived from judgements/ while D-031 is open
+data/
 data/private/
 data/derived/
 # Scratch work and tool caches
@@ -39,3 +40,5 @@ tmp/
 *.log
 # Office lock files: Excel and Word write the user's name into them (G13)
 ~$*
+# Per-run outputs of the pipeline steps (decisions, logs, manifests): rebuilt by the runs, loaded into the DB (D-061)
+data/runs/
