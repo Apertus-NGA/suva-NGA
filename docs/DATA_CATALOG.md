@@ -1,6 +1,6 @@
 # suva-NGA data catalog: layers 1 and 2, layer 3 preview
 
-> **Status: measured snapshot, 28 Nov 2026, 10:40 CET, on `main` @ `14caaba`.** **Amended 28 Nov ~11:45 CET** for layer 2's DDL-1, DDL-2 and replay policy (branch `triage/layer2-ddl`); counts unchanged. Owner: `lead`. Readers: whoever builds the UI or the API, human or agent. Out of date after any change to `src/db/sql/`, to the ingest, to layer 1 or layer 2, or when layer 3 or the ranking lands: regenerate it then.
+> **Status: measured snapshot, 28 Nov 2026, 10:40 CET, on `main` @ `14caaba`.** **Amended 28 Nov 10:53 CET** for layer 2's DDL-1, DDL-2 and replay policy (branch `triage/layer2-ddl`); counts unchanged. Owner: `lead`. Readers: whoever builds the UI or the API, human or agent. Out of date after any change to `src/db/sql/`, to the ingest, to layer 1 or layer 2, or when layer 3 or the ranking lands: regenerate it then.
 
 An exhaustive, raw list of the data that exists. It makes no recommendation and no design decision.
 

@@ -606,7 +606,7 @@ Mutation checks (G9): a head cut off by one character, `j` removed from the Ja t
 - **Not touched:** `src/db/sql/*`, `tests/sql/*`, every layer-1 file (`src/layer1/*`, `src/courts.py`, `src/ingest/hf_base.py`, `src/ingest/gold.py`, registries, `expected/layer1/*`, `expected/ingest/*`, `tests/test_layer1_*`, `tests/test_ingest_*`), the Postgres `suva-l1-pg`, the worktree `tmp/worktrees/layer1-traceability`, layer-1 audits and handoffs.
 - **Note:** `tmp/worktrees/l2-pr42-check` was this session's throwaway merge check (§26.4); it was removed at 08:16 CET, before the message arrived. Nothing of layer 1 was in it.
 
-### 26.6 After the merge into `main` (28 Nov, 10:40–11:30 CET, branch `triage/layer2-ddl` from `14caaba`)
+### 26.6 After the merge into `main` (28 Nov, 10:40–10:53 CET, branch `triage/layer2-ddl` from `14caaba`)
 
 Both layers are in `main` (PR #44 layer 1, PR #45 layer 2). The layer-1 session resolved the conflicts, passed
 `code_paths=CODE_PATHS` to `begin_run`, accepted `models`/`prompts` in `StepVersionEntry`, made `events()` idempotent by
