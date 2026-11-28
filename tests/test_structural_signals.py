@@ -83,7 +83,9 @@ def test_italian_ruling_suva_brings_the_appeal():
     assert v["bench_size"] == 3
     assert v["appeal_by_institution"] is True
     assert v["suva_party"] is True and v["suva_appellant"] is True
-    assert v["proposed_for_publication"] == "unknown"  # the list was not seen: unknown, never False
+    assert v["proposed_for_publication"] == "unknown"
+    assert v["core_topics"] == 0 and v["long_ruling"] is False and v["appeal_upheld"] is False
+    assert v["other_accident_insurer"] is False  # the list was not seen: unknown, never False
 
 
 def test_single_judge_disability_ruling():
@@ -106,6 +108,7 @@ def test_every_signal_says_where_it_was_read():
     assert [s.name for s in signals] == [
         "area", "bench_size", "single_judge", "five_judges", "appeal_by_institution", "suva_appellant",
         "suva_party", "manifestly_unfounded", "proposed_for_publication",
+        "other_accident_insurer", "core_topics", "core_topic_names", "long_ruling", "appeal_upheld",
     ]  # fmt: skip
     by_name = {s.name: s for s in signals}
     assert by_name["area"].evidence.field == "sachgebiet"
@@ -117,10 +120,41 @@ def test_every_signal_says_where_it_was_read():
     assert "Viscione" in DE_INSURED_VS_SUVA[bench.start : bench.end]
 
 
+def test_other_accident_insurer_topics_length_and_outcome_in_three_languages():
+    german = values(DE_INSURED_VS_SUVA, "Unfallversicherung")
+    assert german["other_accident_insurer"] is False  # Suva is the party
+    assert german["core_topics"] == 1 and german["core_topic_names"] == "causality"
+    assert german["appeal_upheld"] is False and german["long_ruling"] is False  # "abgewiesen"
+    french = values(FR_INSURER_APPEALS_FIVE_JUDGES, "Assurance-accidents")
+    assert french["other_accident_insurer"] is True  # an accident ruling, Helsana is the insurer
+    assert french["appeal_upheld"] is True  # "Le recours est admis"
+    upheld = {s.name: s for s in st.structural_signals("Assurance-accidents", False, FR_INSURER_APPEALS_FIVE_JUDGES)}
+    span = upheld["appeal_upheld"].evidence
+    assert FR_INSURER_APPEALS_FIVE_JUDGES[span.start : span.end] == "admis"
+    italian = values(IT_SUVA_APPEALS, "Assicurazione contro gli infortuni")
+    assert italian["other_accident_insurer"] is False and italian["appeal_upheld"] is False  # no operative part
+    disability = values(DE_SINGLE_JUDGE, "Invalidenversicherung")
+    assert disability["other_accident_insurer"] is False  # not an accident ruling
+
+
+def test_a_topic_counts_once_and_the_word_admis_in_the_facts_is_not_an_outcome():
+    more_topics = "Das Gutachten und ein zweites Gutachten zum Rückfall. Der Versicherte"
+    text = DE_INSURED_VS_SUVA.replace("Der Versicherte", more_topics) + "x" * st.LONG_RULING
+    v = values(text, "Unfallversicherung")
+    assert v["core_topics"] == 3 and v["core_topic_names"] == "causality, expert_opinion, relapse"
+    assert v["long_ruling"] is True
+    facts_only = FR_INSURER_APPEALS_FIVE_JUDGES.replace("Le recours est admis.", "Le recours est rejeté.").replace(
+        "L'assuré a été placé", "Le fait est admis. L'assuré a été placé"
+    )
+    assert values(facts_only, "Assurance-accidents")["appeal_upheld"] is False
+
+
 @pytest.mark.parametrize("text", [None, "", "Kurzer Text ohne Kopf."])
 def test_a_ruling_without_a_readable_header_still_gets_signals(text):
     v = values(text, None, None)
     assert v["area"] == "other"
     assert v["suva_party"] is False and v["manifestly_unfounded"] is False
     assert v["proposed_for_publication"] == "unknown"
+    assert v["core_topics"] == 0 and v["long_ruling"] is False and v["appeal_upheld"] is False
+    assert v["other_accident_insurer"] is False
     assert "bench_size" not in v and "appeal_by_institution" not in v  # absent, not guessed

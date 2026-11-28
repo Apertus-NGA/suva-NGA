@@ -34,7 +34,7 @@ from src.triage import readings as rd
 from src.triage import scorer as sc
 from src.triage.reading_prompts import sections
 
-VERSION = "triage_pipeline@1"
+VERSION = "triage_pipeline@2"
 CORE_AREAS = ("UV", "MV", "IV")
 LISTED = ("2025 Q4", "2026 Q1")  # the quarters for which Suva's list is complete
 RESULTS = Path(__file__).resolve().parents[2] / "results" / "triage_pipeline.json"
@@ -172,6 +172,9 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
             if chosen:
                 ruling["tier"] = "suspected_relevant"
     failed = sum(1 for r in core for v in r["readings"].values() if v is None)
+    # Rulings Suva summarised outside the listed quarters: relevant to Suva, never used as labels. A check the
+    # fit cannot have learned: how many of them score above the frozen threshold.
+    unseen = [r for r in kept if r["basis"] == "gold_summary_only" and r["y"] is None]
     summary = {
         "version": VERSION,
         "rulings": len(prepared),
@@ -183,7 +186,15 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
         "training_relevant": int(y.sum()),
         "relevant_not_kept_by_layer1": relevant_all - int(y.sum()),
         "threshold": round(model.threshold, 4),
+        "scorer": sc.VERSION,
+        "rule_weights": {k: {a: round(b, 4) for a, b in v.items()} for k, v in model.weights().items()},
+        "intercept": round(model.model.intercept_, 4),
         "out_of_quarter": measured,
+        "summarised_by_suva_not_in_training": {
+            "rulings": len(unseen),
+            "scored_above_threshold": sum(1 for r in unseen if r["score"] >= model.threshold),
+            "scored_below_0.10": sum(1 for r in unseen if r["score"] < 0.10),
+        },
         "by_quarter": {
             q: {
                 "kept": sum(1 for r in kept if r["quarter"] == q),
@@ -214,6 +225,8 @@ def write(conn: Any, result: dict[str, Any], model_names: list[dict[str, str]]) 
         "reading_prompts": {name: version for name, (version, _) in rd.READINGS.items()},
         "scorer": sc.VERSION,
         "features": sc.FEATURES,
+        "rule_weights": model.weights(),
+        "intercept": model.model.intercept_,
         "threshold": model.threshold,
         "consensus_stats": result["consensus"].stats,
         "measured": summary["out_of_quarter"],
@@ -266,7 +279,7 @@ def model_names(client: Any) -> list[dict[str, str]]:
             "role": "six relevance readings and the layer-1 matter reading",
         },
         {
-            "name": "logistic regression (scikit-learn)",
+            "name": "sign-constrained logistic regression (own code, src/triage/scorer.py)",
             "role": "combines code-read facts and the Apertus consensus into the score",
         },
     ]

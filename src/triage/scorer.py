@@ -1,8 +1,10 @@
 """Triage steps 3b to 5: the Apertus consensus, the score, the cut and the explanation.
 
 - consensus: the six readings, each standardised, averaged with equal weights. Nothing is fitted to labels.
-- score: logistic regression on eight code-read facts and the consensus, trained on the kept rulings of the
-  listed quarters (Suva's list as labels, closed world, Q-04).
+- score: a sign-constrained logistic regression on eleven code-read facts and the consensus, trained on the
+  kept rulings of the listed quarters (Suva's list as labels, closed world, Q-04). Each rule may move the score
+  only in the direction a lawyer expects (``SIGNS``); a rule the labels do not support gets weight 0, it never
+  turns against its meaning.
 - cut: a score threshold frozen from out-of-fold scores of the listed quarters.
 """
 
@@ -13,12 +15,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from scipy.optimize import minimize
 from sklearn.model_selection import StratifiedKFold
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
-VERSION = "scorer@1"
+VERSION = "scorer@2"
 PROB_READINGS = frozenset({"verdict", "yes_strict"})  # probabilities, standardised on the log-odds scale
 FEATURES = [
     "area_uvmv",
@@ -30,7 +30,25 @@ FEATURES = [
     "suva_party",
     "single_judge",
     "consensus",
+    "core_topics",
+    "long_accident",
+    "other_accident_insurer",
 ]
+# The only direction each rule may move the score: +1 towards relevant, -1 away from it. Fixed before fitting.
+SIGNS = {
+    "area_uvmv": 1,
+    "area_iv": 1,
+    "appeal_by_institution": 1,
+    "five_judges": 1,
+    "publication": 1,
+    "manifestly_unfounded": -1,
+    "suva_party": 1,
+    "single_judge": -1,
+    "consensus": 1,
+    "core_topics": 1,
+    "long_accident": 1,
+    "other_accident_insurer": 1,
+}
 RULE_DE = {
     "area_uvmv": "Unfall- oder Militärversicherung",
     "area_iv": "Invalidenversicherung",
@@ -41,6 +59,9 @@ RULE_DE = {
     "suva_party": "Suva ist Partei",
     "single_judge": "Einzelrichterentscheid",
     "consensus": "Apertus-Lesungen: rechtliche Aussage über den Einzelfall hinaus",
+    "core_topics": "Kernthemen der Unfallversicherung im Text",
+    "long_accident": "ausführliches Urteil in der Unfall- oder Militärversicherung",
+    "other_accident_insurer": "anderer Unfallversicherer ist Partei",
 }
 CORE_SHARE = 0.40  # share of the kept accident / military / disability rulings promoted to "suspected relevant"
 
@@ -95,11 +116,51 @@ def features(signals: dict[str, Any], consensus: float) -> list[float]:
         float(bool(signals.get("suva_party"))),
         float(bool(signals.get("single_judge"))),
         float(consensus),
+        float(signals.get("core_topics") or 0),
+        # A long ruling counts in accident and military insurance only. In disability insurance it looked like a
+        # reason against in the two listed quarters (0 of 19 picked), but Suva summarised all three long
+        # disability rulings of Q3/2025, which the fit never saw: that rule did not hold and was removed.
+        float(bool(signals.get("long_ruling")) and area in ("UV", "MV")),
+        float(bool(signals.get("other_accident_insurer"))),
     ]
 
 
-def _model() -> Any:
-    return make_pipeline(StandardScaler(), LogisticRegression(C=1.0, class_weight="balanced", max_iter=3000))
+class SignedLogistic:
+    """Logistic regression (L2, C = 1, balanced classes, standardised inputs) whose weights are bounded to the
+    sign given for each input. The problem stays convex: one optimum, found by L-BFGS-B."""
+
+    def __init__(self, signs: list[int], c: float = 1.0):
+        self.signs, self.c = list(signs), c
+
+    def fit(self, x: np.ndarray, y: np.ndarray) -> SignedLogistic:
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        self.mean_ = x.mean(axis=0)
+        spread = x.std(axis=0)
+        self.scale_ = np.where(spread > 0, spread, 1.0)
+        z = (x - self.mean_) / self.scale_
+        n, positive = len(y), float(y.sum())
+        weight = np.where(y == 1, n / (2 * max(positive, 1.0)), n / (2 * max(n - positive, 1.0)))
+
+        def loss(params: np.ndarray) -> tuple[float, np.ndarray]:
+            w, b = params[:-1], params[-1]
+            margin = z @ w + b
+            residual = weight * (1 / (1 + np.exp(-margin)) - y)
+            value = float((weight * (np.logaddexp(0, margin) - y * margin)).sum() + 0.5 / self.c * w @ w)
+            return value, np.append(z.T @ residual + w / self.c, residual.sum())
+
+        bounds = [(0, None) if s > 0 else (None, 0) if s < 0 else (None, None) for s in self.signs]
+        result = minimize(loss, np.zeros(z.shape[1] + 1), jac=True, bounds=[*bounds, (None, None)], method="L-BFGS-B")
+        self.coef_, self.intercept_ = result.x[:-1], float(result.x[-1])
+        return self
+
+    def predict_proba(self, x: np.ndarray) -> np.ndarray:
+        margin = ((np.asarray(x, float) - self.mean_) / self.scale_) @ self.coef_ + self.intercept_
+        p = 1 / (1 + np.exp(-margin))
+        return np.column_stack([1 - p, p])
+
+
+def _model() -> SignedLogistic:
+    return SignedLogistic([SIGNS[name] for name in FEATURES])
 
 
 def out_of_fold(x: np.ndarray, y: np.ndarray, repeats: int = 5) -> np.ndarray:
@@ -132,9 +193,17 @@ class Scorer:
 
     def contributions(self, row: list[float]) -> dict[str, float]:
         """Each rule's push on the log-odds for one ruling, relative to an average ruling."""
-        scaler, lr = self.model[0], self.model[-1]
-        z = (np.array(row) - scaler.mean_) / scaler.scale_
-        return {name: float(c) for name, c in zip(FEATURES, z * lr.coef_[0], strict=True)}
+        z = (np.array(row) - self.model.mean_) / self.model.scale_
+        return {name: float(c) for name, c in zip(FEATURES, z * self.model.coef_, strict=True)}
+
+    def weights(self) -> dict[str, dict[str, float]]:
+        """The fitted rule table: for each input its allowed direction, its weight per standard deviation, and
+        the average and spread it is standardised with. With the intercept this is the whole algorithm."""
+        m = self.model
+        return {
+            name: {"sign": SIGNS[name], "weight": float(w), "mean": float(mu), "scale": float(sd)}
+            for name, w, mu, sd in zip(FEATURES, m.coef_, m.mean_, m.scale_, strict=True)
+        }
 
 
 def explanation_de(tier: str, contributions: dict[str, float], row: list[float], n_readings: int) -> str:

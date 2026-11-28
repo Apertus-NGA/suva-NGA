@@ -116,7 +116,15 @@ def test_consensus_is_neutral_without_readings_and_uses_what_is_there():
 
 
 def test_features_follow_the_declared_order_and_unknown_publication_is_not_yes():
-    signals = {"area": "IV", "appeal_by_institution": True, "five_judges": False, "proposed_for_publication": "unknown"}
+    signals = {
+        "area": "IV",
+        "appeal_by_institution": True,
+        "five_judges": False,
+        "proposed_for_publication": "unknown",
+        "core_topics": 3,
+        "long_ruling": True,
+        "other_accident_insurer": False,
+    }
     row = dict(zip(sc.FEATURES, sc.features(signals, 0.7), strict=True))
     assert row == {
         "area_uvmv": 0.0,
@@ -128,7 +136,13 @@ def test_features_follow_the_declared_order_and_unknown_publication_is_not_yes()
         "suva_party": 0.0,
         "single_judge": 0.0,
         "consensus": 0.7,
+        "core_topics": 3.0,
+        "long_accident": 0.0,  # a long ruling counts in accident and military insurance only
+        "other_accident_insurer": 0.0,
     }
+    assert "long_disability" not in sc.FEATURES  # removed: it did not hold on rulings the fit never saw
+    accident = dict(zip(sc.FEATURES, sc.features({"area": "UV", "long_ruling": True}, 0.0), strict=True))
+    assert accident["long_accident"] == 1.0 and accident["core_topics"] == 0.0
 
 
 def toy_data(n: int = 120, seed: int = 0):
@@ -144,13 +158,51 @@ def toy_data(n: int = 120, seed: int = 0):
 def test_scorer_ranks_rulings_with_the_signals_higher_and_explains_each_rule():
     x, y = toy_data()
     model = sc.Scorer.fit(x, y, n_core=len(y))
-    strong = [1, 0, 1, 0, 0, 0, 0, 0, 1.5]
-    weak = [0, 0, 0, 0, 0, 0, 0, 0, -1.5]
+    strong = [1, 0, 1, 0, 0, 0, 0, 0, 1.5, 0, 0, 0]
+    weak = [0, 0, 0, 0, 0, 0, 0, 0, -1.5, 0, 0, 0]
     scores = model.score(np.array([strong, weak], float))
     assert scores[0] > scores[1] and 0 <= scores[1] <= scores[0] <= 1
     contributions = model.contributions(strong)
     assert set(contributions) == set(sc.FEATURES)
     assert contributions["area_uvmv"] > 0 and contributions["consensus"] > 0
+
+
+def test_a_rule_never_turns_against_its_meaning():
+    """Every weight keeps the sign fixed in SIGNS; a rule the labels contradict gets weight 0, not the other sign."""
+    rng = np.random.default_rng(3)
+    n = 200
+    x = np.zeros((n, len(sc.FEATURES)))
+    upheld, five, single = (sc.FEATURES.index(k) for k in ("area_uvmv", "five_judges", "single_judge"))
+    x[:, upheld] = rng.integers(0, 2, n)
+    x[:, five] = rng.integers(0, 2, n)
+    x[:, single] = rng.integers(0, 2, n)
+    # five judges and single judge both point the WRONG way in these labels; accident insurance the right way
+    y = ((x[:, upheld] - x[:, five] + x[:, single] + rng.normal(scale=0.4, size=n)) > 0.5).astype(int)
+    model = sc.Scorer.fit(x, y, n_core=n)
+    weights = model.weights()
+    assert set(weights) == set(sc.FEATURES)
+    for name, rule in weights.items():
+        assert rule["weight"] * sc.SIGNS[name] >= 0, name
+    assert weights["five_judges"]["weight"] == 0 and weights["single_judge"]["weight"] == 0
+    assert weights["area_uvmv"]["weight"] > 0.5
+    row = [0.0] * len(sc.FEATURES)
+    row[five] = 1.0
+    assert model.contributions(row)["five_judges"] == 0  # so the explanation never cites it against the ruling
+
+
+def test_signed_model_matches_plain_logistic_regression_when_no_bound_binds():
+    """Same optimum as scikit-learn's L2 logistic regression (C = 1, balanced) when the signs agree with the data."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import StandardScaler
+
+    x, y = toy_data()
+    cols = [0, 2, 8]  # the three informative inputs, all expected positive
+    signed = sc.SignedLogistic([1, 1, 1]).fit(x[:, cols], y)
+    plain = LogisticRegression(C=1.0, class_weight="balanced", max_iter=3000).fit(
+        StandardScaler().fit_transform(x[:, cols]), y
+    )
+    assert signed.coef_ == pytest.approx(plain.coef_[0], abs=2e-3)
+    assert signed.intercept_ == pytest.approx(plain.intercept_[0], abs=2e-3)
 
 
 def test_the_cut_promotes_forty_percent_of_the_core_rulings_by_score():
@@ -161,12 +213,13 @@ def test_the_cut_promotes_forty_percent_of_the_core_rulings_by_score():
 
 
 def test_explanation_is_built_from_the_rules_that_apply():
-    row = [1, 0, 1, 0, 0, 1, 0, 0, 0.9]
-    contributions = dict(zip(sc.FEATURES, [0.8, 0, 0.9, 0, 0, -0.7, 0, 0, 0.4], strict=True))
+    row = [1, 0, 1, 0, 0, 1, 0, 0, 0.9, 2, 0, 0]
+    contributions = dict(zip(sc.FEATURES, [0.8, 0, 0.9, 0, 0, -0.7, 0, 0, 0.4, 0.3, 0, 0], strict=True))
     text = sc.explanation_de("suspected_relevant", contributions, row, n_readings=6)
     assert text.startswith("Vermutlich relevant.")
     assert "Beschwerde eines Versicherers oder einer Behörde" in text and "Unfall- oder Militärversicherung" in text
     assert "Dagegen: als offensichtlich unbegründet erledigt." in text
+    assert "Kernthemen der Unfallversicherung im Text" in text
     assert "Fünferbesetzung" not in text  # a rule that does not apply is not cited
     assert "Keine Apertus-Lesung" in sc.explanation_de("possibly_relevant", contributions, row, n_readings=0)
 
@@ -222,7 +275,7 @@ def test_write_retires_earlier_predictions_and_stores_one_explained_row_per_kept
     pytest.importorskip("psycopg")
     x, y = toy_data()
     model = sc.Scorer.fit(x, y, n_core=len(y))
-    row = [1, 0, 1, 0, 0, 0, 0, 0, 1.0]
+    row = [1, 0, 1, 0, 0, 0, 0, 0, 1.0, 0, 0, 0]
     kept = [
         {
             "id": 11,
@@ -239,9 +292,9 @@ def test_write_retires_earlier_predictions_and_stores_one_explained_row_per_kept
             "id": 12,
             "tier": "possibly_relevant",
             "score": 0.08,
-            "x": [0.0] * 9,
+            "x": [0.0] * len(sc.FEATURES),
             "consensus": 0.0,
-            "contributions": model.contributions([0.0] * 9),
+            "contributions": model.contributions([0.0] * len(sc.FEATURES)),
             "layer1": {"subject": "kept_subject", "kept": True},
             "signals": {"area": "KV"},
         },
@@ -265,3 +318,6 @@ def test_write_retires_earlier_predictions_and_stores_one_explained_row_per_kept
     assert inserts[0][2] == 0.91 and inserts[0][4].startswith("Vermutlich relevant.")
     assert "Keine Apertus-Lesung" in inserts[1][4]
     assert inserts[0][5].obj["tier"] == "suspected_relevant" and inserts[0][5].obj["apertus_readings"]["verdict"] == 0.9
+    stored = conn.statements[0][1][1].obj  # the run's params: the whole rule table, so the score can be recomputed
+    assert set(stored["rule_weights"]) == set(sc.FEATURES) and "intercept" in stored
+    assert stored["rule_weights"]["single_judge"]["sign"] == -1
