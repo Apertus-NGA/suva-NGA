@@ -24,9 +24,46 @@ def _default_run(published_from: str, published_to: str) -> None:
         ingest.ingest(conn, published_from, published_to, extra_dockets=gold_dockets())
 
 
+def default_assess() -> dict:
+    """Score every ruling again after an ingest, so the new ones get their tier (src/triage/pipeline.py).
+
+    Live when the gateway is configured: a new ruling has no cached Apertus answer, the known ones are read
+    from the cache. Replay otherwise: it then fails on the first new ruling the model must read, nothing is
+    written, and the new rulings stay "not assessed" until a live run.
+    """
+    import sys
+
+    from suva_data import config
+
+    if str(config.REPO) not in sys.path:  # src/triage lives at the repository root
+        sys.path.insert(0, str(config.REPO))
+    from src.llm.client import client_from_env
+    from src.llm.config import ConfigError
+    from src.triage import pipeline as tp
+
+    try:
+        client, mode = client_from_env("live"), "live"
+    except ConfigError:
+        client, mode = client_from_env("replay"), "replay"
+    try:
+        with db.connect() as conn:
+            summary = tp.run_and_store(conn, client, mode=mode, write_db=True)
+    finally:
+        client.close()
+    return {
+        "mode": mode.upper(),
+        "assessed": summary["kept_by_layer1"],
+        "suspected_relevant": sum(q["suspected_relevant"] for q in summary["by_quarter"].values()),
+    }
+
+
 class Updates:
-    def __init__(self, run: Callable[[str, str], None] = _default_run) -> None:
+    def __init__(
+        self, run: Callable[[str, str], None] = _default_run, assess: Callable[[], dict] | None = None
+    ) -> None:
         self._run = run
+        self._assess = assess  # runs after an ingest that did not crash; None: no assessment (tests, tools)
+        self.last_assessment: dict | None = None  # how the assessment after the last ingest went
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self.current: dict | None = None  # {"published_from", "published_to"} while a run is going
@@ -57,6 +94,12 @@ class Updates:
     def _work(self, published_from: str, published_to: str) -> None:
         try:
             self._run(published_from, published_to)
+            if self._assess is not None:
+                self.last_assessment = None
+                try:
+                    self.last_assessment = {"status": "ok", **self._assess()}
+                except (Exception, SystemExit) as e:  # noqa: BLE001  the ingest stands; the tiers are missing
+                    self.last_assessment = {"status": "failed", "error": f"{type(e).__name__}: {e}"}
         except Exception as e:  # recorded as a failed run by ingest when it got that far; kept here in any case
             self.last_error = f"{type(e).__name__}: {e}"
         finally:
@@ -84,6 +127,7 @@ class Updates:
             "current": self.current if self.running else None,
             "last": _run_summary(last) if last else None,
             "last_error": self.last_error,
+            "last_assessment": self.last_assessment,
             "next_range": next_range,
             "ingested_rulings": conn.execute("SELECT count(*) FROM ingested_rulings").fetchone()[0],
         }

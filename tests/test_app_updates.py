@@ -52,6 +52,7 @@ def test_status_before_any_update(db_conn):
         "current": None,
         "last": None,
         "last_error": None,
+        "last_assessment": None,
         "next_range": {"published_from": "2026-10-27", "published_to": "2026-11-26"},  # newest date held, minus 14 days
         "ingested_rulings": 0,
     }
@@ -147,3 +148,49 @@ def test_a_failed_run_is_shown_with_its_error(db_conn, url):
     updates.wait(5)
     last = updates.status(db_conn, today=TODAY)["last"]
     assert (last["status"], last["error"], last["new_rulings"]) == ("failed", "RuntimeError: refused", None)
+
+
+# --- after the ingest: the new rulings are assessed, so they get their tier ----------------------------------
+# Mock declared (G9): `assess` stands in for the triage pipeline (src/triage/pipeline.run_and_store).
+
+
+def test_the_new_rulings_are_assessed_once_the_ingest_has_finished(db_conn, url):
+    _ruling(db_conn)
+    order = []
+
+    def assess():
+        with db.connect(url) as conn:  # the ingest's run is recorded before the assessment starts
+            order.append(conn.execute("SELECT count(*) FROM ingest_runs WHERE status <> 'running'").fetchone()[0])
+        return {"mode": "LIVE", "assessed": 12, "suspected_relevant": 3}
+
+    updates = Updates(run=recording_run(url, {"new_rulings": 12}, status="ok"), assess=assess)
+    assert updates.status(db_conn, today=TODAY)["last_assessment"] is None
+    updates.start(db_conn, today=TODAY)
+    updates.wait(5)
+    status = updates.status(db_conn, today=TODAY)
+    assert order == [1]
+    assert status["last_assessment"] == {"status": "ok", "mode": "LIVE", "assessed": 12, "suspected_relevant": 3}
+    assert (status["running"], status["last_error"]) == (False, None)
+
+
+def test_an_assessment_that_fails_is_reported_and_the_ingest_still_counts(db_conn, url):
+    def assess():
+        raise RuntimeError("replay cache incomplete: 6 readings have no cached answer")
+
+    updates = Updates(run=recording_run(url, {"new_rulings": 2}, status="ok"), assess=assess)
+    updates.start(db_conn, "2026-07-01", "2026-07-02")
+    updates.wait(5)
+    status = updates.status(db_conn, today=TODAY)
+    assert status["last"]["new_rulings"] == 2 and status["last_error"] is None
+    assert status["last_assessment"] == {
+        "status": "failed",
+        "error": "RuntimeError: replay cache incomplete: 6 readings have no cached answer",
+    }
+
+
+def test_no_assessment_after_an_ingest_that_crashed(db_conn, url):
+    called = []
+    updates = Updates(run=recording_run(url, fail=OSError("disk full")), assess=lambda: called.append(1) or {})
+    updates.start(db_conn, "2026-07-01", "2026-07-02")
+    updates.wait(5)
+    assert called == [] and updates.status(db_conn, today=TODAY)["last_assessment"] is None

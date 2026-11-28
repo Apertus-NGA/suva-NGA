@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from suva_data import db
 
 from . import feedback, queries, workspace
-from .updates import UpdateRunning, Updates
+from .updates import UpdateRunning, Updates, default_assess
 
 WEB_DIST = Path(__file__).resolve().parents[1] / "web" / "dist"
 
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Suva Rechtsprechung", lifespan=lifespan)
-updates = Updates()
+updates = Updates(assess=default_assess)  # after each ingest the new rulings get their tier
 
 
 def get_conn():
