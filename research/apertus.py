@@ -1,13 +1,42 @@
-"""Cached, threaded client for the Apertus gateway (OpenAI-compatible chat completions).
+"""Research front-end to the shared Apertus client `src/llm/` (AGENTS.md G2, G3). Development use only.
 
-Reads LLM_BASE_URL / LLM_API_KEY from the repo's .env (never print the key).
-Every response is cached in research/cache/apertus.sqlite keyed by the full request,
-so reruns cost nothing and results are reproducible.
+Every live call goes through `src.llm.client`: its configuration from the environment (G3, no defaults), its
+timeout, its single error classifier and retry policy, its served-model check against MODELS.md §1, its
+`finish_reason == "length"` rule, its per-member concurrency cap and its cache and call log
+(`data/derived/llm/research/`, git-ignored). This module only keeps the call signatures the research scripts
+(and a teammate's notebook) import:
 
-    from apertus import chat, chat_many, p_yes
-    r = chat("apertus-v1-5-70b", [{"role": "user", "content": "..."}], max_tokens=200)
-    r["text"], r["reasoning"], r["usage"], r["logprobs"]
+    from apertus import chat, chat_many, p_yes, M70
+    r = chat(M70, [{"role": "user", "content": "..."}], max_tokens=200)
+    r["text"], r["reasoning"], r["usage"], r["logprobs"], r["error"]
+
+Settings come from the environment, or from `.env` / `.env.local` read by `src.cli.load_dotenv` (never
+overriding the environment). The research script chooses the model: `model` is passed to the shared
+client as its `LLM_NAME` for that call, and must name an Apertus model (E1).
+
+Old answers: `research/cache/apertus.sqlite` (written by the earlier direct client, git-ignored) is still
+read, read-only, under its old request key, so earlier experiments replay offline. Nothing new is written
+there.
+
+What the shared client refuses, and this module therefore refuses with `ResearchRefused` instead of
+bypassing it (a cached old answer is still returned):
+- thinking models (`*-thinking`) and assistant-prefill controls (`continue_final_message`,
+  `add_generation_prompt`): thinking mode stays off (G3). Scripts that need them (arm_k_thinking.py,
+  arm_n_thinking2.py, the `*_think` arms of arm_a_pilot.py / arm_a_full.py) replay from the old cache only.
+- sampling other than temperature 0 (`temperature`, `top_p`), and any other request field the client
+  does not expose.
+- `retries` and `timeout` are accepted for compatibility: retries are decided by the client's error
+  classifier (the argument is ignored); `timeout` sets the client's timeout (`LLM_TIMEOUT_S`).
+
+Label calls (`logprobs=True` with `max_tokens <= 4`) are sent as the client's first-token calls
+(`first_token_only`, `max_tokens` capped at 2), the only short call the client accepts without treating
+`finish_reason == "length"` as a failure. `p_yes` reads the first token, so the scores keep their meaning;
+the returned text is at most two tokens.
+
+`chat_many` runs at most `LLM_CONCURRENCY` calls at once (the client's cap, at most the member share of
+D-030), whatever `workers` asks for.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,84 +44,128 @@ import json
 import math
 import os
 import sqlite3
+import sys
 import threading
-import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DB = ROOT / "cache" / "apertus.sqlite"
+if str(ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(ROOT.parent))
+
+from src.cli import load_dotenv  # noqa: E402
+from src.llm.client import DEFAULT_STORE, InputRejected, LLMClient, LLMError, ReplayMiss  # noqa: E402
+from src.llm.config import DEFAULT_CONCURRENCY, ConfigError, LLMConfig  # noqa: E402
+
+LEGACY_DB = ROOT / "cache" / "apertus.sqlite"
+STORE = DEFAULT_STORE / "research"
 M70, M70T, M8, M8T = "apertus-v1-5-70b", "apertus-v1-5-70b-thinking", "apertus-v1-5-8b", "apertus-v1-5-8b-thinking"
+PASSED_THROUGH = {"max_tokens", "logprobs", "top_logprobs", "seed", "response_format"}
+REFUSED_CONTROLS = {"continue_final_message", "add_generation_prompt", "chat_template_kwargs"}
 _lock = threading.Lock()
-_env: dict | None = None
+_clients: dict[tuple[str, int], LLMClient] = {}
 
 
-def _cfg() -> dict:
-    global _env
-    if _env is None:
-        _env = {}
-        for line in (ROOT.parent / ".env").read_text().splitlines():
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                _env[k.strip()] = v.strip()
-        _env.update({k: v for k, v in os.environ.items() if k.startswith("LLM_")})
-    return _env
+class ResearchRefused(RuntimeError):
+    """A request the shared client deliberately does not make (thinking, sampling, raw controls)."""
 
 
-def _con() -> sqlite3.Connection:
-    con = sqlite3.connect(DB, timeout=60)
-    con.execute("pragma journal_mode=WAL")
-    con.execute("create table if not exists calls (key text primary key, model text, tag text, request text, response text, ts real)")
-    return con
-
-
-def chat(model: str, messages: list[dict], tag: str = "", retries: int = 6, timeout: int = 300, **params) -> dict:
-    """One chat completion. params go straight into the request body (temperature defaults to 0)."""
-    body = {"model": model, "messages": messages, "temperature": 0, **params}
+def _legacy_lookup(body: dict) -> dict | None:
+    """Answer of the earlier direct client for exactly this request body, if cached (read-only)."""
+    if not LEGACY_DB.is_file():
+        return None
     key = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     with _lock:
-        con = _con()
-        row = con.execute("select response from calls where key=?", (key,)).fetchone()
-        con.close()
-    if row:
-        return _parse(json.loads(row[0]), cached=True)
-    cfg = _cfg()
-    req = urllib.request.Request(cfg["LLM_BASE_URL"].rstrip("/") + "/chat/completions",
-                                 data=json.dumps(body).encode(),
-                                 headers={"Authorization": "Bearer " + cfg["LLM_API_KEY"], "Content-Type": "application/json"})
-    err = None
-    for i in range(retries):
+        con = sqlite3.connect(f"file:{LEGACY_DB}?mode=ro", uri=True, timeout=60)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                data = json.loads(r.read())
-            with _lock:
-                con = _con()
-                con.execute("insert or replace into calls values (?,?,?,?,?,?)",
-                            (key, model, tag, json.dumps(body, ensure_ascii=False), json.dumps(data, ensure_ascii=False), time.time()))
-                con.commit(); con.close()
-            return _parse(data, cached=False)
-        except urllib.error.HTTPError as e:
-            err = f"HTTP {e.code}: {e.read()[:300]!r}"
-            if e.code in (400, 401, 403, 404, 422):
-                break
-        except Exception as e:  # timeouts, connection resets
-            err = repr(e)[:300]
-        time.sleep(min(60, 2 ** i))
-    return {"text": None, "error": err, "reasoning": None, "usage": {}, "logprobs": None, "cached": False}
+            row = con.execute("select response from calls where key=?", (key,)).fetchone()
+        except sqlite3.OperationalError:
+            row = None
+        finally:
+            con.close()
+    return _parse_legacy(json.loads(row[0])) if row else None
 
 
-def _parse(data: dict, cached: bool) -> dict:
+def _parse_legacy(data: dict) -> dict:
     ch = data["choices"][0]
     msg = ch["message"]
     lp = (ch.get("logprobs") or {}).get("content")
     return {"text": msg.get("content"), "reasoning": msg.get("reasoning") or msg.get("reasoning_content"),
-            "usage": data.get("usage", {}), "logprobs": lp, "finish": ch.get("finish_reason"), "cached": cached, "error": None}
+            "usage": data.get("usage", {}), "logprobs": lp, "finish": ch.get("finish_reason"), "cached": True,
+            "error": None}
+
+
+def _config(model: str, timeout: int) -> LLMConfig:
+    load_dotenv()
+    env = {**os.environ, "LLM_NAME": model, "LLM_NAME_SMALL": model, "LLM_TIMEOUT_S": str(timeout)}
+    return LLMConfig.from_env("live", env)
+
+
+def _client(model: str, timeout: int) -> LLMClient:
+    with _lock:
+        key = (model, timeout)
+        if key not in _clients:
+            _clients[key] = LLMClient(_config(model, timeout), store_dir=STORE)
+        return _clients[key]
+
+
+def _refusal(model: str, params: dict) -> str | None:
+    if "thinking" in model.lower():
+        return f"{model!r} is a thinking model: the shared client keeps thinking off (AGENTS.md G3)"
+    controls = REFUSED_CONTROLS & params.keys()
+    if controls:
+        return f"{sorted(controls)} prefill the assistant turn for thinking: refused by the shared client (G3)"
+    if params.get("temperature", 0) != 0 or "top_p" in params:
+        return "sampling (temperature != 0, top_p) is not offered by the shared client: it calls at temperature 0"
+    unknown = params.keys() - PASSED_THROUGH - {"temperature"}
+    if unknown:
+        return f"request fields {sorted(unknown)} are not offered by the shared client (src/llm/client.py)"
+    if "max_tokens" not in params:
+        return "max_tokens is required by the shared client"
+    return None
+
+
+def chat(model: str, messages: list[dict], tag: str = "", retries: int = 6, timeout: int = 300, **params) -> dict:
+    """One chat completion through `src.llm.client`. Same result dict as before; `retries` is ignored."""
+    del retries  # the client's classify_error decides retries (G3)
+    body = {"model": model, "messages": messages, "temperature": 0, **params}
+    old = _legacy_lookup(body)
+    if old is not None:
+        return old
+    reason = _refusal(model, params)
+    if reason:
+        raise ResearchRefused(f"{reason}. Only a cached answer in {LEGACY_DB.name} could serve this request.")
+    logprobs = bool(params.get("logprobs"))
+    max_tokens = int(params["max_tokens"])
+    first_token_only = logprobs and max_tokens <= 4
+    try:
+        r = _client(model, timeout).chat(
+            messages,
+            max_tokens=min(max_tokens, 2) if first_token_only else max_tokens,
+            prompt_version="research:" + (tag or "untagged"),
+            response_format=params.get("response_format"),
+            logprobs=logprobs,
+            top_logprobs=params.get("top_logprobs"),
+            seed=params.get("seed"),
+            first_token_only=first_token_only,
+        )
+    except (LLMError, InputRejected, ReplayMiss) as exc:
+        return {"text": None, "error": str(exc)[:300], "reasoning": None, "usage": {}, "logprobs": None,
+                "finish": None, "cached": False}
+    return {"text": r.content, "reasoning": None, "usage": r.usage, "logprobs": (r.logprobs or {}).get("content"),
+            "finish": r.finish_reason, "cached": r.mode == "REPLAY", "error": None}
 
 
 def chat_many(jobs: list[dict], workers: int = 8, progress: int = 50) -> list[dict]:
-    """jobs: list of kwargs for chat(). Returns results in order."""
+    """jobs: list of kwargs for chat(). Returns results in order. Workers are capped at the client's cap."""
+    if not jobs:
+        return []
+    load_dotenv()
+    try:
+        cap = LLMConfig.from_env("live", {**os.environ, "LLM_NAME": M70}).concurrency
+    except ConfigError:  # offline replay of old answers; a live call still fails in chat() with the clear message
+        cap = DEFAULT_CONCURRENCY
+    workers = max(1, min(workers, cap))
     out: list = [None] * len(jobs)
     done = [0]
 

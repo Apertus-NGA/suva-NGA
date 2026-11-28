@@ -1,6 +1,10 @@
 """Arm N: 70B with REAL thinking. The reasoning block is forced by prefilling the assistant turn with <|inner_prefix|>
 (thinking model, no system message, continue_final_message). Step 2 asks the base 70B for a one-word verdict given that
-reasoning and reads P(Ja) from token probabilities, so the result can be ranked."""
+reasoning and reads P(Ja) from token probabilities, so the result can be ranked.
+
+DEVELOPMENT EXPERIMENT (MODELS.md §4): this arm needs a thinking model, which the shared client src/llm/
+refuses (AGENTS.md G3, thinking off). research/apertus.py therefore raises ResearchRefused for any
+request not already answered in research/cache/apertus.sqlite: the arm replays offline only."""
 import re, sys
 import numpy as np, pandas as pd
 import arm_a_lib as A
