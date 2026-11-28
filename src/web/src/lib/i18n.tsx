@@ -194,7 +194,7 @@ const en = {
   "learning.unchanged.note": "An expert confirmed Apertus's text as written",
 
   "nav.scoring": "How scoring works",
-  "view.scoring.hint": "The rules behind every relevance score, and what they measured",
+  "view.scoring.hint": "The rules behind every relevance score",
   "rel.title": "Relevance",
   "rel.how": "How the score is computed",
   "rel.suspected": "Suspected relevant",
@@ -277,12 +277,6 @@ const en = {
   "scoring.formula.body": "Each rule that applies adds or subtracts its strength. The sum, with a fixed starting value, is turned into a number from 0 to 100. The strengths were learned from the rulings Suva's legal department selected in past quarters.",
   "scoring.run": "Run {id} · {pipeline} · {date}",
   "scoring.scored": "{n} rulings scored, {suspected} suspected relevant",
-  "scoring.measured": "Measured on rulings the rules had not seen",
-  "scoring.measured.note": "Trained on one quarter of Suva's selections and tested on the other, both ways.",
-  "scoring.found": "of Suva's selections found",
-  "scoring.recall": "Recall",
-  "scoring.f2": "F2",
-  "scoring.submitted": "{n} rulings proposed as suspected relevant in the test.",
   "scoring.loadError": "The scoring rules could not be loaded.",
 };
 
@@ -474,7 +468,7 @@ const de: Messages = {
   "learning.unchanged.note": "Der Text von Apertus wurde fachlich so bestätigt",
 
   "nav.scoring": "So wird bewertet",
-  "view.scoring.hint": "Die Regeln hinter jedem Relevanz-Score und was sie gemessen haben",
+  "view.scoring.hint": "Die Regeln hinter jedem Relevanz-Score",
   "rel.title": "Relevanz",
   "rel.how": "So entsteht der Score",
   "rel.suspected": "Vermutlich relevant",
@@ -557,12 +551,6 @@ const de: Messages = {
   "scoring.formula.body": "Jede zutreffende Regel addiert oder subtrahiert ihre Stärke. Die Summe wird mit einem festen Startwert in eine Zahl von 0 bis 100 umgerechnet. Die Stärken wurden aus den Entscheiden gelernt, die die Rechtsabteilung der Suva in früheren Quartalen ausgewählt hat.",
   "scoring.run": "Lauf {id} · {pipeline} · {date}",
   "scoring.scored": "{n} Entscheide bewertet, {suspected} vermutlich relevant",
-  "scoring.measured": "Gemessen an Entscheiden, die die Regeln nicht kannten",
-  "scoring.measured.note": "Auf einem Quartal der Suva-Auswahl trainiert und auf dem anderen getestet, in beide Richtungen.",
-  "scoring.found": "der Suva-Auswahl gefunden",
-  "scoring.recall": "Recall",
-  "scoring.f2": "F2",
-  "scoring.submitted": "{n} Entscheide im Test als vermutlich relevant vorgeschlagen.",
   "scoring.loadError": "Die Bewertungsregeln konnten nicht geladen werden.",
 };
 
@@ -751,7 +739,7 @@ const fr: Messages = {
   "learning.unchanged.note": "Un expert a confirmé le texte d'Apertus sans modification",
 
   "nav.scoring": "Méthode de notation",
-  "view.scoring.hint": "Les règles derrière chaque score de pertinence, et ce qu'elles ont mesuré",
+  "view.scoring.hint": "Les règles derrière chaque score de pertinence",
   "rel.title": "Pertinence",
   "rel.how": "Comment le score est calculé",
   "rel.suspected": "Probablement pertinent",
@@ -834,12 +822,6 @@ const fr: Messages = {
   "scoring.formula.body": "Chaque règle qui s'applique ajoute ou retranche sa force. La somme, avec une valeur de départ fixe, est convertie en un nombre de 0 à 100. Les forces ont été apprises à partir des arrêts que le service juridique de la Suva a sélectionnés lors des trimestres passés.",
   "scoring.run": "Exécution {id} · {pipeline} · {date}",
   "scoring.scored": "{n} arrêts notés, {suspected} probablement pertinents",
-  "scoring.measured": "Mesuré sur des arrêts que les règles n'avaient pas vus",
-  "scoring.measured.note": "Entraîné sur un trimestre des sélections de la Suva et testé sur l'autre, dans les deux sens.",
-  "scoring.found": "des sélections de la Suva retrouvées",
-  "scoring.recall": "Rappel",
-  "scoring.f2": "F2",
-  "scoring.submitted": "{n} arrêts proposés comme probablement pertinents dans le test.",
   "scoring.loadError": "Les règles de notation n'ont pas pu être chargées.",
 };
 

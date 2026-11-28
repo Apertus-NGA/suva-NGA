@@ -174,7 +174,6 @@ export type Scoring = {
   rules: Array<{ rule: string; source: "code" | "apertus"; direction: 1 | -1; weight: number; effect: number; share: number | null }>;
   intercept: number | null;
   readings: string[];
-  measured: { relevant_found: number; relevant_total: number; recall: number; f2: number; submitted: number } | null;
   share_promoted: number;
   scored: number;
   suspected: number;

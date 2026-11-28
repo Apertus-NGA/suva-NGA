@@ -10,7 +10,7 @@ const STEPS: Array<{ title: Key; body: Key; by: Key }> = [
   { title: "scoring.step4.title", body: "scoring.step4.body", by: "scoring.source.code" },
 ];
 
-/** The open box: the steps from a ruling to its score, the rule table of the current run, and what it measured. */
+/** The open box: the steps from a ruling to its score, and the rule table of the current run. */
 export function ScoringPage() {
   const { t, tx, formatNumber, formatDate } = useI18n();
   const [scoring, setScoring] = useState<Scoring | null>(null);
@@ -26,7 +26,6 @@ export function ScoringPage() {
 
   const rules = [...scoring.rules].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
   const widest = Math.max(...rules.map((r) => Math.abs(r.effect)), 1);
-  const measured = scoring.measured;
   const counts = { n: rules.length, facts: rules.filter((r) => r.source === "code").length, share: Math.round(scoring.share_promoted * 100) };
   const percent = (share: number) => `${formatNumber(Math.round(share * 100))}%`;
 
@@ -101,11 +100,11 @@ export function ScoringPage() {
         </table>
       </section>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div>
         <section className="rounded-xl bg-surface px-5 py-5">
           <h2 className="text-[13px] font-medium text-ink">{t("scoring.formula")}</h2>
-          <p className="mt-1.5 text-[13px] leading-5 text-muted">{t("scoring.formula.body")}</p>
-          <p className="mt-3 rounded-md bg-wash px-3 py-2 font-mono text-[12px] leading-5 text-ink">
+          <p className="mt-1.5 max-w-[86ch] text-[13px] leading-5 text-muted">{t("scoring.formula.body")}</p>
+          <p className="mt-3 max-w-[86ch] rounded-md bg-wash px-3 py-2 font-mono text-[12px] leading-5 text-ink">
             score = 100 / (1 + e<sup>−(start + Σ rules)</sup>)
             {scoring.intercept !== null && <span className="text-muted"> · start = {scoring.intercept.toFixed(2)}</span>}
           </p>
@@ -115,31 +114,7 @@ export function ScoringPage() {
             {t("scoring.scored", { n: formatNumber(scoring.scored), suspected: formatNumber(scoring.suspected) })}
           </p>
         </section>
-
-        <section className="rounded-xl bg-surface px-5 py-5">
-          <h2 className="text-[13px] font-medium text-ink">{t("scoring.measured")}</h2>
-          <p className="mt-0.5 text-[12px] leading-[18px] text-faint">{t("scoring.measured.note")}</p>
-          {measured && (
-            <dl className="mt-4 grid grid-cols-3 gap-4">
-              <Tile value={`${measured.relevant_found} / ${measured.relevant_total}`} label={t("scoring.found")} />
-              <Tile value={percent(measured.recall)} label={t("scoring.recall")} />
-              <Tile value={measured.f2.toFixed(2)} label={t("scoring.f2")} />
-            </dl>
-          )}
-          {measured && (
-            <p className="mt-3 text-[12px] leading-[18px] text-faint">{t("scoring.submitted", { n: formatNumber(measured.submitted) })}</p>
-          )}
-        </section>
       </div>
-    </div>
-  );
-}
-
-function Tile({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <dd className="font-serif text-[28px] leading-9 tracking-[-0.02em] tabular-nums text-ink">{value}</dd>
-      <dt className="mt-1 text-[12px] leading-[18px] text-muted">{label}</dt>
     </div>
   );
 }
