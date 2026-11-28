@@ -320,12 +320,16 @@ def repair_prompt(
     )
 
 
-def chat(messages: list[dict]) -> str:
+def chat(messages: list[dict], mode: str = "live", store_dir: Path | None = None) -> str:
+    """One call through the shared client. `mode="replay"` answers from its replay cache (D-032) and raises
+    `ReplayMiss` for a request never answered live; it never reaches the gateway. `store_dir` is the client's
+    store (default: data/derived/llm)."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
+    from src.llm import client as llm
     from src.llm.client import LLMError, client_from_env
 
-    client = client_from_env("live")
+    client = client_from_env(mode, store_dir or llm.DEFAULT_STORE)
     try:
         return client.chat(messages, max_tokens=1200, prompt_version=VERSION).content
     except LLMError as exc:

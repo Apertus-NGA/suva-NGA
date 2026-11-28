@@ -26,6 +26,7 @@ stored if either language fails; the model is only reached through `summarize.ch
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import sys
 from collections import Counter
@@ -37,12 +38,14 @@ from psycopg.types.json import Jsonb
 if str(Path(__file__).resolve().parents[2]) not in sys.path:  # run as a script or as a module
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from src.llm.client import ReplayMiss  # noqa: E402
 from src.summarize import finish, summarize  # noqa: E402
 from src.summarize.prompts import VERSION as PROMPT_VERSION  # noqa: E402
 from src.summarize.prompts import category_of  # noqa: E402
 
 PIPELINE_VERSION = "1"
 LANGUAGES = ("de", "fr")
+MODES = ("live", "replay")
 CATEGORIES = ("uv", "iv", "kv", "bv", "vvg", "other")
 _AREA = (
     "coalesce(r.area, nullif(split_part(r.subject, ' (', 1), ''))"  # the area, also for rulings not yet on a court list
@@ -112,6 +115,7 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
             "pipeline": PIPELINE_VERSION,
             "prompt": PROMPT_VERSION,
             "category": result["category"],
+            "mode": result.get("mode"),
             "problems": {lang: p["problems"] for lang, p in result["languages"].items()},
             "finish_notes": {lang: p["finish_notes"] for lang, p in result["languages"].items()},
         }
@@ -141,13 +145,27 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
     return out
 
 
-def summarise_ruling(conn, ruling_id: int, ask: Ask | None = None, model: str | None = None) -> dict:
-    """Route, write, finish and store the fiches of one ruling. Returns the result with what was stored."""
+def summarise_ruling(
+    conn, ruling_id: int, ask: Ask | None = None, model: str | None = None, mode: str = "live"
+) -> dict:
+    """Route, write, finish and store the fiches of one ruling. Returns the result with what was stored.
+
+    Without `ask`, the model is reached through `summarize.chat` in `mode`: "live" calls the gateway,
+    "replay" answers from the client's replay cache and raises `ReplayMiss` (nothing stored) on a miss.
+    With `ask`, the caller's function answers and `mode` is recorded as "injected".
+    """
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     ruling = load_ruling(conn, ruling_id)
     shots = {language: examples(conn, language, ruling["docket"]) for language in LANGUAGES}
-    result = write(ruling, shots, ask)
+    result = write(ruling, shots, ask or functools.partial(_chat, mode=mode))
+    result["mode"] = "injected" if ask is not None else mode
     result["stored"] = store(conn, ruling_id, result, model or os.environ.get("LLM_NAME") or "unknown")
     return result
+
+
+def _chat(messages: list[dict], mode: str) -> str:
+    return summarize.chat(messages, mode=mode)  # looked up at call time, so tests can replace summarize.chat
 
 
 def routes(conn, where: str = "", params: tuple = ()) -> list[tuple[int, str, str | None, str]]:
@@ -182,6 +200,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--status", help="summarise rulings of this status, highest score first (needs --limit)")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true", help="show the routing, call no model, store nothing")
+    parser.add_argument(
+        "--mode", choices=MODES, default="live", help="live: call Apertus; replay: answer from the replay cache only"
+    )
     args = parser.parse_args(argv)
 
     from suva_data import db
@@ -207,8 +228,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             continue
         try:
-            result = summarise_ruling(conn, ruling_id)
-        except (NotSummarisable, SystemExit) as e:
+            result = summarise_ruling(conn, ruling_id, mode=args.mode)
+        except (NotSummarisable, ReplayMiss, SystemExit) as e:
             failed += 1
             print(f"  failed: {e}", flush=True)
             continue
