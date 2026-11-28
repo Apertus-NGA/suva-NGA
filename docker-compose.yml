@@ -37,7 +37,8 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # Localhost only, like the database.
+      - "127.0.0.1:8000:8000"
     volumes:
       # Suva-derived artefacts stay outside the image and outside git while D-031 is open.
       - ./data/derived:/app/data/derived
