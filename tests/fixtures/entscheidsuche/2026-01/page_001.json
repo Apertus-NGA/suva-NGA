@@ -1,0 +1,61 @@
+{
+ "hits": [
+  {
+   "_id": "CH_BGer_005_5A-40-2026_2026-01-22",
+   "_source": {
+    "attachment": {
+     "content": " \n\nBundesgericht \n\nTribunal fédéral \n\nTribunale federale \n\nTribunal federal \n\n \n\n               \n  \n  \n \n\n \n\n \n\n\n    \n  5A_40/2026\n  \n \n\n \n\nDecreto del 22 gennaio 2026 \n\n \n\n\n    \n  II Corte di diritto civile\n  \n \n\n \n\nComposizione \n\nGiudice federale Bovey, Presidente, \n\nCancelliera Antonini. \n\n \n\nPartecipanti al procedimento \n\nComunione ereditaria fu A.________ composta di: \n\n \n\n1. B.________, \n\n2. C.________, \n\npatrocinati dall'avv. B.________, \n\nricorrenti, \n\n \n\ncontro \n\n \n\nUfficio di esecuzione di Lugano, via Bossi 2a, 6900 Lugano, \n\n \n\nB.________. \n\n \n\nOggetto \n\navviso di pignoramento, revisione, \n\n \n\nricorso contro la sentenza emanata il 15 dicembre 2025 dalla Camera di esecuzione e fallimenti del Tribunale d'appello del Cantone Ticino, quale autorità di vigilanza (n. 15.2025.168). \n\n \n\n \n\n\n    \n  Ritenuto in fatto e considerando in diritto:\n  \n \n\n \n\n\n    \n  1. \n \n\nIl 12 gennaio 2026, mediante ricorso in materia civile e ricorso sussidiario in materia costituzionale, la \" comunione ereditaria di A.________, composta da C.________ e B.________ \" ha impugnato dinanzi al Tribunale federale una sentenza 15 dicembre 2025 della Camera di esecuzione e fallimenti del Tribunale d'appello del Cantone Ticino, quale autorità di vigilanza, con la quale quest'ultima aveva respinto, nella misura della sua ricevibilità, un'istanza di revisione di una sua precedente decisione 10 novembre 2025 (v. anche sentenza 5A_1050/2025 del Tribunale federale dell'8 gennaio 2026). La parte ricorrente ha chiesto, previo conferimento dell'effetto sospensivo al rimedio, l'accertamento della nullità o in via subordinata l'annullamento delle sentenze 10 novembre e 15 dicembre 2025. \n\nCon decreto 16 gennaio 2026 l'istanza di conferimento dell'effetto sospensivo al ricorso è stata respinta. \n\nNon sono state chieste determinazioni. \n\n \n\n\n    \n  2. \n \n\nCon scritto 20 gennaio 2026 la parte ricorrente ha comunicato di ritirare il suo ricorso 12 gennaio 2026. \n\nIl Presidente della Corte adita, competente in virtù dell'art. 32 cpv. 1 e 2 LTF, non può pertanto far altro che prendere atto del ritiro del ricorso e disporre, quale giudice unico, lo stralcio della causa dai ruoli (art. 71 LTF in relazione con l'art. 73 PC). \n\nLe spese giudiziarie, ridotte in applicazione dell'art. 66 cpv. 2 LTF in considerazione dello stadio della procedura nel quale è avvenuta la desistenza, vanno poste a carico della parte che ritira il ricorso (art. 66 cpv. 1 LTF; v. decreto 5A_327/2024 del 2 luglio 2024 consid. 2). \n\n \n\n \n\n\n    \n  Per questi motivi, il Presidente decreta:\n  \n \n\n \n\n\n    \n  1. \n \n\nLa causa è stralciata dai ruoli a seguito del ritiro del ricorso. \n\n \n\n\n    \n  2. \n \n\nLe spese giudiziarie di fr. 200.-- sono poste a carico della parte ricorrente. \n\n \n\n\n    \n  3. \n \n\nComunicazione ai partecipanti al procedimento e alla Camera di esecuzione e fallimenti del Tribunale d'appello del Cantone Ticino, quale autorità di vigilanza. \n\n \n\n \n\nLosanna, 22 gennaio 2026 \n\n \n\nIn nome della II Corte di diritto civile \n\ndel Tribunale federale svizzero \n\n \n\nIl Presidente:    Bovey \n\n \n\nLa Cancelliera:    Antonini ",
+     "content_length": 3121,
+     "content_type": "text/html; charset=UTF-8",
+     "content_url": "https://entscheidsuche.ch/docs/CH_BGer/CH_BGer_005_5A-40-2026_2026-01-22.html",
+     "language": "it",
+     "source": "446973/45/2830"
+    },
+    "canton": "CH",
+    "date": "2026-01-22",
+    "hierarchy": [
+     "CH",
+     "CH_BGer",
+     "CH_BGer_005"
+    ],
+    "id": "CH_BGer_005_5A-40-2026_2026-01-22",
+    "language": "it",
+    "meta": {
+     "de": "Eidgenossenschaft Bundesgericht II. Zivilrechtliche Abteilung",
+     "fr": "Conféderation Tribunal fédéral IIe Cour de droit civil",
+     "it": "Confederazione Tribunale federale II Corte di diritto civile"
+    },
+    "reference": [
+     "5A_40/2026"
+    ],
+    "scrapedate": "2026-10-19",
+    "source": "446973/45/2830",
+    "title": {
+     "de": "Bundesgericht II. Zivilrechtliche Abteilung 22.01.2026 5A_40/2026",
+     "fr": "Tribunal fédéral IIe Cour de droit civil 22.01.2026 5A_40/2026",
+     "it": "Tribunale federale II Corte di diritto civile 22.01.2026 5A_40/2026"
+    }
+   }
+  }
+ ],
+ "query": {
+  "bool": {
+   "filter": [
+    {
+     "term": {
+      "hierarchy": "CH_BGer"
+     }
+    },
+    {
+     "range": {
+      "date": {
+       "gte": "2026-01-01",
+       "lte": "2026-01-31"
+      }
+     }
+    }
+   ]
+  }
+ },
+ "total": 1
+}
