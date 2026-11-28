@@ -554,7 +554,7 @@ Nothing in §15 starts before 1 and 2 are answered.
 | L2-00 G0 | answered: six-schema DB; `review/final-cleanup` never merged | D-075 |
 | L2-01 prompt and configuration | done; the prompt file is generated from the measured constants (`ast`) | `prompts/layer2_judge/question.V1.0.0.json`; `test_prompt_file_is_the_measured_prompt` |
 | L2-02 engine | done | `tests/test_layer2_engine.py` (14 tests; reading compared with the benchmark's own function; 3 real rulings de/fr/it) |
-| L2-03 loaders, registry, profile | done: `load_models` (MODELS.md), `load_prompt`, model and prompt bindings per version; `default` V0.3.0 | `make db-registry` twice, no error |
+| L2-03 loaders, registry, profile | done: `load_models` (MODELS.md), `load_prompt`, `bind_resources` (model and prompt bindings per version) in `src/db/llm_registry.py`; `default` V0.3.0 | `make db-registry` twice, no error |
 | L2-04 client observer, run models | done: cache hits logged, trace per call, observer; `begin_run(resolved_models, model_override)`, `finish_run(status)` | `tests/test_llm_client.py` (2 new tests; the 21 others unchanged and green) |
 | L2-05 runner | done | run `8fc08fc1…`: 634 judged |
 | L2-06 wiring | done: `make layer2`, `make layer2-validate`, `make run` S3 | `SERVE=0 make run` (S3 skipped with its reason in CI) |
@@ -576,6 +576,8 @@ Mutation checks (G9): a head cut off by one character, `j` removed from the Ja t
 5. The client also writes cache hits to `llm_calls.jsonl` (mode `REPLAY`, `cache_hit: true`): every answer a step uses now has a record.
 6. Live-run protections, added after a first live attempt whose `LLM_BASE_URL` was a pasted placeholder: every call failed with `UnsupportedProtocol`, was retried 4 times, for each of 383 rulings, with no output, until Ctrl-C left the run `running`. Now: `LLM_BASE_URL` scheme checked at startup (`src/llm/config.py`), preflight call, breaker after 5 failed calls in a row, progress on stderr, `fail_run(status="aborted")` on Ctrl-C (`docs/LAYER2.md` §6). The interrupted run was closed as `aborted` after the fact.
 7. `python -m src.layer2 report` writes a run's aggregates to `results/` (G11).
+8. The model and prompt loaders, planned in `src/db/registry.py` (§A.6, §13, L2-03), live in `src/db/llm_registry.py`, so that `registry.py`, which the layer-1 work changes, stays identical to `main` (§26.5).
+9. `validate` compares the scores of the run that covers the most rulings of the certified set (latest on a tie), not the latest run: the first version took a 3-ruling live slice and reported a false failure (`certification_run`, test red on the old selection, green on the new).
 
 ### 26.3 Found while implementing
 
@@ -587,6 +589,7 @@ Mutation checks (G9): a head cut off by one character, `j` removed from the Ja t
 
 - PR #42 is open, up to date with `main`, and deletes nothing: it adds a second data layer (`db/migrations`, schema `public`) and the other relevance pipeline (`src/triage/`, read by the UI), and changes `src/courts.py`. Merged with this branch in a throwaway worktree: one conflict (`docs/STATE.md`), all tests green (270 DB tests), layer 2 unchanged (634/634, certification intact), layer 1 unchanged in its decisions but with 386 parity warnings per run (the reference `courts.py` moved).
 - `triage/apertus-features`, `summarize/refine` and `summarize/extract` contain `review/final-cleanup`: merging any of them deletes the DDL and `src/layer1/` (D-075).
+- 08:47 CET, PR #42 definitive at `1e4ebb3` (triage v2: 13 code and Apertus rules, a logistic regression whose weights keep the sign fixed for each rule, the rule table stored per run). No file in common with this branch. Merged with `7a8639a` in a throwaway worktree: one conflict (`docs/STATE.md`), 727 tests green (270 DB tests), layer 2 unchanged (634/634, certification intact). Defect for its author: `scipy` imported by `src/triage/scorer.py`, not declared in `pyproject.toml`. v2 meets R-3 (the boundary does not rest on the 8B: twelve code rules plus the 70B consensus) and R-4 (a failed reading is empty, never "no"); its cut is still a 40 % share per quarter, not a frozen F2 threshold (D-021 point 5).
 - Open for the lead: which relevance output the UI and the export show (`triage.*` from `layer2_judge`, or `public.predictions` from the branch pipeline), D-021 and D-046. Detail: the audit dossier §11.
 
 ### 26.5 Coordination with the layer-1 traceability work (message of 08:20 CET, merge order decided by the lead)

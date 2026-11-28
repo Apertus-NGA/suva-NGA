@@ -1,7 +1,7 @@
 {
   "what": "layer2_judge certification against the D-074 benchmark (docs/LAYER2.md)",
   "version": "V1.0.0",
-  "git_commit": "e1bc7c295d11825e85a9dfdaff2bbf0d05eb6a37",
+  "git_commit": "7a8639a35368fc89a437488f2d981ba65d4d9b7a",
   "git_dirty": true,
   "expected": {
     "canonical": "layer2-golden-1",

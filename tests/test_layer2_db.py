@@ -396,3 +396,19 @@ def test_the_breaker_stops_a_run_whose_calls_keep_failing(db):
         url, "SELECT status::text FROM ops.pipeline_run WHERE kind = 'layer2' ORDER BY started_at DESC LIMIT 1"
     )
     assert status == [("failed",)]
+
+
+def test_certification_compares_the_run_that_covers_the_set_not_the_latest_slice(db):
+    from src.layer2.validate import certification_run
+
+    url, tmp = db
+    full = run(url, tmp, client(tmp / "store_h", Gateway()), mode="live")
+    slice_ = run(url, tmp, client(tmp / "store_h", Gateway()), mode="live", kind="eval", limit=1)
+    keys = {(d, str(dd)) for d, dd in rows(url, "SELECT docket, decision_date FROM corpus.ruling")}
+    with pipeline(url) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT component_version_id::text FROM ops.span WHERE run_id = %s AND parent_span_id IS NULL",
+            (slice_["run_id"],),
+        )
+        chosen = certification_run(cur, cur.fetchone()[0], keys)
+    assert chosen == full["run_id"] != slice_["run_id"]  # the slice is newer but covers 1 ruling, the run 3

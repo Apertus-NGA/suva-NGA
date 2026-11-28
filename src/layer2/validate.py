@@ -54,19 +54,27 @@ def check_frozen(manifest_path: Path, data_root: Path) -> str:
     return manifest["ids_digest_sha256"]
 
 
-def latest_run(cur: psycopg.Cursor, component_version_id: str) -> str:
+def certification_run(cur: psycopg.Cursor, component_version_id: str, keys: set[tuple[str, str]]) -> str:
+    """The run whose scores are compared with the benchmark: among the usable runs of this version, the one that
+    judged the most rulings of the certified set (`keys` = (docket, decision date)), the latest on a tie. Not
+    simply the latest run: a small live or eval slice would otherwise replace the full replay of the set."""
     cur.execute(
-        """SELECT pr.run_id::text FROM ops.pipeline_run pr
+        """SELECT pr.run_id::text, r.docket, r.decision_date::text
+           FROM ops.pipeline_run pr
+           JOIN triage.assessment a ON a.run_id = pr.run_id AND a.step = 'layer2_judge' AND a.outcome = 'ok'
+                                   AND a.component_version_id = %s
+           JOIN corpus.ruling r ON r.ruling_id = a.ruling_id
            WHERE pr.kind IN ('layer2', 'eval') AND pr.status IN ('succeeded', 'partial')
-             AND EXISTS (SELECT 1 FROM triage.assessment a WHERE a.run_id = pr.run_id AND a.step = 'layer2_judge'
-                                                            AND a.component_version_id = %s)
-           ORDER BY pr.finished_at DESC LIMIT 1""",
+           ORDER BY pr.finished_at""",
         (component_version_id,),
     )
-    row = cur.fetchone()
-    if row is None:
+    coverage: dict[str, int] = {}
+    for run, docket, decided in cur.fetchall():
+        coverage[run] = coverage.get(run, 0) + ((docket, decided) in keys)
+    if not coverage:
         raise LookupError("no layer-2 run of this version: run python -m src.layer2 run first")
-    return row[0]
+    best = max(coverage.values())
+    return [run for run, n in coverage.items() if n == best][-1]  # runs come in finishing order: the latest tie
 
 
 def validate(
@@ -119,9 +127,9 @@ def validate(
         # 2. scores parity
         scores: dict = {"compared": 0}
         if bench_dir is not None:
-            run = run_id or latest_run(cur, cvid)
             bench = {r["decision_id"]: r for fold in FOLDS for r in _rows(bench_dir / fold / "rep000.jsonl")}
             by_key = {(r["meta"]["docket"], r["meta"]["decision_date"]): r["meta"]["decision_id"] for r in dataset}
+            run = run_id or certification_run(cur, cvid, set(by_key))
             cur.execute(
                 """SELECT r.docket, r.decision_date::text, j.p_yes, a.score_0_100, a.score_raw
                    FROM triage.assessment a JOIN triage.llm_judgement j USING (assessment_id)
