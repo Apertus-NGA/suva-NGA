@@ -1,4 +1,4 @@
-"""Command line: uv run python -m suva_data {fetch,build,verify,dump,pull}
+"""Command line: uv run python -m suva_data {fetch,build,verify,dump,export,ingest,pull}
 
 fetch   download the raw inputs into data/snapshot/ (the only step that uses the network)
 build   snapshot -> PostgreSQL: load, reconcile, attach labels and gold summaries, verify, write the report
@@ -6,6 +6,9 @@ verify  re-run the checks on the existing database
 dump    write data/dump/suva.sql.gz (what `docker compose up` loads from db/init/)
 export  write data/tables/*.parquet + schema.sql (the same data, readable without a database)
 pull    download the published snapshot + dump from Hugging Face
+ingest  add the rulings published in a date range (--from/--to) or since the last ingest (--since-last);
+        add-only: nothing already stored is changed (uses the network: bger.ch first, then Hugging Face
+        and the mirror)
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import config, db, export, load, reconcile as rec, verify
+from . import config, db, export, ingest, load, reconcile as rec, verify
 from .loaders import gold_summaries, labels_xlsx
 from .models import normalise_docket
 from .sources.bger_lists import BgerListAdapter
@@ -69,9 +72,11 @@ def cmd_fetch(args) -> int:
 
 
 def cmd_build(args) -> int:
-    window, extras = config.DEFAULT_WINDOW, gold_dockets()
+    window = config.DEFAULT_WINDOW
     conn = db.connect()
     db.migrate(conn)
+    # Rulings added by a live ingest are kept by a rebuild, although they may lie outside the window.
+    extras = gold_dockets() | ingest.ingested_dockets(conn)
     run_id = db.start_run(conn, "build", {"window": [window.decision_from, window.decision_to], "extra_dockets": len(extras)})
     try:
         # 1. snapshot manifest: what exactly are we building from?
@@ -179,6 +184,38 @@ def cmd_dump(args) -> int:
     return 0
 
 
+def cmd_ingest(args) -> int:
+    """Add the rulings published in a date range, or since the last ingest. Never changes what is already stored."""
+    conn = db.connect()
+    db.migrate(conn)
+    if args.since_last:
+        if args.published_from or args.published_to:
+            raise SystemExit("give either --since-last or --from/--to, not both")
+        published_from, published_to = ingest.since_last_range(conn)
+    elif args.published_from and args.published_to:
+        published_from, published_to = args.published_from, args.published_to
+    else:
+        raise SystemExit("give --since-last, or both --from and --to (publication dates, YYYY-MM-DD)")
+    print(f"ingest: rulings published {published_from} .. {published_to}")
+    report = ingest.ingest(conn, published_from, published_to, extra_dockets=gold_dockets())
+    bger, mirror, days = report.bger, report.mirror, report.daily["days"]
+    by_status = {k: sum(1 for d in days if d["status"] == k) for k in sorted({d["status"] for d in days})}
+    print(f"  bger.ch lists: {bger['status']} ({bger['records']} entries for the range)")
+    print(f"  Hugging Face daily files: {report.daily['status']} {by_status}, {report.daily['records']} rulings in the range")
+    print(f"  mirror (entscheidsuche.ch): {mirror['status']}, asked for {mirror['asked']} rulings, found {mirror['found']}")
+    print(f"  added {len(report.new_rulings)} new rulings; {report.known_rulings} were already held and left as they were")
+    print(f"  new rulings with two independent texts: {report.new_with_two_texts} of {len(report.new_rulings)}")
+    print(f"  not yet confirmed by a bger.ch list: {report.not_confirmed_by_bger}")
+    if report.text_mismatches:
+        print(f"  texts differ between sources for: {', '.join(report.text_mismatches[:20])}")
+    if report.kept_existing:
+        print(f"  {len(report.kept_existing)} stored record(s) differ from what the source now sends (kept as stored):")
+        for k in report.kept_existing[:20]:
+            print(f"    {k['docket']} ({k['source']}): {', '.join(k['differs'])}")
+    print(f"  status: {report.status} (run {report.run_id})")
+    return 0
+
+
 def cmd_export(args) -> int:
     """Parquet tables + schema.sql from the current database; their checksums go into data/manifest.json."""
     conn = db.connect()
@@ -223,6 +260,11 @@ def main(argv=None) -> int:
     sub.add_parser("verify").set_defaults(fn=cmd_verify)
     sub.add_parser("dump").set_defaults(fn=cmd_dump)
     sub.add_parser("export").set_defaults(fn=cmd_export)
+    ing = sub.add_parser("ingest", help="add rulings by publication date; add-only")
+    ing.add_argument("--from", dest="published_from", metavar="YYYY-MM-DD")
+    ing.add_argument("--to", dest="published_to", metavar="YYYY-MM-DD")
+    ing.add_argument("--since-last", action="store_true", help="from the last ingest (minus an overlap) to yesterday")
+    ing.set_defaults(fn=cmd_ingest)
     pl = sub.add_parser("pull"); pl.add_argument("--revision"); pl.set_defaults(fn=cmd_pull)
     args = p.parse_args(argv)
     return args.fn(args)

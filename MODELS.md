@@ -13,7 +13,8 @@
 | Embeddings for search and similar rulings | pplx-embed-context-v1-0.6b | `<revision>`; query-side model to fix | local; weights downloaded at image build time and never committed (the template's `.gitignore` excludes weight files), so a **build-time** external dependency listed in the report's Target architecture | MIT | DECIDED if search uses embeddings (D-005); whether it does is OPEN (D-033) |
 | Embedding baseline | bge-m3 | `<revision>` | local (weights downloaded at build time, as above) | MIT | OPEN (D-020) |
 | Learned relevance score | logistic regression on signals + Apertus probability | trained artefact `results/models/<hash>` | local (scikit-learn) | n/a (our model) | OPEN (D-021, option B only) |
-| Evaluation judge (optional) | open-weights, other family than Apertus | `<id>` | `<endpoint>` | `<licence>` | OPEN (`docs/EVAL.md` §4); used only with published κ |
+| Evaluation judge of the summaries (evaluation only, never called by `make run`) | gpt-oss 120B, reasoning effort high | Hugging Face `openai/gpt-oss-120b`, revision `b5c939de8f` | any OpenAI-compatible endpoint set in `JUDGE_BASE_URL` (Hugging Face router, or local) | Apache-2.0 | PROPOSED (`docs/JUDGE.md` §4); not measured yet; used in a headline number only with its validation and κ published |
+| Judge candidates for the comparison of `docs/JUDGE.md` §4 | DeepSeek V4 Pro; Qwen 3.5 397B | Hugging Face `deepseek-ai/DeepSeek-V4-Pro`; `Qwen/Qwen3.5-397B-A17B` | as above | MIT; Apache-2.0 | OPEN: kept only if measured better than the default |
 
 `LLM_NAME` is "name and version of the model" (template `README.md`): the judges may set either size, in either form (gateway id or Hugging Face id). The client maps both forms, and the pipeline must complete when `LLM_NAME` is the 8B (`AGENTS.md` G3; D-032, Q-23).
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 import shutil
 from collections import Counter
 
@@ -44,11 +45,8 @@ def test_real_files_numbers(real):
     assert len(real) == 55
     assert len({s.docket for s in real}) == 55
     assert all(s.body_de.strip() and s.body_fr.strip() for s in real)
-    assert Counter(s.author for s in real) == {
-        "Frei Thomas (FRT), Rechtsanwalt": 38,
-        "Lüthi Christophe (LC4), Avocat": 14,
-        "Villa Rebeca (VIL), Rechtsanwältin, Bereichsleiterin": 3,
-    }
+    # Three authors; the names themselves stay in judgements/ and are not repeated here (D-051).
+    assert sorted(Counter(s.author for s in real).values()) == [3, 14, 38]
     assert Counter(s.title_language for s in real) == {"fr": 31, "de": 22, "it": 2}
     assert all(s.decision_date_from_title for s in real)
     assert all(s.source_url and s.source_url.startswith("http") for s in real)
@@ -80,7 +78,9 @@ def test_real_file_content(real):
     assert summary.title == "Arrêt du TF 8C_72/2025 du 11 décembre 2025"
     assert summary.title_language == "fr"
     assert summary.decision_date_from_title == "2025-12-11"
-    assert summary.author == "Frei Thomas (FRT), Rechtsanwalt"
+    # Shape only ("Surname Given (CODE), title"): the value stays in judgements/ (D-051).
+    assert re.fullmatch(r"\S+ \S+ \(\w{2,4}\), \S.*", summary.author)
+    assert summary.author == Counter(s.author for s in real).most_common(1)[0][0]
     assert summary.source_url == (
         "https://search.bger.ch/ext/eurospider/live/de/php/aza/http/index.php"
         "?highlight_docid=aza://11-12-2025-8C_72-2025&lang=de&zoom=&type=show_document"
@@ -133,10 +133,10 @@ def test_paragraph_handling():
 def test_author_without_paragraph_tag_and_missing_link():
     html = (
         "<h1>Arrêt du TF 9C_2/2025 du 1er mars 2026</h1><h2>Text DE</h2><p>A</p><h2>Text FR</h2><p>B</p>"
-        "<h2>Link zum Urteil</h2><h2>Autor</h2>\n Frei Thomas (FRT),\n Rechtsanwalt\n"
+        "<h2>Link zum Urteil</h2><h2>Autor</h2>\n Muster Anna (MUA),\n Rechtsanwältin\n"
     )
     summary = parse_export(html, "Export_9C_2_2025.html")
-    assert summary.author == "Frei Thomas (FRT), Rechtsanwalt"
+    assert summary.author == "Muster Anna (MUA), Rechtsanwältin"
     assert summary.source_url is None
     assert (summary.docket, summary.title_language, summary.decision_date_from_title) == ("9C_2/2025", "fr", "2026-03-01")
 

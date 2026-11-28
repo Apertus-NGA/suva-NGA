@@ -111,9 +111,8 @@ def test_hyperlink_target_is_extracted(real):
     first = next(row for row in real.rows if row.docket == "8C_464/2025")
     assert first.xlsx_row == 2
     assert first.erstellt == "2026-03-23T10:30:07"
-    assert first.sharepoint_url == (
-        "https://suvaprodcloud.sharepoint.com/sites/jlsm/SitePages/BGer-Urteil-8C_464-2025-vom-25.-Februar-2026.aspx"
-    )
+    # Only the page name is checked: the intranet host and path stay in judgements/ (D-051).
+    assert first.sharepoint_url.endswith("/BGer-Urteil-8C_464-2025-vom-25.-Februar-2026.aspx")
 
 
 def test_missing_hyperlink_is_none(tmp_path):
@@ -181,9 +180,11 @@ def test_write_real_labels_happy_path_and_idempotent(db_conn, real):
     assert {r[1] for r in rows} == {config.LABEL_SET_XLSX} and {r[2] for r in rows} == {"relevant"}
     by_docket = {r[0]: r for r in rows}
     assert by_docket["8C_458/2025"][3] == "2025 Q4"
-    assert by_docket["8C_458/2025"][4] == {
+    metadata = dict(by_docket["8C_458/2025"][4])
+    # Only the page name is checked: the intranet host and path stay in judgements/ (D-051).
+    assert metadata.pop("sharepoint_url").endswith("/BGer-Urteil-458-2025-vom-18.-November-2025.aspx")
+    assert metadata == {
         "erstellt": "2025-12-15T10:43:02",
-        "sharepoint_url": "https://suvaprodcloud.sharepoint.com/sites/jlsm/SitePages/BGer-Urteil-458-2025-vom-18.-November-2025.aspx",
         "xlsx_title": MALFORMED_TITLE,
         "xlsx_row": 49,
     }

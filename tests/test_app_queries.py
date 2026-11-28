@@ -72,6 +72,7 @@ def test_row_shape(db_conn, data):
         "subject": "Unfallversicherung (Kausalzusammenhang)", "outcome": "dismissed", "official_url": None,
         "label": "relevant", "label_basis": "suva_xlsx", "score": 91, "predicted_relevant": True,
         "has_gold_summary": False, "has_summary": False, "topic": "UV",
+        "publication_source": None, "ingested_at": None, "title": "Kausalzusammenhang", "status": "expert_confirmed",
     }
 
 
@@ -208,3 +209,95 @@ def test_stub_remove_deletes_placeholders_and_keeps_real_predictions(db_conn, da
     f = queries.facets(db_conn)
     assert (f["scored"], f["stub_scores"]) == (4, False)
     assert stub.remove(db_conn) == 0
+
+
+# --- titles ---------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("subject, area, expected", [
+    ("Unfallversicherung (Fallabschluss; Kausalzusammenhang)", "Unfallversicherung", "Fallabschluss; Kausalzusammenhang"),
+    ("Assurance-accidents (rente d'invalidité)", "Assurance-accidents", "Rente d'invalidité"),
+    ("Invalidenversicherung, Invalidenrente", "Invalidenversicherung", "Invalidenrente"),
+    ("Unfallversicherung", "Unfallversicherung", None),               # says no more than the area
+    ("Garantievertrag,", "Vertragsrecht", "Garantievertrag"),         # stray comma from the source
+    ("Rechtsverweigerung (Prozessvoraussetzung)", "Invalidenversicherung", "Rechtsverweigerung (Prozessvoraussetzung)"),
+    ("Unfallversicherungsgesetz, Revision", "Unfallversicherung", "Unfallversicherungsgesetz, Revision"),  # not the area + keywords
+    ("Unfallversicherung (Rente) und weiteres", "Unfallversicherung", "Unfallversicherung (Rente) und weiteres"),
+    ("Haft", None, "Haft"),
+    (None, "Strafprozess", None),
+    ("  ", None, None),
+])
+def test_display_title(subject, area, expected):
+    assert queries.display_title(subject, area) == expected
+
+
+def test_list_gives_title_next_to_the_unchanged_subject(db_conn, data):
+    rows = {r["docket"]: r for r in queries.list_rulings(db_conn)["items"]}
+    assert (rows["8C_607/2025"]["title"], rows["8C_607/2025"]["subject"]) == ("Rente d'invalidité", "Assurance-accidents (rente d'invalidité)")
+    assert rows["8C_300/2025"]["title"] is None            # "Assicurazione militare": the area only
+    assert rows["7B_5/2026"]["title"] == "Haft"
+
+
+# --- rulings added by an update ---------------------------------------------------------------------------
+
+
+def test_ingested_filter_and_fields(db_conn, data):
+    db_conn.execute(
+        "INSERT INTO ingested_rulings (docket, decision_date, published_from, published_to) VALUES ('8C_607/2025', '2026-06-30', '2026-07-24', '2026-07-24')"
+    )
+    db_conn.execute("""UPDATE rulings SET field_sources = '{"publication_date": "bger_list"}' WHERE docket = '8C_72/2025'""")
+    assert _dockets(db_conn, RulingFilters(ingested=True)) == ["8C_607/2025"]
+    assert len(_dockets(db_conn, RulingFilters(ingested=False))) == 4
+    rows = {r["docket"]: r for r in queries.list_rulings(db_conn)["items"]}
+    assert rows["8C_607/2025"]["ingested_at"] is not None and rows["8C_72/2025"]["ingested_at"] is None
+    assert rows["8C_72/2025"]["publication_source"] == "bger_list" and rows["8C_607/2025"]["publication_source"] is None
+
+
+# --- summaries and the learning numbers ---------------------------------------------------------------------
+
+
+def _gold(conn, ruling_id, language="de"):
+    conn.execute(
+        "INSERT INTO gold_summaries (ruling_id, language, title, body) VALUES (%s, %s, 'Titel', 'Text.')", (ruling_id, language)
+    )
+
+
+def _summary(conn, ruling_id, origin):
+    run = None
+    if origin == "model":
+        run = conn.execute(
+            "INSERT INTO model_runs (kind, models) VALUES ('summary', %s) RETURNING id", (Jsonb([{"name": "m", "role": "r"}]),)
+        ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO summaries (ruling_id, language, body, origin, run_id) VALUES (%s, 'de', 'Text.', %s, %s)",
+        (ruling_id, origin, run),
+    )
+
+
+def test_summarised_filter_covers_reference_and_generated_summaries(db_conn, data):
+    _gold(db_conn, data["uv_de"])
+    _summary(db_conn, data["iv"], "model")
+    assert set(_dockets(db_conn, RulingFilters(summarised=True))) == {"8C_72/2025", "9C_10/2025"}
+    assert len(_dockets(db_conn, RulingFilters(summarised=False))) == 3
+
+
+def test_learning_numbers(db_conn, data):
+    empty = queries.learning(db_conn)
+    assert {k: v for k, v in empty.items() if v} == {"relevant_rulings": 1}
+    assert set(empty) == {
+        "relevant_rulings", "confirmed_by_experts", "rejected_by_experts", "reference_summaries", "generated_summaries",
+        "expert_summaries", "revision_requests", "accepted_unchanged", "decisions", "transitions", "revision_reasons",
+    }  # fmt: skip
+    _gold(db_conn, data["uv_de"], "de")
+    _gold(db_conn, data["uv_de"], "fr")
+    _summary(db_conn, data["iv"], "model")
+    _summary(db_conn, data["mv"], "expert")
+    db_conn.execute("UPDATE summaries SET confirmed_at = now(), confirmed_by = 'expert' WHERE origin = 'expert'")
+    db_conn.execute("INSERT INTO labels (ruling_id, label_set, value) VALUES (%s, 'expert_override', 'relevant')", (data["uv_fr"],))
+    db_conn.execute("INSERT INTO labels (ruling_id, label_set, value) VALUES (%s, 'expert_override', 'not_relevant')", (data["iv"],))
+    numbers = queries.learning(db_conn)
+    assert {k: numbers[k] for k in ("relevant_rulings", "confirmed_by_experts", "rejected_by_experts", "reference_summaries",
+                                    "generated_summaries", "expert_summaries")} == {
+        "relevant_rulings": 2, "confirmed_by_experts": 1, "rejected_by_experts": 1,
+        "reference_summaries": 1, "generated_summaries": 1, "expert_summaries": 1,
+    }  # fmt: skip

@@ -284,17 +284,28 @@ def reconcile(conn, window: config.Window = config.DEFAULT_WINDOW, extra_dockets
                    cited_decisions = EXCLUDED.cited_decisions, official_url = EXCLUDED.official_url,
                    field_sources = EXCLUDED.field_sources, flags = EXCLUDED.flags, in_window = EXCLUDED.in_window"""
         )
-        # Rulings no longer supported by any source record: remove, unless something is attached to them.
+        # Rulings this run no longer covers (no source record, or outside the window): remove them, unless
+        # they carry work. Work is anything attached to a ruling: a label or expert override, a reference
+        # summary, a generated or expert-edited summary, a prediction. Then nothing is removed at all:
+        # the error undoes the whole reconcile, so a too-narrow window can never cost an expert's edit.
         cur.execute(
             """SELECT r.id, r.docket,
                       EXISTS (SELECT 1 FROM labels l WHERE l.ruling_id = r.id) OR
-                      EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id)
+                      EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id) OR
+                      EXISTS (SELECT 1 FROM summaries s WHERE s.ruling_id = r.id) OR
+                      EXISTS (SELECT 1 FROM predictions p WHERE p.ruling_id = r.id) OR
+                      EXISTS (SELECT 1 FROM relevance_events e WHERE e.ruling_id = r.id) OR
+                      EXISTS (SELECT 1 FROM summary_events e WHERE e.ruling_id = r.id)
                FROM rulings r WHERE NOT EXISTS (SELECT 1 FROM _r WHERE _r.docket = r.docket AND _r.decision_date = r.decision_date)"""
         )
         stale = cur.fetchall()
-        attached = [d for _, d, has in stale if has]
+        attached = sorted(d for _, d, has in stale if has)
         if attached:
-            raise RuntimeError(f"rulings with labels or gold summaries lost all their source records: {sorted(attached)}")
+            shown = ", ".join(attached[:20]) + (f" and {len(attached) - 20} more" if len(attached) > 20 else "")
+            raise RuntimeError(
+                f"reconcile would delete {len(attached)} ruling(s) that carry labels, summaries or predictions "
+                f"(not covered by the window, or no source record left); nothing was changed: {shown}"
+            )
         if stale:
             cur.execute("DELETE FROM rulings WHERE id = ANY(%s)", ([i for i, _, _ in stale],))
             rep.rulings_removed = len(stale)

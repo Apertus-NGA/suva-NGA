@@ -1,0 +1,413 @@
+{
+  "version": "judge-v3",
+  "note": "One binary call per criterion. Weights sum to 1. `evidence` names the text a FAIL must be quoted from. `cover_every_sentence`: the answer must quote every sentence of the summary, which code verifies. The examples are invented: none comes from a ruling or from Suva's summaries. `confirm_fail`: a FAIL is re-examined by a second call that looks for support in the source; a failing unit is cleared only if that call quotes real supporting text.",
+  "dimensions": {
+    "style": "Legal terminology and tone (first priority)",
+    "faithfulness": "Everything the summary says is true and comes from the ruling",
+    "coverage": "What matters in the ruling is in the summary"
+  },
+  "criteria": [
+    {
+      "id": "T1",
+      "name": "Swiss legal terminology",
+      "dimension": "style",
+      "weight": 0.15,
+      "critical": true,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "summary",
+      "question": "Does every legal term of art in the summary use the established Swiss term in the summary's language?",
+      "units": "Each legal term of art in the summary that is NOT the established Swiss term (institutions, remedies and procedural acts, benefits, legal notions, standards of proof), one unit per term, with the term in `summary_quote`. If every term is established, give one unit that says so, with `ok: true`.",
+      "pass": "Every term is the one Swiss federal legislation, the Federal Supreme Court or Swiss insurance practice uses in that language (the equivalence table, or the source's own wording when the source is in the summary's language).",
+      "fail": [
+        "a term from another legal order (Germany, Austria, France, Belgium) where Swiss law has its own term, for example Klage or Berufung for Beschwerde, Widerspruch or Widerspruchsbescheid for Einsprache or Einspracheentscheid, Erwerbsminderungsrente for Invalidenrente, Schmerzensgeld for Integritätsentschädigung, Krankengeld for Taggeld; appel or pourvoi for recours, plainte for opposition or recours, pension d'invalidité for rente d'invalidité, dommages-intérêts for indemnité pour atteinte à l'intégrité",
+        "a lay paraphrase where a term of art exists and precision is lost, for example 'Einkommen ohne Unfall' for Valideneinkommen, 'lien avec l'accident' for lien de causalité naturelle",
+        "a literal calque of the other language's term of art, for example 'Expertise' for Gutachten or 'eine Einsprache unzulässig erklären' for 'auf eine Einsprache nicht eintreten' in German; 'décision d'opposition' for décision sur opposition or 'revenu valide' for revenu sans invalidité in French",
+        "a term of art left in the other language inside the text, for example 'CFC' or 'IPAI' in a German summary, 'Einspracheentscheid' in a French one"
+      ],
+      "ignore": "Whether the term is applied to the right fact (faithfulness criteria), citation format, grammar and ordinary vocabulary (T3), tone (T2), names of statistical tables or bodies that have no translation.",
+      "doubt": "Mark a term not ok only if it falls under one of the four FAIL kinds AND you can name the correct Swiss term in the note. A term the source ruling itself uses in the summary's language is always ok. Variants and short forms of an established term are ok (demi-rente, rente entière, IV-Rente, Suva-Arzt). If you are unsure whether a term is established, it is ok.",
+      "examples": [
+        {
+          "text": "Die Suva trat auf die Einsprache nicht ein; das kantonale Gericht wies die Beschwerde ab.",
+          "verdict": "PASS",
+          "why": "Einsprache, nicht eintreten, Beschwerde, abweisen are the Swiss terms."
+        },
+        {
+          "text": "Der Versicherte legte gegen den Widerspruchsbescheid Berufung ein.",
+          "verdict": "FAIL",
+          "why": "German-law terms; Swiss: Einspracheentscheid, Beschwerde."
+        },
+        {
+          "text": "L'assuré a fait appel de la décision d'opposition.",
+          "verdict": "FAIL",
+          "why": "Swiss: a recouru contre la décision sur opposition."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": false
+    },
+    {
+      "id": "T2",
+      "name": "Register and tone",
+      "dimension": "style",
+      "weight": 0.1,
+      "critical": false,
+      "inputs": [
+        "examples"
+      ],
+      "evidence": "summary",
+      "question": "Is the whole summary written in the impersonal, neutral, declarative register of a professional case-law digest?",
+      "units": "Every sentence of the summary, in order, one unit per sentence, with the sentence in `summary_quote`. Mark `ok: false` each sentence that departs from that register.",
+      "pass": "Third person, neutral and declarative throughout; parties named by role. A short neutral editorial note (for example 'Anmerkung: …', 'Remarque : …', or the mention of a five-judge bench) is acceptable.",
+      "fail": [
+        "first or second person, or an address to the reader (ich, wir, Sie; je, nous, vous; 'merken Sie sich', 'à retenir')",
+        "the summariser's own opinion, praise, criticism or emotion (leider, erfreulicherweise, hart; malheureusement, sévère, à juste titre used as the summariser's comment rather than the court's finding)",
+        "colloquial or conversational wording, exclamation marks, rhetorical questions",
+        "talk about the summary or the task ('Zusammenfassung:', 'Im Folgenden', 'Voici le résumé', 'En résumé'), or assistant phrasing ('Gerne', 'Bien sûr')",
+        "advice, recommendation or a comment on the ruling's relevance for the insurer",
+        "a party, judge, clerk or lawyer named, or an anonymisation placeholder kept in the text (for example 'A.________') instead of a role"
+      ],
+      "ignore": "Wrong legal terms (T1), grammar and foreign words (T3), boilerplate and repetition (T4), truth of the content, length.",
+      "doubt": "A FAIL needs a quotable passage. If no passage clearly departs from the register, PASS. Formal idioms that the Federal Supreme Court itself uses in its rulings are not colloquial. The style examples show the house register; they are other cases and their content is irrelevant.",
+      "examples": [
+        {
+          "text": "Das Bundesgericht hält fest, dass die Frist mit der Zustellung der Verfügung zu laufen beginnt.",
+          "verdict": "PASS",
+          "why": "Neutral, declarative."
+        },
+        {
+          "text": "Leider ein strenger Entscheid: Merken Sie sich, dass der Versicherer hier Recht bekam!",
+          "verdict": "FAIL",
+          "why": "Opinion, address to the reader, exclamation."
+        },
+        {
+          "text": "A.________ a chuté d'une échelle en 2019.",
+          "verdict": "FAIL",
+          "why": "Anonymisation placeholder instead of 'l'assuré'."
+        }
+      ],
+      "cover_every_sentence": true,
+      "confirm_fail": false
+    },
+    {
+      "id": "T3",
+      "name": "Language quality",
+      "dimension": "style",
+      "weight": 0.1,
+      "critical": false,
+      "inputs": [],
+      "evidence": "summary",
+      "question": "Is the summary written entirely in correct, idiomatic German or French (the language named in the request), as a native legal writer in Switzerland would write it?",
+      "units": "Every sentence of the summary, in order, one unit per sentence, with the sentence in `summary_quote`. Mark `ok: false` each sentence with a language defect.",
+      "pass": "The whole text is in the requested language and is grammatically correct.",
+      "fail": [
+        "a word, phrase or sentence left in another language (other than proper names, Latin expressions, statute abbreviations and official names without translation)",
+        "a grammar error: wrong gender or agreement, wrong case or preposition, missing verb, a sentence that does not parse",
+        "a wrong word: a word that exists but is not the one meant ('se montant' for 'ce montant'), or a false friend that changes the meaning"
+      ],
+      "ignore": "Idiom and elegance: never mark a sentence not ok because it sounds unidiomatic, formal, archaic or heavy. Swiss legal German and French have idioms of their own that are correct ('ensuite de', 'l'arrêt entrepris', 'déployer des effets', 'est réputé tel', 'les premiers juges'; 'in casu', 'tut dem keinen Abbruch', 'Vernehmlassung', 'erhellt', 'sein Bewenden haben'). A misspelling that yields a non-word, spacing, punctuation, typographic quotes, 'ss' against 'ß'. Legal terms of art (T1). Tone (T2). Truth of the content.",
+      "doubt": "Mark a sentence not ok only for one of the three FAIL kinds, and give the corrected wording in the note. If you cannot give a correction that a grammar book would support, the sentence is ok.",
+      "examples": [
+        {
+          "text": "La juridiction cantonale a confirmé la décision sur opposition de l'assureur.",
+          "verdict": "PASS",
+          "why": "Native legal French."
+        },
+        {
+          "text": "Der Versicherte arbeitete als Maçon auf einer Baustelle.",
+          "verdict": "FAIL",
+          "why": "French word left in the German text (Maurer)."
+        },
+        {
+          "text": "L'assureur a nié son obligation, ce que n'est pas à critiquer et reste à confirmer le jugement.",
+          "verdict": "FAIL",
+          "why": "Calqued construction that does not parse in French."
+        }
+      ],
+      "cover_every_sentence": true,
+      "confirm_fail": false
+    },
+    {
+      "id": "T4",
+      "name": "Digest economy",
+      "dimension": "style",
+      "weight": 0.05,
+      "critical": false,
+      "inputs": [
+        "examples"
+      ],
+      "evidence": "summary",
+      "question": "Does the summary contain only digest content, each point stated once?",
+      "units": "Every sentence of the summary, in order, one unit per sentence, with the sentence in `summary_quote`. Mark `ok: false` each sentence that is boilerplate, part of a pasted operative part, or a repetition of an earlier sentence.",
+      "pass": "Facts needed to understand the point, the legal point, its application, optionally the outcome in one sentence.",
+      "fail": [
+        "procedural boilerplate with no bearing on the point: admissibility or standard-of-review recitals, composition of the court, court costs, party compensation, legal aid, notification, signatures, place and date of the ruling (unless one of these is itself the disputed question)",
+        "the operative part copied as a block or as numbered points",
+        "the same statement made twice, for example the outcome sentence repeated"
+      ],
+      "ignore": "Level of factual detail, length, tone (T2), terminology (T1), truth of the content.",
+      "doubt": "A FAIL needs a quotable passage of one of the three kinds. Otherwise PASS.",
+      "examples": [
+        {
+          "text": "… Die Beschwerde wird abgewiesen.",
+          "verdict": "PASS",
+          "why": "Outcome once, in one sentence."
+        },
+        {
+          "text": "… Le recours est rejeté. Les frais judiciaires, arrêtés à 800 fr., sont mis à la charge du recourant. Le recours est rejeté.",
+          "verdict": "FAIL",
+          "why": "Costs boilerplate and repeated outcome."
+        }
+      ],
+      "cover_every_sentence": true,
+      "confirm_fail": false
+    },
+    {
+      "id": "F1",
+      "name": "Facts supported by the ruling",
+      "dimension": "faithfulness",
+      "weight": 0.1,
+      "critical": true,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "summary",
+      "question": "Is every factual statement of the summary stated in, or directly entailed by, the source ruling?",
+      "units": "Each factual statement of the summary: events, who the persons are (role, occupation), dates and durations, amounts, percentages, medical findings, what the insurer and the lower court decided, and what each party argued. One unit per statement; a sentence with three facts gives three units.",
+      "pass": "Each statement is found in the source (translated or condensed is fine), with the same numbers and the same actor.",
+      "fail": [
+        "a statement the source contradicts",
+        "a statement with no support in the source (invented detail)",
+        "a number, date, amount or percentage that differs from the source",
+        "a decision, argument or position attributed to the wrong actor (for example the insurer's argument presented as the insured's)"
+      ],
+      "ignore": "Statements of law and the court's legal reasoning (F2). Who appealed to the Federal Supreme Court and how the appeal was disposed of (F3). Legal references (F4). Facts the summary leaves out.",
+      "doubt": "The burden is on the summary, but search before you conclude. A summary condenses and paraphrases: look for the same fact under another word, in translation, or spread over several passages (médecine d'assurance = médecin-conseil = Kreisarzt; the insurer = Suva = CNA; a later ruling of the same court in the same case). Look in the facts section AND in the considerations. Only when no passage carries the fact, or a passage contradicts it, is the unit not ok; then put the closest passage of the source in `source_quote`. Generalising to a role and sensible rounding are ok.",
+      "examples": [
+        {
+          "text": "Summary: 'Der Versicherer sprach eine Rente von 18 % zu; das kantonale Gericht erhöhte sie auf 24 %.' Source states both figures and both actors.",
+          "verdict": "PASS",
+          "why": "Figures and actors match."
+        },
+        {
+          "text": "Summary: 'rente fondée sur un taux de 35 %'. Source: 'taux d'invalidité de 30 %'.",
+          "verdict": "FAIL",
+          "why": "Percentage differs."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": true
+    },
+    {
+      "id": "F2",
+      "name": "Legal content faithful",
+      "dimension": "faithfulness",
+      "weight": 0.12,
+      "critical": true,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "summary",
+      "question": "Is every statement of law or legal reasoning that the summary attributes to the Federal Supreme Court faithful to the source in content and in strength?",
+      "units": "Each legal statement of the summary: a rule, principle, condition, threshold, interpretation, legal conclusion on the case, or a question said to be left open. One unit per statement.",
+      "pass": "Each statement matches what the Federal Supreme Court itself says in its considerations: same direction, same conditions, same strength, same scope.",
+      "fail": [
+        "reversed or negated (allowed where the court forbids, 'if' where the court says 'unless')",
+        "a condition, exception or threshold added, dropped or changed (cumulative against alternative, 'at least' against 'more than')",
+        "strength changed: 'in principle' or 'as a rule' turned into 'always' or 'never', 'rarely' into 'regularly', a question the court leaves open presented as decided, or the reverse",
+        "scope extended to benefits, insurers or situations the court does not address",
+        "a view of the lower court or of a party presented as the Federal Supreme Court's own holding although the court does not adopt it",
+        "a legal statement with no support in the source"
+      ],
+      "ignore": "Facts and party positions (F1). The disposition of the appeal (F3). Whether the cited article or consideration is the right one (F4). Legal points the summary leaves out (coverage criteria). Terminology and style.",
+      "doubt": "The burden is on the summary, but search before you conclude. A summary condenses and paraphrases: look for the same legal point under other words or in translation, in every consideration, including where the court adopts the lower court's reasoning ('à juste titre', 'zu Recht', 'ne prête pas le flanc à la critique'). A view the court endorses is the court's own. Only when no passage carries the point, or a passage contradicts it, is the unit not ok; then put the closest passage of the source in `source_quote`.",
+      "examples": [
+        {
+          "text": "Summary: 'Eine Verrechnung ist in der Regel zulässig.' Source: 'Eine Verrechnung ist nur ausnahmsweise zulässig.'",
+          "verdict": "FAIL",
+          "why": "Strength reversed."
+        },
+        {
+          "text": "Summary: 'Le Tribunal fédéral laisse ouverte la question de la prescription.' Source: the court says the question of prescription need not be examined.",
+          "verdict": "PASS",
+          "why": "Left open in both."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": true
+    },
+    {
+      "id": "F3",
+      "name": "Outcome and procedural posture correct",
+      "dimension": "faithfulness",
+      "weight": 0.08,
+      "critical": true,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "summary",
+      "question": "Is everything the summary says about the appeal to the Federal Supreme Court and its outcome correct?",
+      "units": "Each statement of the summary about: who appealed to the Federal Supreme Court; the disposition (admitted, partially admitted, dismissed, not entered into, remanded, and to whom and for what); what is confirmed or annulled; who prevails. If the summary says nothing of the kind, give one unit that says so, with `ok: true`.",
+      "pass": "Each statement agrees with the operative part ('Demnach erkennt das Bundesgericht', 'Par ces motifs, le Tribunal fédéral prononce', 'Per questi motivi, il Tribunale federale pronuncia') and with the procedural history. A summary that states no outcome passes.",
+      "fail": [
+        "the disposition differs (dismissed against admitted; admitted against partially admitted; dismissed against not entered into)",
+        "the appellant or the prevailing party is wrong",
+        "a remand is stated that the court did not order, or the authority or purpose of the remand is wrong",
+        "what is confirmed or annulled is wrong (for example a rate the court did not fix)"
+      ],
+      "ignore": "The missing outcome (not required). Earlier procedural history (F1). Legal reasoning (F2).",
+      "doubt": "'Dismissed in so far as admissible' may be rendered as 'dismissed'. 'Manifestly ill-founded' may be omitted but not added. If a stated element cannot be reconciled with the operative part, the unit is not ok.",
+      "examples": [
+        {
+          "text": "Summary: 'Die Beschwerde der Suva wird abgewiesen.' Operative part: 'Die Beschwerde wird gutgeheissen.'",
+          "verdict": "FAIL",
+          "why": "Disposition reversed."
+        },
+        {
+          "text": "Summary states only the rule and no outcome.",
+          "verdict": "PASS",
+          "why": "Nothing stated, nothing wrong."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": false
+    },
+    {
+      "id": "F4",
+      "name": "Legal references exact",
+      "dimension": "faithfulness",
+      "weight": 0.05,
+      "critical": false,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "summary",
+      "question": "Is every legal reference in the summary present in the source and attached to the same point?",
+      "units": "Each reference in the summary: statute article (with paragraph and letter), consideration number (E., Erw., consid.), cited decision. If the summary has no reference, give one unit that says so, with `ok: true`.",
+      "pass": "The source cites the same provision for the same point (the statute abbreviation may be in the other language; a summary that cites an article without the paragraph or letter the source gives is ok), and a cited consideration exists and deals with the point (the consideration itself, its sub-considerations, and the paragraphs that follow its number up to the next number).",
+      "fail": [
+        "an article the source does not cite, or a paragraph or letter that differs from the source's",
+        "a provision cited for a point the source ties to another provision",
+        "a consideration number that does not exist in the source, or that deals with another subject",
+        "a decision (BGE, ATF, docket) the source does not cite"
+      ],
+      "ignore": "A statute named without any article ('nach VVG', 'selon la LAA') is not a reference to check. The citation format and the language of the abbreviation (checked by code). Whether the legal statement itself is right (F2). References the summary leaves out.",
+      "doubt": "Consideration numbers stand at the start of a paragraph of the source, in the form '5.2.' or '6.3.1.': search for the number there before you conclude it does not exist. A reference placed at the end of a passage covers that passage; it is ok when the cited consideration (or one of its sub-considerations) deals with the same subject. If you cannot find an article, paragraph or letter in the source, the unit is not ok.",
+      "examples": [
+        {
+          "text": "Summary: 'art. 53 al. 1 LPGA'. Source: 'Art. 53 Abs. 1 ATSG', same point.",
+          "verdict": "PASS",
+          "why": "Same provision, other language."
+        },
+        {
+          "text": "Summary: '(E. 6.4)'. Source considerations end at 5.",
+          "verdict": "FAIL",
+          "why": "Consideration does not exist."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": true
+    },
+    {
+      "id": "C1",
+      "name": "A legal holding is stated",
+      "dimension": "coverage",
+      "weight": 0.09,
+      "critical": true,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "source",
+      "question": "Does the summary state at least one legal holding of the ruling together with its reason, that is, a point a lawyer can take away?",
+      "units": "First unit: the holdings of the ruling, found in the considerations where the court resolves a disputed point (quote the decisive passage of the source). Then one unit for the summary: does it convey one of them with its reason (quote the summary if it does).",
+      "pass": "The summary conveys a rule, principle or decisive consideration the court applies to resolve a disputed point, specific enough to be used in another case or to explain this one. A single sentence can be enough. Rule alone, without the facts of the case, is enough.",
+      "fail": [
+        "the summary only narrates facts, procedure and outcome ('the insurer refused, the cantonal court confirmed, the appeal is dismissed')",
+        "the only reason given is generic and would fit any ruling ('because the conditions were not met', 'da die Voraussetzungen nicht erfüllt sind', 'le grief est mal fondé')",
+        "the only legal content is a recital of the standard of review or of admissibility"
+      ],
+      "ignore": "Whether the holding stated is the main one (C2). Whether it is rendered faithfully (F2). Style.",
+      "doubt": "Ask: after reading only the summary, can a lawyer say what legal point the court made and why? If not, the summary unit is not ok. In every case quote in `source_quote` the passage of the source that holds the court's point.",
+      "examples": [
+        {
+          "text": "Die Frist beginnt erst mit der tatsächlichen Kenntnis des Schadens; blosse Vermutungen genügen nicht.",
+          "verdict": "PASS",
+          "why": "A rule, usable elsewhere."
+        },
+        {
+          "text": "Die Versicherte verlangte Leistungen. Der Versicherer verneinte seine Leistungspflicht, das kantonale Gericht bestätigte dies. Die Beschwerde wird abgewiesen.",
+          "verdict": "FAIL",
+          "why": "Facts, procedure and outcome only."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": false
+    },
+    {
+      "id": "C2",
+      "name": "Main disputed question resolved in substance",
+      "dimension": "coverage",
+      "weight": 0.08,
+      "critical": false,
+      "inputs": [
+        "source"
+      ],
+      "evidence": "source",
+      "question": "Does the summary say how the Federal Supreme Court resolved the main disputed question, in substance?",
+      "units": "Unit 1, the question: the main disputed question in a few words (nothing to quote). Unit 2, the court's reasoned answer: the passage of the CONSIDERATIONS where the court gives its answer and its reason, in `source_quote`. Never quote the operative part, nor a sentence that only says the appeal is well-founded or ill-founded. Unit 3, the summary: does it convey the substance of the passage of unit 2 (its words in `summary_quote` if it does)? Units 1 and 2 are `ok: true`; only unit 3 decides.",
+      "pass": "The summary conveys what the court decided on the main question in substance: its legal answer with at least the decisive reason. Only the main question counts. The disposition of the appeal need not be stated.",
+      "fail": [
+        "the summary is silent on the main question and deals only with a side point",
+        "the summary gives only the disposition ('the appeal is dismissed', 'the cantonal ruling is confirmed') or a generic reason, without the substance of the court's answer",
+        "the summary names the question but not the court's answer"
+      ],
+      "ignore": "The disposition of the appeal: stating it is neither required nor enough. Secondary questions (a second head of claim, costs, legal aid, a formal complaint), unless one of them is what the ruling is about. Whether the answer is rendered faithfully (F2). Facts.",
+      "doubt": "The main question is the one the court frames with 'Streitig ist', 'Le litige porte sur', 'Oggetto del contendere', or the one its decisive considerations deal with. When a ruling disposes of a routine case but clarifies one legal point at length, that point is the main question. If the substance of the summary cannot be matched to the court's answer, the second unit is not ok.",
+      "examples": [
+        {
+          "text": "Ruling: the main question is whether a deadline was met; the court says no, because it started with the notification. Summary states that the deadline starts with the notification and was therefore missed, and does not state the disposition.",
+          "verdict": "PASS",
+          "why": "Substantive answer with its reason; the disposition is not required."
+        },
+        {
+          "text": "Same ruling. Summary: 'Der Versicherer verneinte seine Leistungspflicht, das kantonale Gericht bestätigte dies. Die Beschwerde wird abgewiesen.'",
+          "verdict": "FAIL",
+          "why": "Disposition only: nothing on how the court answered the question."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": false
+    },
+    {
+      "id": "R1",
+      "name": "Covers the expert reference",
+      "dimension": "coverage",
+      "weight": 0.08,
+      "critical": false,
+      "inputs": [
+        "reference"
+      ],
+      "evidence": "reference",
+      "question": "Does the summary convey every legal point that the expert reference summary of the same ruling makes?",
+      "units": "One unit per legal point of the reference: each rule, principle, legal conclusion or question left open that the reference states (quote the reference in `source_quote`). For each, whether the summary conveys the same point (quote the summary if it does).",
+      "pass": "Every legal point of the reference is conveyed by the summary, in any wording, in any order, in either language. The summary may say more than the reference.",
+      "fail": [
+        "a legal point of the reference is absent from the summary",
+        "a legal point of the reference is contradicted by the summary"
+      ],
+      "ignore": "Facts, figures, considerations numbers, order, length and style of the reference. Points the summary adds. The reference may be in another language than the summary.",
+      "doubt": "If a point of the reference is not clearly conveyed, the unit is not ok. If the reference makes no legal point at all, give one unit that says so, with `ok: true`.",
+      "examples": [
+        {
+          "text": "Reference: the deadline starts with actual knowledge; the burden of proof lies with the insurer. Summary: states only when the deadline starts.",
+          "verdict": "FAIL",
+          "why": "Second legal point absent."
+        }
+      ],
+      "cover_every_sentence": false,
+      "confirm_fail": false
+    }
+  ]
+}

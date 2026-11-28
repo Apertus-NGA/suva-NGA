@@ -35,5 +35,5 @@ export function AreaFilter({ topics, areas, selectedTopics, selectedAreas, onCha
 }
 
 function SectionTitle({ children }: { children: string }) {
-  return <div className="px-3 pb-0.5 pt-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-faint">{children}</div>;
+  return <div className="px-3 pb-0.5 pt-2.5 text-[12px] text-faint">{children}</div>;
 }

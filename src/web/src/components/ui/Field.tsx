@@ -7,7 +7,7 @@ type Props = InputHTMLAttributes<HTMLInputElement> & { label: string };
 export function Field({ label, className, ...input }: Props) {
   return (
     <label className="flex min-w-0 flex-1 flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-faint">{label}</span>
+      <span className="text-[12px] text-faint">{label}</span>
       <input
         {...input}
         className={cn(

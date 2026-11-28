@@ -215,7 +215,14 @@ def _text_sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _flush(conn: psycopg.Connection, batch: list[_Row], raw_ids: dict[str, int], counts: dict[str, int]) -> None:
+def _flush(
+    conn: psycopg.Connection,
+    batch: list[_Row],
+    raw_ids: dict[str, int],
+    counts: dict[str, int],
+    kept: list[dict] | None = None,
+) -> None:
+    """`kept` is not None in add-only mode: a stored record is then never rewritten (see load_source_records)."""
     existing = {
         (r[0], r[1]): r[2:]
         for r in conn.execute(
@@ -263,6 +270,22 @@ def _flush(conn: psycopg.Connection, batch: list[_Row], raw_ids: dict[str, int],
         if content_same and status_same:
             if row.status == "loaded":
                 counts["unchanged"] += 1
+            continue
+        if kept is not None:
+            # Add-only: the stored record stays exactly as it is. What differs in substance is reported.
+            if row.status == "loaded":
+                counts["kept_existing"] += 1
+            differs = [
+                name
+                for name, same in (
+                    ("case number or decision date", docket == row.docket and ddate == row.decision_date),
+                    ("fields", fields == json.loads(row.fields_json)),
+                    ("text", (text_sha if has_text else None) == new_text_sha),
+                )
+                if not same
+            ]
+            if differs:
+                kept.append({"source": row.source, "source_key": row.source_key, "docket": docket, "differs": differs})
             continue
         # The record's own content changed: it goes back to 'loaded' and the reconciler must look at it again.
         updates.append((rec_id, row))
@@ -341,7 +364,9 @@ def _flush(conn: psycopg.Connection, batch: list[_Row], raw_ids: dict[str, int],
         )
 
 
-def load_source_records(conn: psycopg.Connection, records: Iterable[SourceRecord]) -> dict[str, int]:
+def load_source_records(
+    conn: psycopg.Connection, records: Iterable[SourceRecord], *, add_only: bool = False, kept: list[dict] | None = None
+) -> dict[str, int]:
     """Upsert SourceRecords into `source_records` (key: source, source_key) and their texts into `ruling_texts`.
 
     Returns counts with  read == inserted + updated + unchanged + rejected :
@@ -356,10 +381,19 @@ def load_source_records(conn: psycopg.Connection, records: Iterable[SourceRecord
     record, raw_file or text) DID change, its row is rewritten and reset to status='loaded', ruling_id NULL,
     and its text to is_canonical=false, ruling_id NULL. A text is removed when the record no longer has one.
 
+    add_only=True (used by the live ingest): a record that is already stored is never rewritten, whatever the
+    source now says. Such records are counted as `kept_existing` (so read == inserted + kept_existing +
+    unchanged + rejected, and `updated` stays 0), and those whose case number, decision date, fields or text
+    differ are appended to `kept` as {"source", "source_key", "docket", "differs": [...]}.
+
     Raises KeyError (and writes nothing) if a record names a raw_file that is not in `raw_files`:
     call register_raw_files first.
     """
+    if add_only and kept is None:
+        kept = []
     counts = {k: 0 for k in ("read", "inserted", "updated", "unchanged", "rejected", "not_stored", "texts", "bad_texts")}
+    if add_only:
+        counts["kept_existing"] = 0
     with conn.transaction():
         raw_ids: dict[str, int] = dict(conn.execute("SELECT path, id FROM raw_files").fetchall())
         seen: set[tuple[str, str]] = set()
@@ -391,8 +425,8 @@ def load_source_records(conn: psycopg.Connection, records: Iterable[SourceRecord
                 chars += len(row.text)
             batch.append(row)
             if len(batch) >= BATCH_ROWS or chars >= BATCH_TEXT_CHARS:
-                _flush(conn, batch, raw_ids, counts)
+                _flush(conn, batch, raw_ids, counts, kept if add_only else None)
                 batch, chars = [], 0
         if batch:
-            _flush(conn, batch, raw_ids, counts)
+            _flush(conn, batch, raw_ids, counts, kept if add_only else None)
     return counts

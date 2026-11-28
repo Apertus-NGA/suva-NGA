@@ -2,6 +2,8 @@
 
 export type Label = "relevant" | "not_relevant" | "unknown";
 export type Topic = "UV" | "MV" | "IV";
+export type Status = "not_assessed" | "potentially_relevant" | "ai_relevant" | "expert_confirmed" | "not_relevant";
+export type RelevanceAction = "confirm_relevant" | "mark_not_relevant" | "reopen";
 
 export type Ruling = {
   id: number;
@@ -13,11 +15,15 @@ export type Ruling = {
   starred: boolean | null;
   area: string | null;
   topic: Topic | null;
-  subject: string | null;
+  subject: string | null; // the court's subject line, as published
+  title: string | null; // the subject without the repeated area; null when it says no more than the area
+  publication_source: string | null; // "bger_list" when the publication date is confirmed by bger.ch
+  ingested_at: string | null; // set when the ruling was added by an update
   outcome: string | null;
   official_url: string | null;
   label: Label;
-  label_basis: string;
+  label_basis: string; // "expert_override" when the decision was made in this workspace
+  status: Status;
   score: number | null; // 0..100
   predicted_relevant: boolean | null;
   has_gold_summary: boolean;
@@ -42,6 +48,7 @@ export type Facets = {
   languages: FacetValue[];
   outcomes: FacetValue[];
   labels: FacetValue[];
+  statuses: FacetValue[];
 };
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -50,7 +57,119 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type SourceStatus = "complete" | "blocked" | "incomplete" | "failed" | null;
+
+export type UpdateRun = {
+  run_id: number;
+  status: "ok" | "partial" | "failed";
+  published_from: string;
+  published_to: string;
+  finished_at: string | null;
+  new_rulings: number | null;
+  known_rulings: number | null;
+  not_confirmed_by_bger: number | null;
+  new_with_two_texts: number | null;
+  text_mismatches: number;
+  sources: { bger: SourceStatus; daily: SourceStatus; mirror: SourceStatus };
+  error: string | null;
+};
+
+export type UpdatesStatus = {
+  running: boolean;
+  current: { published_from: string; published_to: string } | null;
+  last: UpdateRun | null;
+  last_error: string | null;
+  next_range: { published_from: string; published_to: string } | null;
+  ingested_rulings: number;
+};
+
+export const fetchUpdates = (signal?: AbortSignal) => get<UpdatesStatus>("/api/updates", signal);
+
+/** Start an update: a range of publication dates, or nothing for "since the last update". */
+export async function startUpdate(range?: { published_from: string; published_to: string }): Promise<UpdatesStatus> {
+  const response = await fetch("/api/updates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(range ?? {}),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json() as Promise<UpdatesStatus>;
+}
+
+export type Learning = {
+  relevant_rulings: number;
+  confirmed_by_experts: number;
+  rejected_by_experts: number;
+  reference_summaries: number;
+  generated_summaries: number;
+  expert_summaries: number;
+  decisions: number;
+  revision_requests: number;
+  accepted_unchanged: number;
+  revision_reasons: Array<{ reason: string; n: number }>;
+  transitions: Array<{ before: Status; after: Status; n: number }>;
+};
+
+/** Record an expert decision on a ruling's relevance. Confirming creates a gold label. */
+export async function decideRelevance(rulingId: number, action: RelevanceAction): Promise<void> {
+  const response = await fetch(`/api/rulings/${rulingId}/relevance`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+}
+
+export const fetchLearning = (signal?: AbortSignal) => get<Learning>("/api/learning", signal);
+
 export const fetchFacets = (signal?: AbortSignal) => get<Facets>("/api/facets", signal);
 
 export const fetchRulings = (query: URLSearchParams, signal?: AbortSignal) =>
   get<RulingPage>(`/api/rulings?${query.toString()}`, signal);
+
+// --- the ruling page and the summary workspace ---------------------------------------------------------------
+
+export type SummaryLanguage = "de" | "fr";
+
+export type Summary = {
+  id: number;
+  version: number;
+  origin: "model" | "expert";
+  body: string;
+  confirmed: boolean; // confirmed by an expert as final: a gold summary
+  category: string | null; // the matter whose prompt wrote it
+  problems: string[]; // what the code-side checker found
+};
+
+export type RulingDetail = {
+  ruling: Ruling;
+  text: string | null;
+  text_source: string | null;
+  prompt_category: string;
+  summaries: Record<SummaryLanguage, Summary | null>;
+  reference: Record<SummaryLanguage, string | null>; // Suva's own summary, where one exists
+  revisions: string[];
+};
+
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json() as Promise<T>;
+}
+
+const summaries = (id: number) => `/api/rulings/${id}/summaries`;
+
+export const fetchRuling = (id: number, signal?: AbortSignal) => get<RulingDetail>(`/api/rulings/${id}/workspace`, signal);
+export const generateSummaries = (id: number) => send<RulingDetail>("POST", summaries(id));
+export const saveSummary = (id: number, language: SummaryLanguage, body: string, confirm: boolean) =>
+  send<RulingDetail>("PUT", `${summaries(id)}/${language}`, { body, confirm });
+export const confirmSummary = (id: number, language: SummaryLanguage) =>
+  send<RulingDetail>("POST", `${summaries(id)}/${language}/confirm`);
+export const unconfirmSummary = (id: number, language: SummaryLanguage) =>
+  send<RulingDetail>("POST", `${summaries(id)}/${language}/unconfirm`);
+export const reviseSummary = (id: number, language: SummaryLanguage, reason: string, note: string) =>
+  send<RulingDetail>("POST", `${summaries(id)}/${language}/revise`, { reason, note: note || null });

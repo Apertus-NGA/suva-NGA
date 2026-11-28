@@ -15,7 +15,9 @@ export type Filters = {
   language: string[];
   outcome: string[];
   label: string[];
+  status: string[];
   starred: boolean; // true = only rulings marked for publication
+  ingested: boolean; // true = only rulings added by an update
   predicted_relevant: "" | "true" | "false";
   score_min: string; // "" or 0..100
   score_max: string;
@@ -38,7 +40,9 @@ export const DEFAULT_FILTERS: Filters = {
   language: [],
   outcome: [],
   label: [],
+  status: [],
   starred: false,
+  ingested: false,
   predicted_relevant: "",
   score_min: "",
   score_max: "",
@@ -48,7 +52,7 @@ export const DEFAULT_FILTERS: Filters = {
 };
 
 const TEXT_KEYS = ["q", "decided_from", "decided_to", "published_from", "published_to", "score_min", "score_max"] as const;
-const LIST_KEYS = ["topic", "area", "division", "language", "outcome", "label"] as const;
+const LIST_KEYS = ["topic", "area", "division", "language", "outcome", "label", "status"] as const;
 const SORT_KEYS: SortKey[] = ["score", "docket", "area", "decision_date", "publication_date"];
 
 /** Query string for the address bar: only what differs from the defaults. */
@@ -57,6 +61,7 @@ export function toUrlParams(f: Filters): URLSearchParams {
   for (const key of TEXT_KEYS) if (f[key]) p.set(key, f[key]);
   for (const key of LIST_KEYS) for (const value of f[key]) p.append(key, value);
   if (f.starred) p.set("starred", "true");
+  if (f.ingested) p.set("ingested", "true");
   if (f.predicted_relevant) p.set("predicted_relevant", f.predicted_relevant);
   if (f.sort !== DEFAULT_FILTERS.sort || f.order !== DEFAULT_FILTERS.order) {
     p.set("sort", f.sort);
@@ -71,6 +76,7 @@ export function fromUrlParams(p: URLSearchParams): Filters {
   for (const key of TEXT_KEYS) f[key] = p.get(key) ?? "";
   for (const key of LIST_KEYS) f[key] = p.getAll(key);
   f.starred = p.get("starred") === "true";
+  f.ingested = p.get("ingested") === "true";
   const predicted = p.get("predicted_relevant");
   f.predicted_relevant = predicted === "true" || predicted === "false" ? predicted : "";
   const sort = p.get("sort") as SortKey | null;

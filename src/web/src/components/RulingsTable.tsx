@@ -1,13 +1,20 @@
 import { ArrowDown, ArrowUp, Star } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Ruling } from "../lib/api";
+import type { RelevanceAction, Ruling } from "../lib/api";
 import type { Order, SortKey } from "../lib/filters";
 import { useI18n, type I18n, type Key } from "../lib/i18n";
-import { LabelBadge } from "./LabelBadge";
+import { StatusCell } from "./StatusCell";
 import { Score } from "./Score";
 import { cn } from "./ui/cn";
 
-type Props = { rulings: Ruling[]; sort: SortKey; order: Order; onSort: (sort: SortKey, order: Order) => void };
+type Props = {
+  rulings: Ruling[];
+  sort: SortKey;
+  order: Order;
+  onSort: (sort: SortKey, order: Order) => void;
+  onDecide: (ruling: Ruling, action: RelevanceAction) => void;
+  onOpen: (ruling: Ruling) => void;
+};
 
 /** `wide`: only shown on wide windows (1280px and up), so the subject keeps its room on smaller ones. */
 type Column = { title: Key; width?: number; sort?: SortKey; firstOrder?: Order; wide?: boolean };
@@ -19,10 +26,10 @@ const COLUMNS: Column[] = [
   { title: "col.decided", width: 108, sort: "decision_date", firstOrder: "desc" },
   { title: "col.published", width: 108, sort: "publication_date", firstOrder: "desc" },
   { title: "col.outcome", width: 176, wide: true },
-  { title: "col.label", width: 128 },
+  { title: "col.status", width: 236 },
 ];
 
-export function RulingsTable({ rulings, sort, order, onSort }: Props) {
+export function RulingsTable({ rulings, sort, order, onSort, onDecide, onOpen }: Props) {
   const { t, tx, formatDate } = useI18n();
   return (
     <table className="w-full table-fixed border-separate border-spacing-0">
@@ -65,7 +72,13 @@ export function RulingsTable({ rulings, sort, order, onSort }: Props) {
       </thead>
       <tbody>
         {rulings.map((ruling) => (
-          <tr key={ruling.id} className="group">
+          <tr
+            key={ruling.id}
+            className="group cursor-pointer"
+            tabIndex={0}
+            onClick={() => onOpen(ruling)}
+            onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && onOpen(ruling)}
+          >
             <Cell first>
               <Score score={ruling.score} relevant={ruling.predicted_relevant} />
             </Cell>
@@ -80,8 +93,13 @@ export function RulingsTable({ rulings, sort, order, onSort }: Props) {
               </span>
             </Cell>
             <Cell>
-              <div className="truncate text-ink" title={ruling.subject ?? undefined}>
-                {ruling.subject ?? "–"}
+              <div className="flex items-center gap-2">
+                <span className="truncate text-ink" title={ruling.subject ?? undefined}>
+                  {ruling.title ?? ruling.area ?? "–"}
+                </span>
+                {ruling.ingested_at && (
+                  <span className="shrink-0 rounded border border-line-strong px-1 text-[11px] leading-4 text-muted">{t("ruling.new")}</span>
+                )}
               </div>
               <div className="truncate text-[12px] leading-[18px] text-faint">{meta(ruling, tx)}</div>
             </Cell>
@@ -89,7 +107,7 @@ export function RulingsTable({ rulings, sort, order, onSort }: Props) {
             <Cell className="tabular-nums text-muted">{formatDate(ruling.publication_date)}</Cell>
             <Cell className="hidden truncate text-muted xl:table-cell">{tx("outcome", ruling.outcome)}</Cell>
             <Cell>
-              <LabelBadge label={ruling.label} />
+              <StatusCell ruling={ruling} onDecide={(action) => onDecide(ruling, action)} />
             </Cell>
           </tr>
         ))}
@@ -98,10 +116,10 @@ export function RulingsTable({ rulings, sort, order, onSort }: Props) {
   );
 }
 
-/** Second line under the subject: the area of law (unless the subject already starts with it) and the language. */
+/** Second line under the title: the area of law (unless it already is the title) and the language. */
 function meta(ruling: Ruling, tx: I18n["tx"]): string {
   const parts: string[] = [];
-  if (ruling.area && !(ruling.subject ?? "").startsWith(ruling.area)) parts.push(ruling.area);
+  if (ruling.area && ruling.title) parts.push(ruling.area);
   if (ruling.language) parts.push(tx("language", ruling.language));
   return parts.join(" · ");
 }

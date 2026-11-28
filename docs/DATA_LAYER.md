@@ -96,7 +96,7 @@ Also store the SharePoint hyperlink target (from the xlsx relationships) as meta
 <h2>Text DE</h2> <p>…</p><p>…</p>
 <h2>Text FR</h2> <p>…</p><p>…</p>
 <h2>Link zum Urteil</h2> <a href="https://search.bger.ch/…aza://11-12-2025-8C_72-2025…">…</a>
-<h2>Autor</h2> Frei Thomas (FRT), Rechtsanwalt
+<h2>Autor</h2> Surname Given-name (STAFF-CODE), job title
 ```
 
 - Case number comes from the **filename** (`Export_8C_72_2025.html` → `8C_72/2025`). One file is named `Export_8C_176_2025 3.html` (stray " 3"); the regex must still match.

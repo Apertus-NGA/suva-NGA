@@ -674,6 +674,34 @@ def _critical(language: str, text: str, source: str, docket: str) -> list[str]:
     return [item for item in blocking(language, text, source) if item.startswith("critique")]
 
 
+def write_fiche(language: str, target: dict, examples: list[dict], category: str, ask=None) -> tuple[str, list[str]]:
+    """One fiche in one language: generate, let the checker ask for up to two repairs, return (text, problems).
+
+    `target` is {"docket", "decision_date", "division", "area", "text"}; `examples` are [{"docket", "body"}].
+    `ask` sends the messages to the model and returns its text (default: `chat`, the gateway client).
+    The prompt is the one of the ruling's matter (`category`), in the fiche's language.
+    """
+    ask = ask or chat
+    system = system_prompt(language, category)
+    user = user_prompt(language, examples, target, category)
+    text = ask([{"role": "system", "content": system}, {"role": "user", "content": user}])
+    forms = required_forms(language, target["text"])
+    sense = directions(language, target["text"])
+    for _ in range(2):
+        issue = _critical(language, text, target["text"], target["docket"])
+        if not issue:
+            break
+        revised = ask(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": repair_prompt(language, text, forms, issue, sense, category)},
+            ]
+        )
+        if len(_critical(language, revised, target["text"], target["docket"])) < len(issue):
+            text = revised
+    return text, review(language, text, target["text"], target["docket"])
+
+
 def summarize(docket: str) -> dict:
     rulings, gold = load_tables()
     target = row_for(rulings, docket)
@@ -692,31 +720,7 @@ def summarize(docket: str) -> dict:
     }
     for language in ("de", "fr"):
         examples = [{"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT]
-        text = chat(
-            [
-                {"role": "system", "content": system_prompt(language, category)},
-                {"role": "user", "content": user_prompt(language, examples, target, category)},
-            ]
-        )
-        forms = required_forms(language, target["text"])
-        sense = directions(language, target["text"])
-        for _ in range(2):
-            issue = _critical(language, text, target["text"], docket)
-            if not issue:
-                break
-            revised = chat(
-                [
-                    {"role": "system", "content": system_prompt(language, category)},
-                    {
-                        "role": "user",
-                        "content": repair_prompt(language, text, forms, issue, sense, category),
-                    },
-                ]
-            )
-            revised_issue = _critical(language, revised, target["text"], docket)
-            if len(revised_issue) < len(issue):
-                text = revised
-        issue = review(language, text, target["text"], docket)
+        text, issue = write_fiche(language, target, examples, category)
         out["languages"][language] = {
             "generated": text,
             "gold": gold_body(gold, docket, language),

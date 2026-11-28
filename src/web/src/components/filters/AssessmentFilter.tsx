@@ -40,7 +40,7 @@ export function AssessmentFilter({ value, onChange }: Props) {
     >
       <div className="flex flex-col gap-3 p-3">
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-faint">{t("filter.assessment.decision")}</span>
+          <span className="text-[12px] text-faint">{t("filter.assessment.decision")}</span>
           <Segmented
             label={t("filter.assessment.decision")}
             options={decisions}
