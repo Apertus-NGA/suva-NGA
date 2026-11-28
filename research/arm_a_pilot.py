@@ -1,3 +1,9 @@
+"""Arm A pilot: Apertus alone, several prompt variants.
+
+DEVELOPMENT EXPERIMENT (MODELS.md §4): the `*_think` variants use a thinking model, which the shared client
+src/llm/ refuses (AGENTS.md G3, thinking off). research/apertus.py raises ResearchRefused for them unless
+research/cache/apertus.sqlite already holds the answer; the other variants run through the client.
+"""
 import sys, time
 import numpy as np, pandas as pd
 from sklearn.metrics import roc_auc_score

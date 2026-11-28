@@ -94,7 +94,7 @@ All Hack Apertus projects are open-sourced. Please check our Terms & Conditions 
 | --- | --- |
 | Our code (`src/`, `tests/`, `eval/`, `Makefile`, Docker and CI files) | Apache-2.0 (`LICENSE`) |
 | Our documentation: `docs/`, `AGENTS.md`, `CLAUDE.md`, `MODELS.md`, `technical_report.md`, the report PDF | CC-BY-4.0 |
-| Datasets we create (`data/public/`) | CDLA-Permissive-2.0 |
+| Datasets we create (published on Hugging Face as `suva-nga/bger-rulings`, not in git: `data/` is git-ignored) | CDLA-Permissive-2.0 |
 | Suva's material from the template (`judgements/`, the pitch PDF) and the organisers' `challenge_description.md` | not ours: their own terms (`NOTICE`) |
 | Other third-party material | its own licence (`NOTICE`) |
 

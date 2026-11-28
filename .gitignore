@@ -65,3 +65,7 @@ src/web/dist/
 # Research caches and per-ruling outputs (large, re-creatable; kept out of git)
 research/cache/
 research/out/
+
+# --- Notebooks (appended, G13d) ---
+# Local notebooks and their outputs (they can hold Suva author fields, D-051); kept out of git
+notebooks/

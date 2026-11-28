@@ -1,6 +1,10 @@
 """Arm K: best 70B prompt (strict rubric) with thinking mode ON.
 Thinking only activates on the gateway when NO system message is sent, so the system text is moved into the user turn.
-Output: reasoning between <|inner_prefix|> and <|inner_suffix|>, then the answer. usage: arm_k_thinking.py [n]"""
+Output: reasoning between <|inner_prefix|> and <|inner_suffix|>, then the answer. usage: arm_k_thinking.py [n]
+
+DEVELOPMENT EXPERIMENT (MODELS.md §4): this arm needs a thinking model, which the shared client src/llm/
+refuses (AGENTS.md G3, thinking off). research/apertus.py therefore raises ResearchRefused for any
+request not already answered in research/cache/apertus.sqlite: the arm replays offline only."""
 import re, sys
 import numpy as np, pandas as pd
 import arm_a_lib as A
