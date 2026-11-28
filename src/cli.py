@@ -64,7 +64,7 @@ def run_layer1_stage() -> int:
         return 0
     from src.db.pg import connect
     from src.layer1.recall import record_recall
-    from src.layer1.run import run_layer1
+    from src.layer1.run import run_layer1, verify_run
 
     with connect(actor="make-run") as conn:
         with conn.cursor() as cur:
@@ -92,6 +92,12 @@ def run_layer1_stage() -> int:
             if missed:
                 print("run S2 recall FAILED: a labelled ruling is dropped", file=sys.stderr)
                 return 1
+        # The run proves itself: its files (decisions, ledger, manifest) equal its database rows (F-16, read-only).
+        records, problems = verify_run(conn, out["run_id"])
+        if problems:
+            print(f"run S2 verify FAILED: {len(problems)} differences, first: {problems[0]}", file=sys.stderr)
+            return 1
+        print(f"run S2 verify: files equal the database ({records} records)")
     return 0
 
 

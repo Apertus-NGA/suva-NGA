@@ -4,6 +4,7 @@
 #   make cluster-env && make cluster-up                 secrets, then db -> migrate, fetch -> load -> pipeline
 #   docker compose --profile sovereign up -d llm        Apertus served inside the cluster (GPU host, air-gapped)
 #   docker compose --profile ops run --rm backup        pg_dump into the backups volume
+#   docker compose --profile ops run --rm validate      release gate: layer 1 on two profiles, recall, compare
 #   docker compose --profile ui up -d app               the API and the UI (after layer 3; `make serve` is a stub)
 #
 # Networks: `backend` is internal (no route out): the database and the local model live there only.
@@ -107,7 +108,8 @@ services:
           memory: 1g
           pids: 512
 
-  # One-shot, as the pipeline login: versions, rules and profiles; the pinned base dataset; Suva's labels.
+  # One-shot, as the pipeline login: versions, rules and profiles; the pinned base dataset; Suva's labels; the
+  # closure check (every row of the file loaded or excluded with its reason, F-04).
   load:
     <<: *app
     command: ["make", "load", "PARQUET=/srv/hf/bger.parquet"]
@@ -115,6 +117,7 @@ services:
       <<: *pipeline-db
     volumes:
       - suva_data:/app/data
+      - ${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived
       - suva_results:/app/results
       - ${HF_BASE_SOURCE:-hf_base}:/srv/hf:ro
     networks:
@@ -130,8 +133,10 @@ services:
           memory: 6g
           pids: 512
 
-  # One-shot, as the pipeline login: `make run SERVE=0` (layer 1 and its recall today; the next stages as they
-  # land). MODE=replay needs no key; MODE=live needs the three LLM_* variables (G3, D-032).
+  # One-shot, as the pipeline login: `make run SERVE=0`. Today S2: layer 1, its golden certification, the blocking
+  # recall check and the run's self-verification (files = database rows). Layer 2 (S3) and layer 3 run here as soon
+  # as `make run` calls them: MODE=live with the LLM_* variables, or MODE=replay with the recorded answers in
+  # data/derived (SUVA_DERIVED_SOURCE, Suva-derived: never in the image or in git, D-031).
   pipeline:
     <<: *app
     command: ["make", "run", "SERVE=0"]
@@ -147,6 +152,7 @@ services:
       LLM_MAX_INPUT_TOKENS: ${LLM_MAX_INPUT_TOKENS:-}
     volumes:
       - suva_data:/app/data
+      - ${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived
       - suva_results:/app/results
     networks:
       - backend
@@ -242,6 +248,9 @@ services:
       PGUSER: suva_api
       # Empty: the API login has no password (src/db/logins.py) and the app cannot connect. Set it to run the app.
       PGPASSWORD: ${SUVA_API_PASSWORD:-}
+      # The API login is least-privileged by its memberships (suva_g_read, suva_g_review): keep them, never SET ROLE
+      # to the pipeline group (src/db/pg.py), which suva_api is not granted.
+      DB_PIPELINE_ROLE: ""
       MODE: ${MODE:-replay}
       LLM_NAME: ${LLM_NAME:-}
       LLM_NAME_SMALL: ${LLM_NAME_SMALL:-}
@@ -251,6 +260,7 @@ services:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
     volumes:
       - suva_data:/app/data
+      - ${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived
       - suva_results:/app/results
     networks:
       - backend
@@ -268,6 +278,29 @@ services:
       resources:
         limits:
           memory: 2g
+          pids: 512
+
+  # Release gate (profile ops), as the pipeline login: `make validate` runs layer 1 on the reference and the
+  # default profiles, the recall check and the comparison; it fails on any removal (later: layer-2 certification).
+  validate:
+    <<: *app
+    profiles: ["ops"]
+    command: ["make", "validate"]
+    environment:
+      <<: *pipeline-db
+    volumes:
+      - suva_data:/app/data
+      - ${SUVA_DERIVED_SOURCE:-suva_derived}:/app/data/derived
+      - suva_results:/app/results
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4g
           pids: 512
 
   # Backups (profile ops): a custom-format pg_dump per run, as the owner, into the backups volume.
@@ -303,6 +336,7 @@ networks:
 volumes:
   pgdata:
   suva_data:
+  suva_derived:
   suva_results:
   hf_base:
   apertus_weights:

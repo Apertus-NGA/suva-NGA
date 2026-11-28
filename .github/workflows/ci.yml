@@ -61,16 +61,20 @@ jobs:
       - name: Python tests against PostgreSQL (layer 1 end to end, throwaway database)
         run: uv run --frozen pytest -m db
 
-  # The cluster (docs/DEPLOY.md): compose valid under every profile, app image built for linux/amd64, then the
-  # schema and the login passwords deployed inside the cluster, and the pipeline login proven least-privileged.
+  # The cluster (docs/DEPLOY.md), end to end on linux/amd64: compose valid under every profile, app image built,
+  # schema and logins deployed (schema guard), pipeline login proven least-privileged, then the whole chain on the
+  # pinned base dataset (fetch, load with its closure check, make run: layer 1, golden, recall, self-verification;
+  # migrate runs again on the same database, so the guard's "same" path is exercised too) and the release gate.
   # Secrets are generated for this run only (src/db/logins.py --init-env), never printed, gone with the runner.
-  # The base dataset (925 MB) and the GPU profile are not exercised here.
+  # The base dataset (925 MB) is cached outside the build context; the GPU profile is not exercised here.
   cluster:
     runs-on: ubuntu-latest  # linux/amd64
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Secrets for this run
         run: python3 -m src.db.logins --init-env .env
+      - name: Base dataset location, outside the build context
+        run: echo "HF_BASE_SOURCE=${{ runner.temp }}/hf" >> "$GITHUB_ENV"
       - name: Compose file valid, every profile
         run: make cluster-config
       - name: Build the app image
@@ -79,6 +83,19 @@ jobs:
         run: docker compose run --rm migrate
       - name: Pipeline login connects and cannot change the schema
         run: docker compose run --rm --no-deps --entrypoint python pipeline -m src.db.logins --verify suva_pipeline
+      - name: Base dataset from the cache
+        id: hf
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ runner.temp }}/hf
+          key: hf-base-${{ hashFiles('src/ingest/fetch.py') }}  # the file that pins the revision and the SHA-256
+      - name: Base dataset on a cache miss (the cluster's fetch job, pinned commit, SHA-256 checked)
+        if: steps.hf.outputs.cache-hit != 'true'
+        run: mkdir -p "$HF_BASE_SOURCE" && chmod 0777 "$HF_BASE_SOURCE" && docker compose run --rm fetch
+      - name: End to end in the cluster (fetch, load and closure, make run with golden, recall and verify)
+        run: docker compose run --rm pipeline
+      - name: Release gate in the cluster (layer 1 on two profiles, recall, compare)
+        run: make cluster-validate
       - name: Stop the cluster
         if: always()
         run: make cluster-down
