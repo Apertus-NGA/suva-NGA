@@ -203,8 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py); flags go to the probe")
     warm = sub.add_parser("warmup", help="warm the large model")
     warm.add_argument("--dry-run", action="store_true")
+    serve = sub.add_parser("serve", help="serve the FastAPI on port 8000")
+    serve.add_argument("--dry-run", action="store_true")
     stubs = {
-        "serve": "serve the API and the UI (FastAPI, docs/agents/ui.md)",
         "crawl": "fetch Neuheiten lists 1 Oct 2025 to 15 Sep 2026 and ruling pages, >= 2 s apart (crawl brief)",
         "refit": "rerun the scoring with the current labels, expert corrections included (D-021)",
         "eval": "run the evaluation suites on public data and write results/*.json (docs/EVAL.md)",
@@ -220,6 +221,14 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "run":
         return cmd_run(args)
+    if args.cmd == "serve":
+        if args.dry_run:
+            print("serve: FastAPI on port 8000")
+            return 0
+        import uvicorn
+
+        uvicorn.run("src.api:app", host="0.0.0.0", port=8000)
+        return 0
     if args.cmd == "warmup":
         return cmd_warmup(args)
     return stub(args.cmd, args.would)
