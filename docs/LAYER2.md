@@ -36,7 +36,8 @@ Version V1.0.0 is the chain of the D-074 benchmark, byte for byte, judged by Ape
 | Live on Q2 only | `make layer2 MODE=live ARGS="--all --population 2026Q2_union"` |
 | Replay from the benchmark's answers | `make layer2 ARGS="--store data/derived/layer2/replay_store --population 2025Q4_decision --population 2026Q1_decision"` (the store holds hard links to `data/derived/finetune/bench_v3/llm_store/cache`, so the benchmark's call log is never written) |
 | Aggregates of a run for `results/` | `python -m src.layer2 report --run RUN_ID --out results/<file>.json` (no Suva label) |
-| Certify a version | `make layer2-validate` (add `ARGS=--write-expected` only for a version that has no expected file) |
+| Certify a version | `make layer2-validate` (add `ARGS=--write-expected` only for a version that has no expected file). Its report goes to `data/runs/validation/layer2_validation.json` unless `OUT=path` names a file; `OUT=results/layer2_validation.json` regenerates the committed report, from a clean checkout so its `git_dirty` is false |
+| Release gate (`make validate`) | layer 1's validation (two runs of kind `eval`), then, when `data/derived/finetune/suva-ft-v3` is mounted, a replay of the labelled quarters from `data/derived/layer2/replay_store` in a run of kind `eval` and the certification of that run: neither changes the label. It needs a succeeded layer-1 run (`make run` S2 or `make layer1`) |
 | In `make run` | stage S3, after layer 1; skipped with its reason without `DATABASE_URL`, without a succeeded layer-1 run, or in replay without a cache |
 | A run ended `partial` | rerun the same command: answered calls come from the cache, failed ones are called again |
 | A run ended `failed` | read `ops.pipeline_run.error_summary`, the run's warnings in `ops.log_event`, `data/runs/<run_id>/manifest.json`; fix; rerun |

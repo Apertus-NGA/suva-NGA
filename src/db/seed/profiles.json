@@ -135,7 +135,7 @@
           ],
           "bump_kind": "initial",
           "previous": null,
-          "changelog": "layer1_filter V1.2.0 on ingest V1.0.0, for validation against default V0.2.0 (D-083).",
+          "changelog": "layer1_filter V1.2.0 on ingest V1.0.0, for validation against the default profile's current version (V0.2.0 when written, V0.3.0 since D-080; validate --baseline-profile default takes the latest) (D-083).",
           "steps": {
             "ingest": [
               1,

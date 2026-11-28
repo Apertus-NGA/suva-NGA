@@ -161,3 +161,38 @@ def test_the_release_gate_certifies_layer_2_when_its_data_is_mounted():
     assert "data/derived/finetune/suva-ft-v3" in steps and "SKIPPED layer2-validate" in steps
     ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8")
     assert "!experiments/finetune/manifests/**" in ignored  # the certification reads the frozen manifest
+
+
+def test_the_release_gate_replays_the_certified_set_before_certifying_it():
+    """Integration review, 28 Nov: the layer-2 branch needed a layer-2 run nothing in the gate created. It now replays
+    the labelled quarters from the benchmark store in a run of kind eval (never the label), then certifies it; every
+    report of the gate goes to data/runs/validation/, never to a committed results file."""
+    steps = " ".join(_recipe("validate"))
+    replay = steps.index(
+        "--kind eval --store $(L2_CERT_STORE) --population 2025Q4_decision --population 2026Q1_decision"
+    )
+    assert replay < steps.index("layer2-validate OUT=")
+    assert steps.index("layer1-validate OUT=") < replay
+    for target in ("layer1-validate", "layer2-validate"):
+        assert "--out $(or $(OUT),data/runs/validation/" in " ".join(_recipe(target)), target
+
+
+def test_layer2_validate_writes_its_report_where_out_says(monkeypatch, tmp_path):
+    """MOCK DECLARED (G9): `connect` and `validate` of src.layer2.__main__ are replaced; only the CLI wiring is under
+    test. Without --out the report keeps its default (results/layer2_validation.json, the committed one)."""
+    from src.layer2 import __main__ as cli
+
+    class Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    calls: list[dict] = []
+    monkeypatch.setattr(cli, "connect", lambda actor: Conn())
+    monkeypatch.setattr(cli, "validate", lambda conn, **kw: calls.append(kw) or {"ok": True})
+    out = tmp_path / "layer2_validation.json"
+    assert cli.main(["validate", "--data-root", "d", "--manifest", "m", "--out", str(out)]) == 0
+    assert cli.main(["validate", "--data-root", "d", "--manifest", "m"]) == 0
+    assert calls[0]["results_path"] == out and "results_path" not in calls[1]
