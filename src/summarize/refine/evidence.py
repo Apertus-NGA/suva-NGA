@@ -193,34 +193,54 @@ def sentences(passage: str) -> list[str]:
     return split_sentences(" ".join(passage.split()))
 
 
-def expand(opening: str, passage: str, count: int = 1) -> str | None:
-    """The `count` sentences of the passage that begin at (or contain) `opening`, copied from the ruling."""
-    words = _HEADING.sub("", opening.strip()).split()  # the model often includes the number: "2. Le litige …"
+_PARENTHETICAL = re.compile(r"\s*\([^()]*\)")
+PREFIXES = (12, 10, 8, 6, MIN_OPENING_WORDS + 1)  # pointer lengths tried, longest first
+
+
+def _loose(text: str) -> str:
+    """The comparison form of a pointer and a sentence: `normalise`, without parentheticals ("(RS 830.1)")."""
+    return normalise(_PARENTHETICAL.sub("", text))
+
+
+def _prefixes(opening: str) -> list[str]:
+    """The pointer as it may be matched: in full, then its first 12, 10, 8, 6, 5 words. Measured on run r3: the
+    model often writes the whole sentence, paraphrasing its end, or drops a parenthetical; the opening words hold."""
+    words = _HEADING.sub("", opening.strip()).split()
     if len(words) < MIN_OPENING_WORDS:
-        return None
-    needle = normalise(" ".join(words))
+        return []
+    sizes = [len(words)] + [n for n in PREFIXES if n < len(words)]
+    return list(dict.fromkeys(_loose(" ".join(words[:n])) for n in sizes))
+
+
+def _locate(needle: str, passage: str, count: int) -> str | None:
+    """The sentences starting at the one that contains the pointer, or that the pointer starts with (a pointer
+    that runs on into the next sentence)."""
     found = sentences(passage)
     for index, sentence in enumerate(found):
-        if needle in normalise(sentence):
+        loose = _loose(sentence)
+        if needle in loose or (len(loose) >= MIN_QUOTE and needle.startswith(loose)):
             return _HEADING.sub("", " ".join(found[index : index + max(1, count)]))
-    # an opening that runs across a sentence boundary: look in the flattened passage
-    flat = " ".join(passage.split())
-    if needle in normalise(flat):
-        for index in range(len(found)):
-            if needle in normalise(" ".join(found[index : index + 2])):
-                return _HEADING.sub("", " ".join(found[index : index + max(2, count)]))
+    return None
+
+
+def expand(opening: str, passage: str, count: int = 1) -> str | None:
+    """The `count` sentences of the passage that begin at (or contain) the pointer, copied from the ruling."""
+    for needle in _prefixes(opening):
+        if text := _locate(needle, passage, count):
+            return text
     return None
 
 
 def find(opening: str, parts: dict[str, str], named: str | None = None, count: int = 1) -> tuple[str, str] | None:
-    """(label, sentences) of the passage that holds the opening: the named passage first, then any other."""
+    """(label, sentences) of the passage that holds the pointer. The longest matching prefix wins; at equal length
+    the passage the model named comes first."""
     if not isinstance(opening, str):
         return None
     order = ([named] if named in parts else []) + [label for label in parts if label != named]
-    for label in order:
-        text = expand(opening, parts[label], count)
-        if text:
-            return label, text
+    for needle in _prefixes(opening):
+        for label in order:
+            if text := _locate(needle, parts[label], count):
+                return label, text
     return None
 
 

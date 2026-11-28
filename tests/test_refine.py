@@ -561,3 +561,25 @@ def test_form_writes_the_outcome_as_its_own_last_sentence_when_the_draft_buries_
 def test_a_pointer_with_the_consideration_number_still_finds_the_sentence():
     parts = evidence.passages(RULING)
     assert evidence.find("2. Streitig ist, ob die Suva ihre Leistungen", parts)[0] == "E.2"
+
+
+def test_a_pointer_that_paraphrases_its_end_or_drops_a_parenthetical_still_finds_the_sentence():
+    parts = evidence.passages(RULING)
+    # the model wrote the whole sentence and changed its end: the opening words still hold
+    assert (
+        evidence.find(
+            "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Zusammenhang immer voraus", parts
+        )[0]
+        == "E.2.1"
+    )
+    # the model dropped a parenthetical of the ruling
+    assert evidence.find("setzt einen natürlichen Kausalzusammenhang voraus. Fällt dieser dahin", parts)[0] == "E.2.1"
+    assert evidence.find("Ein völlig erfundener Satz, der nirgends im Urteil steht", parts) is None
+
+
+def test_a_rule_without_a_legal_anchor_is_not_a_rule():
+    from src.summarize.refine.record import anchored
+
+    assert anchored("Die Leistungspflicht setzt einen natürlichen Kausalzusammenhang voraus (Art. 6 Abs. 1 UVG).")
+    assert anchored("Nach der Rechtsprechung ist der Status quo sine massgebend (BGE 146 V 51 E. 5.1).")
+    assert not anchored("Il ricorrente contesta in questa sede unicamente il reddito da valido.")

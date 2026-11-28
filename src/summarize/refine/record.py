@@ -12,12 +12,30 @@ a rule can stand (`evidence.rule_candidates`).
 from __future__ import annotations
 
 import json
+import re
 
 from src.summarize import finish
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj  # noqa: F401
 
 VERSION = "record@5"
+CHECK_VERSION = "anchor@1"  # code's test of what can be a rule; changes the record without a new model call
+
+# A rule the court applies is anchored in law: an article, a case-law reference, or the court's case-law formula.
+# Measured on the cached run-r3 records: the model sometimes lists a sentence of the facts or of the parties'
+# arguments as a "rule" ("Il ricorrente contesta in questa sede…"); none of those carries an anchor.
+_ANCHOR = re.compile(
+    r"\b(?:BGE|ATF|DTF)\s+\d+|\b(?:SVR|RKUV|SZS)\b|\bUrteil(?:e)?\s+\d[A-Z]_\d+|\barrêts?\s+\d[A-Z]_\d+"
+    r"|\bsentenz[ae]\s+\d[A-Z]_\d+|Rechtsprechung|jurisprudence|giurisprudenza|praxisgemäss|nach ständiger"
+    r"|selon (?:la|une) (?:jurisprudence|pratique)|setzt voraus|suppose que|presuppone",
+    re.IGNORECASE,
+)
+
+
+def anchored(quote: str) -> bool:
+    return bool(evidence.articles(quote) or _ANCHOR.search(quote))
+
+
 MAX_RULES = 3
 
 TASK = (
@@ -72,13 +90,18 @@ def _check(item: dict | None, parts: dict[str, str], allowed: list[str], issues:
 def validate(answer: dict, parts: dict[str, str], candidates: list[str]) -> dict:
     reasoning = evidence.considerations(parts)
     issues: list[str] = []
-    rules = [
-        r for n, item in enumerate(answer["b_rules"]) if (r := _check(item, parts, candidates, issues, f"rule {n}"))
-    ]
+    rules = []
+    for n, item in enumerate(answer["b_rules"]):
+        rule = _check(item, parts, candidates, issues, f"rule {n}")
+        if rule and not anchored(rule["quote"]):
+            issues.append(f"rule {n}: no legal anchor (article, case law), not a rule: {rule['quote'][:60]!r}")
+        elif rule and rule["quote"] not in [r["quote"] for r in rules]:
+            rules.append(rule)
     if not answer["b_rules"]:
         issues.append("rules: none given")
     record = {
         "version": VERSION,
+        "check": CHECK_VERSION,
         "question": _check(answer["a_question"], parts, reasoning, issues, "question"),
         "rules": rules,
         "answer": _check(answer["c_answer"], parts, reasoning, issues, "answer"),
