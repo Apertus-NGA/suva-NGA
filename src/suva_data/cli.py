@@ -94,7 +94,8 @@ def cmd_build(args) -> int:
             if diffs:
                 print("Snapshot differs from data/manifest.json:\n  " + "\n  ".join(diffs[:40]), file=sys.stderr)
                 raise SystemExit(
-                    "refusing to build from a snapshot that does not match the manifest (use --update-manifest if intended)"
+                    "refusing to build from a snapshot that does not match the manifest (use --update-manifest if "
+                    "intended)"
                 )
         by_source: dict[str, list[str]] = {}
         for rel, meta in files.items():

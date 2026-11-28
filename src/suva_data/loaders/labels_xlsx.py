@@ -208,7 +208,8 @@ def write_labels(conn, result: LabelsResult, label_set: str = config.LABEL_SET_X
 
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO labels (ruling_id, label_set, value, quarter, metadata) VALUES (%s, %s, %s, %s, %s::jsonb)",
+                "INSERT INTO labels (ruling_id, label_set, value, quarter, metadata) VALUES (%s, %s, %s, %s, "
+                "%s::jsonb)",
                 to_insert,
             )
     return {

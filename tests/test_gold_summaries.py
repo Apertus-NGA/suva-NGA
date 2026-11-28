@@ -249,9 +249,8 @@ def test_write_real_summaries_happy_path_and_idempotent(db_conn, real):
 
     assert write_gold_summaries(db_conn, real) == {"read": 55, "inserted": 110, "unchanged": 0}
     assert db_conn.execute(
-        "SELECT count(*), count(DISTINCT ruling_id), count(*) FILTER (WHERE language = 'de'),"
-        " count(*) FILTER (WHERE version = 1 AND is_current), count(*) FILTER (WHERE author IS NULL OR source_url IS NULL)"
-        " FROM gold_summaries"
+        "SELECT count(*), count(DISTINCT ruling_id), count(*) FILTER (WHERE language = 'de'), count(*) FILTER (WHERE "
+        "version = 1 AND is_current), count(*) FILTER (WHERE author IS NULL OR source_url IS NULL) FROM gold_summaries"
     ).fetchone() == (110, 55, 55, 110, 0)
     expected = next(s for s in real if s.docket == "8C_176/2025")
     rows = db_conn.execute(

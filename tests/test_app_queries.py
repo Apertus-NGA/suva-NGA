@@ -17,7 +17,8 @@ def _ruling(
     conn, docket, decided, *, published=None, area=None, subject=None, language="de", outcome=None, starred=None
 ) -> int:
     return conn.execute(
-        """INSERT INTO rulings (docket, decision_date, publication_date, division, language, area, subject, outcome, starred, in_window)
+        """INSERT INTO rulings (docket, decision_date, publication_date, division, language, area, subject, outcome,
+           starred, in_window)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true) RETURNING id""",
         (docket, decided, published, docket.split("_")[0], language, area, subject, outcome, starred),
     ).fetchone()[0]
@@ -347,7 +348,8 @@ def test_list_gives_title_next_to_the_unchanged_subject(db_conn, data):
 
 def test_ingested_filter_and_fields(db_conn, data):
     db_conn.execute(
-        "INSERT INTO ingested_rulings (docket, decision_date, published_from, published_to) VALUES ('8C_607/2025', '2026-06-30', '2026-07-24', '2026-07-24')"
+        "INSERT INTO ingested_rulings (docket, decision_date, published_from, published_to) VALUES ('8C_607/2025', "
+        "'2026-06-30', '2026-07-24', '2026-07-24')"
     )
     db_conn.execute(
         """UPDATE rulings SET field_sources = '{"publication_date": "bger_list"}' WHERE docket = '8C_72/2025'"""
@@ -408,7 +410,15 @@ def test_learning_numbers(db_conn, data):
         "INSERT INTO labels (ruling_id, label_set, value) VALUES (%s, 'expert_override', 'not_relevant')", (data["iv"],)
     )
     numbers = queries.learning(db_conn)
-    assert {k: numbers[k] for k in ("relevant_rulings", "confirmed_by_experts", "rejected_by_experts", "reference_summaries",
+    assert {k: numbers[k] for k in ((
+        "relevant_rulings"
+    ), (
+        "confirmed_by_experts"
+    ), (
+        "rejected_by_experts"
+    ), (
+        "reference_summaries"
+    ),
                                     "generated_summaries", "expert_summaries")} == {
         "relevant_rulings": 2, "confirmed_by_experts": 1, "rejected_by_experts": 1,
         "reference_summaries": 1, "generated_summaries": 1, "expert_summaries": 1,

@@ -52,12 +52,16 @@ def small_db(db_conn):
     rec.reconcile(db_conn)
     rid = db_conn.execute("SELECT id FROM rulings WHERE docket = '8C_72/2025'").fetchone()[0]
     db_conn.execute(
-        "INSERT INTO labels (ruling_id, label_set, value, quarter, metadata) VALUES (%s, %s, 'relevant', '2025 Q4', %s)",
+        "INSERT INTO labels (ruling_id, label_set, value, quarter, metadata) VALUES (%s, %s, 'relevant', '2025 Q4', "
+        "%s)",
         (rid, config.LABEL_SET_XLSX, '{"xlsx_title": "8C_72/2025", "xlsx_row": 5, "erstellt": "2026-01-19T14:41:32"}'),
     )
     for lang in ("de", "fr"):
         db_conn.execute(
-            "INSERT INTO gold_summaries (ruling_id, language, title, body, author) VALUES (%s, %s, 'Titel', 'Absatz 1\n\nAbsatz 2', 'A')",
+            "INSERT INTO gold_summaries (ruling_id, language, title, body, author) VALUES (%s, %s, 'Titel', 'Absatz "
+            "1\n"
+            "\n"
+            "Absatz 2', 'A')",
             (rid, lang),
         )
     return db_conn

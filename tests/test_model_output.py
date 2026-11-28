@@ -94,7 +94,8 @@ def test_one_prediction_per_ruling_and_run(db_conn):
     )
     with pytest.raises(errors.UniqueViolation):
         db_conn.execute(
-            "INSERT INTO predictions (ruling_id, run_id, score, relevant, is_current) VALUES (%s, %s, 0.3, false, false)",
+            "INSERT INTO predictions (ruling_id, run_id, score, relevant, is_current) VALUES (%s, %s, 0.3, false, "
+            "false)",
             (rid, run),
         )
 
@@ -181,7 +182,8 @@ def test_expert_override_wins_over_prediction_in_v_relevance(db_conn):
     )
     assert db_conn.execute("SELECT relevance, basis FROM v_relevance").fetchone() == ("unknown", "no_label")
     db_conn.execute(
-        "INSERT INTO labels (ruling_id, label_set, value, created_by) VALUES (%s, 'expert_override', 'relevant', 'expert')",
+        "INSERT INTO labels (ruling_id, label_set, value, created_by) VALUES (%s, 'expert_override', 'relevant', "
+        "'expert')",
         (rid,),
     )
     assert db_conn.execute("SELECT relevance, basis FROM v_relevance").fetchone() == ("relevant", "expert_override")

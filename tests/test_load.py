@@ -117,8 +117,8 @@ def test_load_stores_record_and_text_unchanged(db_conn, snap):
     }
 
     row = db_conn.execute(
-        "SELECT sr.source, sr.source_key, sr.docket, sr.decision_date::text, sr.fields, sr.record, f.path, sr.ruling_id, sr.status, sr.status_reason "
-        "FROM source_records sr JOIN raw_files f ON f.id = sr.raw_file_id"
+        "SELECT sr.source, sr.source_key, sr.docket, sr.decision_date::text, sr.fields, sr.record, f.path, "
+        "sr.ruling_id, sr.status, sr.status_reason FROM source_records sr JOIN raw_files f ON f.id = sr.raw_file_id"
     ).fetchone()
     assert row == (
         "swiss_caselaw",
@@ -180,14 +180,16 @@ def test_load_is_idempotent_and_keeps_reconciler_state(db_conn):
 
     # What the reconciler sets later must survive a reload of unchanged records.
     ruling_id = db_conn.execute(
-        "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES ('8C_72/2025', '2025-11-03', '8C', true) RETURNING id"
+        "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES ('8C_72/2025', '2025-11-03', '8C', "
+        "true) RETURNING id"
     ).fetchone()[0]
     db_conn.execute("UPDATE source_records SET ruling_id = %s, status = 'used' WHERE source_key = 'k1'", (ruling_id,))
     db_conn.execute(
         "UPDATE source_records SET status = 'duplicate', status_reason = 'same text as k1' WHERE source_key = 'k3'"
     )
     db_conn.execute(
-        "UPDATE ruling_texts SET ruling_id = %s, is_canonical = true WHERE source_record_id = (SELECT id FROM source_records WHERE source_key = 'k1')",
+        "UPDATE ruling_texts SET ruling_id = %s, is_canonical = true WHERE source_record_id = (SELECT id FROM "
+        "source_records WHERE source_key = 'k1')",
         (ruling_id,),
     )
     reconciled = snapshot(db_conn)
@@ -199,12 +201,14 @@ def test_load_is_idempotent_and_keeps_reconciler_state(db_conn):
 def test_changed_record_is_updated_and_reset(db_conn):
     load.load_source_records(db_conn, [rec("k1", text=GOOD_TEXT, fields={"language": "de"}), rec("k2", text=GOOD_TEXT)])
     ruling_id = db_conn.execute(
-        "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES ('8C_72/2025', '2025-11-03', '8C', true) RETURNING id"
+        "INSERT INTO rulings (docket, decision_date, division, in_window) VALUES ('8C_72/2025', '2025-11-03', '8C', "
+        "true) RETURNING id"
     ).fetchone()[0]
     db_conn.execute("UPDATE source_records SET ruling_id = %s, status = 'used'", (ruling_id,))
     db_conn.execute("UPDATE ruling_texts SET ruling_id = %s", (ruling_id,))
     db_conn.execute(
-        "UPDATE ruling_texts SET is_canonical = true WHERE source_record_id = (SELECT id FROM source_records WHERE source_key = 'k1')"
+        "UPDATE ruling_texts SET is_canonical = true WHERE source_record_id = (SELECT id FROM source_records WHERE "
+        "source_key = 'k1')"
     )
     ids = dict(db_conn.execute("SELECT source_key, id FROM source_records").fetchall())
 
@@ -224,8 +228,8 @@ def test_changed_record_is_updated_and_reset(db_conn):
         "bad_texts": 1,
     }
     rows = db_conn.execute(
-        "SELECT sr.source_key, sr.id, sr.fields, sr.ruling_id, sr.status, t.text, t.bad_reason, t.is_canonical, t.ruling_id, t.char_count "
-        "FROM source_records sr JOIN ruling_texts t ON t.source_record_id = sr.id ORDER BY 1"
+        "SELECT sr.source_key, sr.id, sr.fields, sr.ruling_id, sr.status, t.text, t.bad_reason, t.is_canonical, "
+        "t.ruling_id, t.char_count FROM source_records sr JOIN ruling_texts t ON t.source_record_id = sr.id ORDER BY 1"
     ).fetchall()
     assert rows == [
         ("k1", ids["k1"], {"language": "de"}, None, "loaded", ERROR_PAGE, "error_page", False, None, len(ERROR_PAGE)),
@@ -362,7 +366,8 @@ def test_same_key_in_two_sources_are_two_records(db_conn):
     )
     assert (counts["inserted"], counts["texts"], counts["bad_texts"]) == (2, 2, 1)
     assert db_conn.execute(
-        "SELECT sr.source, t.source, t.bad_reason FROM source_records sr JOIN ruling_texts t ON t.source_record_id = sr.id ORDER BY 1"
+        "SELECT sr.source, t.source, t.bad_reason FROM source_records sr JOIN ruling_texts t ON t.source_record_id = "
+        "sr.id ORDER BY 1"
     ).fetchall() == [("entscheidsuche", "entscheidsuche", "error_page"), ("swiss_caselaw", "swiss_caselaw", None)]
 
 

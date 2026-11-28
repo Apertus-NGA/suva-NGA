@@ -186,7 +186,8 @@ def test_write_real_labels_happy_path_and_idempotent(db_conn, real):
 
     assert write_labels(db_conn, real) == {"read": 59, "dropped": 1, "inserted": 59, "unchanged": 0}
     rows = db_conn.execute(
-        "SELECT r.docket, l.label_set, l.value, l.quarter, l.metadata FROM labels l JOIN rulings r ON r.id = l.ruling_id"
+        "SELECT r.docket, l.label_set, l.value, l.quarter, l.metadata FROM labels l JOIN rulings r ON r.id = "
+        "l.ruling_id"
     ).fetchall()
     assert len(rows) == 59
     assert {r[1] for r in rows} == {config.LABEL_SET_XLSX} and {r[2] for r in rows} == {"relevant"}

@@ -31,7 +31,8 @@ def build(conn, records, extras=frozenset()):
 
 def ruling(conn, docket="8C_72/2025", date="2025-12-11"):
     cur = conn.execute(
-        "SELECT language, publication_date::text, starred, area, subject, outcome, field_sources, flags, in_window, id FROM rulings WHERE docket=%s AND decision_date=%s",
+        "SELECT language, publication_date::text, starred, area, subject, outcome, field_sources, flags, in_window, "
+        "id FROM rulings WHERE docket=%s AND decision_date=%s",
         (docket, date),
     )
     row = cur.fetchone()

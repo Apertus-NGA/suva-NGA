@@ -88,7 +88,8 @@ def db_conn(_db_session):
         tables = [
             r[0]
             for r in conn.execute(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations' ORDER BY 1"
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations' "
+                "ORDER BY 1"
             )
         ]
         if tables:

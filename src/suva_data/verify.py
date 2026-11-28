@@ -14,25 +14,35 @@ from . import config
 # Tables and the columns that define the dataset's content. Surrogate ids and timestamps are left out
 # on purpose: two builds from the same snapshot must give the same fingerprint.
 _FINGERPRINT_SQL = {
-    "rulings": """SELECT md5(coalesce(string_agg(md5(ROW(docket, decision_date, division, language, publication_date, starred, area,
-                         subject, outcome, cited_decisions, official_url, field_sources, flags, in_window)::text), '' ORDER BY decision_date, docket), ''))
+    "rulings": """SELECT md5(coalesce(string_agg(md5(ROW(docket, decision_date, division, language, publication_date,
+                  starred, area,
+                         subject, outcome, cited_decisions, official_url, field_sources, flags, in_window)::text), ''
+                         ORDER BY decision_date, docket), ''))
                   FROM rulings""",
-    "source_records": """SELECT md5(coalesce(string_agg(md5(ROW(sr.source, sr.source_key, sr.docket, sr.decision_date, sr.fields, sr.record,
-                                sr.status, sr.status_reason, r.docket, r.decision_date)::text), '' ORDER BY sr.source, sr.source_key), ''))
+    "source_records": """SELECT md5(coalesce(string_agg(md5(ROW(sr.source, sr.source_key, sr.docket, sr.decision_date,
+                         sr.fields, sr.record,
+                                sr.status, sr.status_reason, r.docket, r.decision_date)::text), '' ORDER BY sr.source,
+                                sr.source_key), ''))
                          FROM source_records sr LEFT JOIN rulings r ON r.id = sr.ruling_id""",
-    "ruling_texts": """SELECT md5(coalesce(string_agg(md5(ROW(sr.source, sr.source_key, md5(t.text), t.sha256_normalized, t.char_count,
+    "ruling_texts": """SELECT md5(coalesce(string_agg(md5(ROW(sr.source, sr.source_key, md5(t.text),
+                       t.sha256_normalized, t.char_count,
                               t.bad_reason, t.is_canonical)::text), '' ORDER BY sr.source, sr.source_key), ''))
                        FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id""",
-    "conflicts": """SELECT md5(coalesce(string_agg(md5(ROW(docket, decision_date, field, kind, winner_source, loser_source, winner_value,
+    "conflicts": """SELECT md5(coalesce(string_agg(md5(ROW(docket, decision_date, field, kind, winner_source,
+                    loser_source, winner_value,
                            loser_value)::text), '' ORDER BY id), '')) FROM conflicts""",
-    "statute_refs": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, s.law_code, s.article, s.paragraph, s.mention_count)::text), ''
+    "statute_refs": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, s.law_code, s.article,
+                       s.paragraph, s.mention_count)::text), ''
                               ORDER BY r.decision_date, r.docket, s.law_code, s.article, s.paragraph), ''))
                        FROM statute_refs s JOIN rulings r ON r.id = s.ruling_id""",
-    "labels": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, l.label_set, l.value, l.quarter, l.metadata, l.created_by)::text), ''
+    "labels": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, l.label_set, l.value, l.quarter,
+                 l.metadata, l.created_by)::text), ''
                         ORDER BY r.decision_date, r.docket, l.label_set), ''))
                  FROM labels l JOIN rulings r ON r.id = l.ruling_id""",
-    "gold_summaries": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, g.language, g.title, g.body, g.author, g.source_url,
-                                g.source_file, g.version, g.is_current)::text), '' ORDER BY r.decision_date, r.docket, g.language, g.version), ''))
+    "gold_summaries": """SELECT md5(coalesce(string_agg(md5(ROW(r.docket, r.decision_date, g.language, g.title, g.body,
+                         g.author, g.source_url,
+                                g.source_file, g.version, g.is_current)::text), '' ORDER BY r.decision_date, r.docket,
+                                g.language, g.version), ''))
                          FROM gold_summaries g JOIN rulings r ON r.id = g.ruling_id""",
 }
 
@@ -87,13 +97,15 @@ def check_invariants(
     n = _one(
         cur,
         """SELECT count(*) FROM rulings r
-                     WHERE (EXISTS (SELECT 1 FROM labels l WHERE l.ruling_id = r.id) OR EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id))
+                     WHERE (EXISTS (SELECT 1 FROM labels l WHERE l.ruling_id = r.id) OR EXISTS (SELECT 1 FROM
+                     gold_summaries g WHERE g.ruling_id = r.id))
                        AND NOT EXISTS (SELECT 1 FROM ruling_texts t WHERE t.ruling_id = r.id AND t.is_canonical)""",
     )
     check("every labelled / gold-summary ruling has a canonical text", n == 0, f"{n} without")
     n = _one(
         cur,
-        "SELECT count(*) FROM rulings r WHERE in_window AND NOT EXISTS (SELECT 1 FROM ruling_texts t WHERE t.ruling_id = r.id AND t.is_canonical)",
+        "SELECT count(*) FROM rulings r WHERE in_window AND NOT EXISTS (SELECT 1 FROM ruling_texts t WHERE "
+        "t.ruling_id = r.id AND t.is_canonical)",
     )
     n_flag = _one(cur, "SELECT count(*) FROM rulings WHERE in_window AND flags ? 'no_valid_text'")
     check("every ruling without a canonical text is flagged", n == n_flag, f"{n} without text, {n_flag} flagged")
@@ -114,7 +126,8 @@ def check_invariants(
     n = _one(
         cur,
         """SELECT count(*) FROM rulings r WHERE NOT in_window
-                     AND NOT EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id) AND NOT EXISTS (SELECT 1 FROM labels l WHERE l.ruling_id = r.id)""",
+                     AND NOT EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id) AND NOT EXISTS (SELECT 1
+                     FROM labels l WHERE l.ruling_id = r.id)""",
     )
     check("rulings outside the window are only gold-summary / labelled cases", n == 0, n)
 
@@ -130,7 +143,8 @@ def check_invariants(
     )
     n = _one(
         cur,
-        "SELECT count(*) FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id WHERE t.ruling_id IS DISTINCT FROM sr.ruling_id",
+        "SELECT count(*) FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id WHERE t.ruling_id "
+        "IS DISTINCT FROM sr.ruling_id",
     )
     check("texts point at the same ruling as their record", n == 0, n)
 
@@ -257,14 +271,16 @@ def quality_report(
         "## Where each canonical value comes from",
         "",
         table(
-            """SELECT k, v, count(*) FROM rulings, jsonb_each_text(field_sources) AS e(k, v) GROUP BY 1,2 ORDER BY 1,2""",
+            """SELECT k, v, count(*) FROM rulings, jsonb_each_text(field_sources) AS e(k, v) GROUP BY 1,2 ORDER BY
+               1,2""",
             ["Field", "Source", "Rulings"],
         ),
         "",
         "## Full texts",
         "",
         table(
-            """SELECT sr.source, count(*), count(*) FILTER (WHERE t.bad_reason IS NOT NULL), count(*) FILTER (WHERE t.is_canonical),
+            """SELECT sr.source, count(*), count(*) FILTER (WHERE t.bad_reason IS NOT NULL), count(*) FILTER (WHERE
+               t.is_canonical),
                           round(sum(t.char_count) / 1e6, 1)
                    FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id GROUP BY 1 ORDER BY 1""",
             ["Source", "Texts", "Bad", "Canonical", "Million chars"],
@@ -282,14 +298,16 @@ def quality_report(
         table(
             """SELECT sr.docket, sr.decision_date, sr.source, t.bad_reason, t.char_count,
                           EXISTS (SELECT 1 FROM ruling_texts c WHERE c.ruling_id = t.ruling_id AND c.is_canonical)
-                   FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id WHERE t.bad_reason IS NOT NULL ORDER BY 1,2,3""",
+                   FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id WHERE t.bad_reason IS NOT
+                   NULL ORDER BY 1,2,3""",
             ["Case", "Decided", "Source", "Reason", "Chars", "Fixed by another source"],
         ),
         "",
         "## Conflicts between sources",
         "",
         table(
-            "SELECT kind, field, coalesce(winner_source,''), coalesce(loser_source,''), count(*) FROM conflicts GROUP BY 1,2,3,4 ORDER BY 1,2,3,4",
+            "SELECT kind, field, coalesce(winner_source,''), coalesce(loser_source,''), count(*) FROM conflicts GROUP "
+            "BY 1,2,3,4 ORDER BY 1,2,3,4",
             ["Kind", "Field", "Winner", "Loser", "Count"],
         ),
         "",

@@ -118,7 +118,8 @@ def register_raw_files(
             conn.execute(
                 """
                 INSERT INTO raw_files (source, path, sha256, bytes) VALUES (%s, %s, %s, %s)
-                ON CONFLICT (path) DO UPDATE SET source = EXCLUDED.source, sha256 = EXCLUDED.sha256, bytes = EXCLUDED.bytes
+                ON CONFLICT (path) DO UPDATE SET source = EXCLUDED.source, sha256 = EXCLUDED.sha256, bytes =
+                EXCLUDED.bytes
                 """,
                 (source, rel, *rows[rel]),
             )
@@ -304,7 +305,8 @@ def _flush(
             (s, k): i
             for s, k, i in conn.execute(
                 """
-                INSERT INTO source_records (source, source_key, docket, decision_date, fields, record, raw_file_id, status, status_reason)
+                INSERT INTO source_records (source, source_key, docket, decision_date, fields, record, raw_file_id,
+                status, status_reason)
                 SELECT * FROM unnest(%s::text[], %s::text[], %s::text[], %s::date[], %s::jsonb[], %s::jsonb[],
                                      %s::bigint[], %s::text[], %s::text[])
                 RETURNING source, source_key, id
@@ -329,7 +331,8 @@ def _flush(
             UPDATE source_records sr
             SET docket = v.docket, decision_date = v.decision_date, fields = v.fields, record = v.record,
                 raw_file_id = v.raw_file_id, status = v.status, status_reason = v.status_reason, ruling_id = NULL
-            FROM unnest(%s::bigint[], %s::text[], %s::date[], %s::jsonb[], %s::jsonb[], %s::bigint[], %s::text[], %s::text[])
+            FROM unnest(%s::bigint[], %s::text[], %s::date[], %s::jsonb[], %s::jsonb[], %s::bigint[], %s::text[],
+            %s::text[])
                  AS v (id, docket, decision_date, fields, record, raw_file_id, status, status_reason)
             WHERE sr.id = v.id
             """,

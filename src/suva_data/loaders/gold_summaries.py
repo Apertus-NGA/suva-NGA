@@ -304,8 +304,8 @@ def write_gold_summaries(conn, summaries: list[GoldSummary]) -> dict[str, int]:
 
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO gold_summaries (ruling_id, language, title, body, author, source_url, source_file, version, is_current)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s, 1, true)",
+                "INSERT INTO gold_summaries (ruling_id, language, title, body, author, source_url, source_file, "
+                "version, is_current) VALUES (%s, %s, %s, %s, %s, %s, %s, 1, true)",
                 to_insert,
             )
     return {"read": len(summaries), "inserted": len(to_insert), "unchanged": unchanged}

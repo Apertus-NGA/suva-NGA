@@ -150,8 +150,8 @@ def test_rulings_unique_docket_and_date(db_conn):
 def test_canonical_text_cannot_have_bad_reason(db_conn):
     sr = _source_record(db_conn)
     insert = (
-        "INSERT INTO ruling_texts (source_record_id, source, text, sha256_normalized, char_count, bad_reason, is_canonical) "
-        "VALUES (%s, 'swiss_caselaw', 'x', %s, 1, %s, %s)"
+        "INSERT INTO ruling_texts (source_record_id, source, text, sha256_normalized, char_count, bad_reason, "
+        "is_canonical) VALUES (%s, 'swiss_caselaw', 'x', %s, 1, %s, %s)"
     )
     with pytest.raises(errors.CheckViolation):
         db_conn.execute(insert, (sr, HASH, "error_page", True))
@@ -163,8 +163,8 @@ def test_canonical_text_cannot_have_bad_reason(db_conn):
 def test_only_one_canonical_text_per_ruling(db_conn):
     rid = _ruling(db_conn)
     insert = (
-        "INSERT INTO ruling_texts (source_record_id, ruling_id, source, text, sha256_normalized, char_count, is_canonical) "
-        "VALUES (%s, %s, 'swiss_caselaw', 'x', %s, 1, true)"
+        "INSERT INTO ruling_texts (source_record_id, ruling_id, source, text, sha256_normalized, char_count, "
+        "is_canonical) VALUES (%s, %s, 'swiss_caselaw', 'x', %s, 1, true)"
     )
     db_conn.execute(insert, (_source_record(db_conn, "k1"), rid, HASH))
     with pytest.raises(errors.UniqueViolation):
@@ -178,7 +178,8 @@ def test_source_records_reject_unknown_source_and_status(db_conn):
         )
     with pytest.raises(errors.CheckViolation):
         db_conn.execute(
-            "INSERT INTO source_records (source, source_key, docket, status) VALUES ('swiss_caselaw', 'k', '8C_72/2025', 'done')"
+            "INSERT INTO source_records (source, source_key, docket, status) VALUES ('swiss_caselaw', 'k', "
+            "'8C_72/2025', 'done')"
         )
 
 

@@ -320,7 +320,8 @@ def reconcile(
 
         # ---------------------------------------------------------------- write
         cur.execute(
-            """CREATE TEMP TABLE _r (docket text, decision_date date, division text, language text, publication_date date,
+            """CREATE TEMP TABLE _r (docket text, decision_date date, division text, language text, publication_date
+               date,
                    starred boolean, area text, subject text, outcome text, cited_decisions jsonb, official_url text,
                    field_sources jsonb, flags jsonb, in_window boolean, ord serial) ON COMMIT DROP"""
         )
@@ -337,8 +338,10 @@ def reconcile(
                       cited_decisions, official_url, field_sources, flags, in_window
                FROM _r ORDER BY ord
                ON CONFLICT (docket, decision_date) DO UPDATE SET
-                   division = EXCLUDED.division, language = EXCLUDED.language, publication_date = EXCLUDED.publication_date,
-                   starred = EXCLUDED.starred, area = EXCLUDED.area, subject = EXCLUDED.subject, outcome = EXCLUDED.outcome,
+                   division = EXCLUDED.division, language = EXCLUDED.language, publication_date =
+                   EXCLUDED.publication_date,
+                   starred = EXCLUDED.starred, area = EXCLUDED.area, subject = EXCLUDED.subject, outcome =
+                   EXCLUDED.outcome,
                    cited_decisions = EXCLUDED.cited_decisions, official_url = EXCLUDED.official_url,
                    field_sources = EXCLUDED.field_sources, flags = EXCLUDED.flags, in_window = EXCLUDED.in_window"""
         )
@@ -354,7 +357,8 @@ def reconcile(
                       EXISTS (SELECT 1 FROM predictions p WHERE p.ruling_id = r.id) OR
                       EXISTS (SELECT 1 FROM relevance_events e WHERE e.ruling_id = r.id) OR
                       EXISTS (SELECT 1 FROM summary_events e WHERE e.ruling_id = r.id)
-               FROM rulings r WHERE NOT EXISTS (SELECT 1 FROM _r WHERE _r.docket = r.docket AND _r.decision_date = r.decision_date)"""
+               FROM rulings r WHERE NOT EXISTS (SELECT 1 FROM _r WHERE _r.docket = r.docket AND _r.decision_date =
+               r.decision_date)"""
         )
         stale = cur.fetchall()
         attached = sorted(d for _, d, has in stale if has)
@@ -369,7 +373,8 @@ def reconcile(
             rep.rulings_removed = len(stale)
 
         cur.execute(
-            "CREATE TEMP TABLE _s (id bigint PRIMARY KEY, docket text, decision_date date, status text, reason text) ON COMMIT DROP"
+            "CREATE TEMP TABLE _s (id bigint PRIMARY KEY, docket text, decision_date date, status text, reason text) "
+            "ON COMMIT DROP"
         )
         ruling_of = {rid: (d, dd) for rid, d, dd in rec_to_ruling}
         with cur.copy("COPY _s (id, docket, decision_date, status, reason) FROM STDIN") as cp:
@@ -405,14 +410,18 @@ def reconcile(
                    loser_source text, winner_value text, loser_value text, ord serial) ON COMMIT DROP"""
         )
         with cur.copy(
-            "COPY _c (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value) FROM STDIN"
+            "COPY _c (docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value) "
+            "FROM STDIN"
         ) as cp:
             for c in conflicts:
                 cp.write_row(c)
         cur.execute(
-            """INSERT INTO conflicts (ruling_id, docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value)
-               SELECT r.id, c.docket, c.decision_date, c.field, c.kind, c.winner_source, c.loser_source, c.winner_value, c.loser_value
-               FROM _c c LEFT JOIN rulings r ON r.docket = c.docket AND r.decision_date = c.decision_date ORDER BY c.ord"""
+            """INSERT INTO conflicts (ruling_id, docket, decision_date, field, kind, winner_source, loser_source,
+               winner_value, loser_value)
+               SELECT r.id, c.docket, c.decision_date, c.field, c.kind, c.winner_source, c.loser_source,
+               c.winner_value, c.loser_value
+               FROM _c c LEFT JOIN rulings r ON r.docket = c.docket AND r.decision_date = c.decision_date ORDER BY
+               c.ord"""
         )
         counts: dict = defaultdict(int)
         for c in conflicts:
@@ -426,7 +435,8 @@ def load_statute_refs(conn, rows) -> int:
     with conn.transaction():
         cur = conn.cursor()
         cur.execute(
-            "CREATE TEMP TABLE _st (decision_id text, law_code text, article text, paragraph text, mention_count integer) ON COMMIT DROP"
+            "CREATE TEMP TABLE _st (decision_id text, law_code text, article text, paragraph text, mention_count "
+            "integer) ON COMMIT DROP"
         )
         with cur.copy("COPY _st FROM STDIN") as cp:
             for r in rows:

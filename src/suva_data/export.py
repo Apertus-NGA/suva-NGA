@@ -78,8 +78,10 @@ TABLES: dict[str, tuple[pa.Schema, str, object]] = {
                 ("is_current", B),
             ]
         ),
-        """SELECT r.docket, r.decision_date, g.language, g.title, g.body, g.author, g.source_url, g.source_file, g.version, g.is_current
-           FROM gold_summaries g JOIN rulings r ON r.id = g.ruling_id ORDER BY r.decision_date, r.docket, g.language, g.version""",
+        """SELECT r.docket, r.decision_date, g.language, g.title, g.body, g.author, g.source_url, g.source_file,
+           g.version, g.is_current
+           FROM gold_summaries g JOIN rulings r ON r.id = g.ruling_id ORDER BY r.decision_date, r.docket, g.language,
+           g.version""",
         None,
     ),
     "labels": (
@@ -117,8 +119,10 @@ TABLES: dict[str, tuple[pa.Schema, str, object]] = {
                 ("text", S),
             ]
         ),
-        """SELECT sr.docket, sr.decision_date, sr.source, sr.source_key, t.is_canonical, t.bad_reason, t.char_count, t.sha256_normalized, t.text
-           FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id ORDER BY sr.source, sr.source_key""",
+        """SELECT sr.docket, sr.decision_date, sr.source, sr.source_key, t.is_canonical, t.bad_reason, t.char_count,
+           t.sha256_normalized, t.text
+           FROM ruling_texts t JOIN source_records sr ON sr.id = t.source_record_id ORDER BY sr.source,
+           sr.source_key""",
         None,
     ),
     "source_records": (
@@ -151,7 +155,8 @@ TABLES: dict[str, tuple[pa.Schema, str, object]] = {
                 ("loser_value", S),
             ]
         ),
-        """SELECT docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value FROM conflicts ORDER BY id""",
+        """SELECT docket, decision_date, field, kind, winner_source, loser_source, winner_value, loser_value FROM
+           conflicts ORDER BY id""",
         None,
     ),
     "statute_refs": (
@@ -166,7 +171,8 @@ TABLES: dict[str, tuple[pa.Schema, str, object]] = {
             ]
         ),
         """SELECT r.docket, r.decision_date, s.law_code, s.article, s.paragraph, s.mention_count
-           FROM statute_refs s JOIN rulings r ON r.id = s.ruling_id ORDER BY r.decision_date, r.docket, s.law_code, s.article, s.paragraph""",
+           FROM statute_refs s JOIN rulings r ON r.id = s.ruling_id ORDER BY r.decision_date, r.docket, s.law_code,
+           s.article, s.paragraph""",
         None,
     ),
 }

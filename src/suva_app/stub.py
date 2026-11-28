@@ -40,7 +40,8 @@ def remove(conn) -> int:
     """Delete every placeholder run (its predictions go with it). Returns the number of predictions removed."""
     with conn.transaction():
         n = conn.execute(
-            "SELECT count(*) FROM predictions p JOIN model_runs m ON m.id = p.run_id WHERE (m.params ->> 'stub')::boolean"
+            "SELECT count(*) FROM predictions p JOIN model_runs m ON m.id = p.run_id WHERE (m.params ->> "
+            "'stub')::boolean"
         ).fetchone()[0]
         conn.execute("DELETE FROM model_runs WHERE (params ->> 'stub')::boolean")
     return n
@@ -63,7 +64,8 @@ def seed(conn) -> int:
         ).fetchone()[0]
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO predictions (ruling_id, run_id, score, relevant, explanation) VALUES (%s, %s, %s, %s, NULL)",
+                "INSERT INTO predictions (ruling_id, run_id, score, relevant, explanation) VALUES (%s, %s, %s, %s, "
+                "NULL)",
                 [
                     (rid, run_id, s, s >= THRESHOLD)
                     for rid, docket, topic, label in rows

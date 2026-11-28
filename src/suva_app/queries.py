@@ -250,7 +250,8 @@ def facets(conn) -> dict:
                       min(publication_date) AS published_min, max(publication_date) AS published_max FROM rulings"""
         ).fetchone()
         scoring = cur.execute(
-            """SELECT count(*) AS scored, coalesce(bool_or(coalesce((m.params ->> 'stub')::boolean, false)), false) AS stub
+            """SELECT count(*) AS scored, coalesce(bool_or(coalesce((m.params ->> 'stub')::boolean, false)), false) AS
+               stub
                FROM predictions p JOIN model_runs m ON m.id = p.run_id WHERE p.is_current"""
         ).fetchone()
         return {
