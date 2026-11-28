@@ -1,4 +1,5 @@
-"""Layer-1 engine (src/layer1/engine.py): parity with src/courts.py, evidence offsets, normalisation, reasons."""
+"""Layer-1 engine (src/layer1/engine.py): parity with src/courts.py, evidence offsets, normalisation, reasons, and the
+rule ledger: every rule of the version evaluated once per ruling, with its outcome (F-01, F-02, F-03, F-13)."""
 
 from __future__ import annotations
 
@@ -10,19 +11,23 @@ import pytest
 from src import courts
 from src.layer1.engine import Layer1Engine, RuleSpec, fingerprint
 from src.layer1.models import Layer1Config
-from src.layer1.run import explain
+from src.layer1.run import NO_TEXT, explain
 
 REGISTRY = json.loads((Path(__file__).resolve().parents[1] / "src/layer1/registry/layer1_filter.json").read_text())
 
 
-def engine(version: list[int]) -> Layer1Engine:
+def specs(version: list[int]) -> list[RuleSpec]:
     ver = next(v for v in REGISTRY["versions"] if v["version"] == version)
     rules = {r["rule_code"]: r for r in REGISTRY["rules"]}
-    specs = [
+    return [
         RuleSpec(code, rules[code]["definition"]["check"], rules[code]["kind"], i)
         for i, code in enumerate(ver["rules"], 1)
     ]
-    return Layer1Engine(Layer1Config.model_validate(ver["config"]), specs)
+
+
+def engine(version: list[int]) -> Layer1Engine:
+    ver = next(v for v in REGISTRY["versions"] if v["version"] == version)
+    return Layer1Engine(Layer1Config.model_validate(ver["config"]), specs(version))
 
 
 V100, V110 = engine([1, 0, 0]), engine([1, 1, 0])
@@ -120,23 +125,245 @@ def test_neuheiten_rubric_wins_over_hf_legal_area():
     assert d.rubric_source == "neuheiten" and d.kept
 
 
+LABELS = {
+    "L1_KEEP_RUBRIC": "Rechtsgebiet in der Liste",
+    "L1_KEEP_RUBRIC_MISSING": "Rechtsgebiet fehlt",
+    "L1_KEEP_ACCIDENT_TERM": "Text nennt die Suva",
+    "L1_KEEP_CONTRACT_TERM": "Text nennt das VVG",
+    "L1_DROP_WRONG_COURT": "Abteilung nicht in der Liste",
+    "L1_DROP_WRONG_LETTER": "Verfahrensart nicht berücksichtigt",
+    "L1_DROP_RUBRIC_OUT": "Rechtsgebiet nicht in der Liste",
+    "L1_FLAG_CLOSED_RUBRIC": "VVG-Begriff, Gebiet ausgeschlossen",
+    "L1_SIGNAL_RUBRIC_FROM_TITLE": "Rechtsgebiet aus dem Gegenstand gelesen",
+}
+
+
 def test_explanation_is_german_and_names_the_reason():
-    labels = {
-        "L1_KEEP_RUBRIC": "Rechtsgebiet in der Liste",
-        "L1_KEEP_ACCIDENT_TERM": "Text nennt die Suva",
-        "L1_DROP_RUBRIC_OUT": "Rechtsgebiet ausserhalb der Liste",
-        "L1_FLAG_CLOSED_RUBRIC": "VVG-Begriff, Gebiet ausgeschlossen",
-        "L1_SIGNAL_RUBRIC_FROM_TITLE": "Rechtsgebiet aus dem Gegenstand gelesen",
-    }
     kept = V100.decide("8C_1/2025", {"hf_legal_area": "Unfallversicherung"}, None, "Die Suva.")
-    assert explain(kept, labels) == "Vorauswahl bestanden: Rechtsgebiet in der Liste. Ebenso: Text nennt die Suva."
-    dropped = V100.decide("9C_1/2025", {"hf_legal_area": "Finances publiques & droit fiscal"}, None, "LCA")
-    assert explain(dropped, labels).startswith("Von der Vorauswahl ausgeschlossen: Rechtsgebiet ausserhalb der Liste.")
+    assert explain(kept, LABELS) == "Vorauswahl bestanden: Rechtsgebiet in der Liste. Ebenso: Text nennt die Suva."
+    titled = V100.decide("9C_1/2025", {"hf_legal_area": None}, "Berufliche Vorsorge,", None)
+    assert explain(titled, LABELS) == (
+        "Vorauswahl bestanden: Rechtsgebiet in der Liste."
+        " (Rechtsgebiet aus dem Gegenstand gelesen: Berufliche Vorsorge)"
+    )
+
+
+def test_a_drop_explanation_states_what_the_text_check_found():
+    """F-03: a drop label states only its own condition; the explanation adds the text outcome from the ledger."""
+    no_text = V110.decide("5A_1/2026", {"hf_legal_area": "Erbrecht"}, None, None)
+    assert explain(no_text, LABELS) == f"Von der Vorauswahl ausgeschlossen: Abteilung nicht in der Liste. {NO_TEXT}"
+    clear = V110.decide("5A_1/2026", {"hf_legal_area": "Erbrecht"}, None, "Erbteilung.")
+    assert explain(clear, LABELS) == (
+        "Von der Vorauswahl ausgeschlossen: Abteilung nicht in der Liste. "
+        "Im Urteilstext geprüft, ohne Treffer: Suchbegriffe zu Suva, Unfall- und Militärversicherung; "
+        "Suchbegriffe zu VVG und Taggeldversicherung "
+        "(nur die Begriffe der Filterversion; andere Formulierungen erkennt die Prüfung nicht)."
+    )
+    blocked = V100.decide("9C_1/2025", {"hf_legal_area": "Finances publiques & droit fiscal"}, None, "impôt et LCA")
+    assert explain(blocked, LABELS) == (
+        "Von der Vorauswahl ausgeschlossen: Rechtsgebiet nicht in der Liste. "
+        "Im Urteilstext geprüft, ohne Treffer: Suchbegriffe zu Suva, Unfall- und Militärversicherung "
+        "(nur die Begriffe der Filterversion; andere Formulierungen erkennt die Prüfung nicht). "
+        "Hinweis: VVG-Begriff, Gebiet ausgeschlossen: «LCA» im Urteilstext gefunden, "
+        "Rechtsgebiet «Finances publiques & droit fiscal»."
+    )
+
+
+def test_a_drop_explanation_names_the_term_lists_searched_not_what_the_ruling_says():
+    """Review finding: the label of a text keep states a meaning ("Text nennt die Suva ..."). Listed as "ohne Treffer"
+    it told a lawyer that a dropped ruling does not name Suva or accident insurance, when the ruling may name them in
+    a wording the term list lacks (V1.1.0 does not list "Unfallversicherungsanstalt", Suva's legal name). The
+    explanation names the term lists searched and says that other wordings are not recognised."""
+    text = "Die Schweizerische Unfallversicherungsanstalt hat Beschwerde geführt."  # synthetic, no party (D-038)
+    d = V110.decide("2C_1/2025", {"hf_legal_area": "Steuerrecht"}, None, text)
+    assert not d.kept and d.reason_code == "L1_DROP_WRONG_COURT"
+    accident = next(e for e in d.evaluations if e.rule_code == "L1_KEEP_ACCIDENT_TERM")
+    assert accident.outcome == "not_fired" and accident.detail["pattern"] == "accident_terms"
+    explanation = explain(d, LABELS)
+    assert LABELS["L1_KEEP_ACCIDENT_TERM"] not in explanation and LABELS["L1_KEEP_CONTRACT_TERM"] not in explanation
+    assert "Suchbegriffe zu Suva, Unfall- und Militärversicherung" in explanation
+    assert "andere Formulierungen erkennt die Prüfung nicht" in explanation
 
 
 def test_a_version_without_a_required_rule_is_refused():
     with pytest.raises(ValueError, match="lacks rules"):
         Layer1Engine(V100.config, [RuleSpec("L1_KEEP_RUBRIC", "court_rubric_kept", "keep", 1)])
+    without_block = [r for r in specs([1, 1, 0]) if r.check != "text_contract_term_blocked"]
+    with pytest.raises(ValueError, match="text_contract_term_blocked"):
+        Layer1Engine(V110.config, without_block)
+
+
+@pytest.mark.parametrize(
+    "check,effect,message",
+    [
+        ("court_rubric_kept", "drop", "check court_rubric_kept is a keep rule, not a drop rule"),
+        ("court_not_listed", "flag", "check court_not_listed is a drop rule, not a flag rule"),
+        ("text_contract_term_blocked", "keep", "check text_contract_term_blocked is a flag rule, not a keep rule"),
+        ("rubric_from_gegenstand", "keep", "check rubric_from_gegenstand is a signal rule, not a keep rule"),
+    ],
+)
+def test_a_rule_whose_kind_is_not_its_checks_effect_is_refused(check, effect, message):
+    """F-13: a subject rule bound as a flag used to end in StopIteration at decide time; now the build refuses it."""
+    bad = [RuleSpec(r.rule_code, r.check, effect, r.ordinal) if r.check == check else r for r in specs([1, 1, 0])]
+    with pytest.raises(ValueError, match=message):
+        Layer1Engine(V110.config, bad)
+
+
+def test_an_unknown_check_or_a_shared_ordinal_is_refused():
+    with pytest.raises(ValueError, match="unknown check 'text_unavailable'"):
+        Layer1Engine(
+            V110.config, [*specs([1, 1, 0]), RuleSpec("L1_KEEP_TEXT_UNAVAILABLE", "text_unavailable", "keep", 10)]
+        )
+    twice = [RuleSpec(r.rule_code, r.check, r.effect, 1) for r in specs([1, 1, 0])]
+    with pytest.raises(ValueError, match="share an ordinal"):
+        Layer1Engine(V110.config, twice)
+
+
+CHECK_ORDER = [
+    "court_rubric_kept",
+    "court_rubric_missing",
+    "text_accident_term",
+    "text_contract_term",
+    "text_contract_term_blocked",
+    "court_not_listed",
+    "letter_not_listed",
+    "court_rubric_out",
+    "rubric_from_gegenstand",
+]
+RULE_ORDER = [
+    "L1_KEEP_RUBRIC",
+    "L1_KEEP_RUBRIC_MISSING",
+    "L1_KEEP_ACCIDENT_TERM",
+    "L1_KEEP_CONTRACT_TERM",
+    "L1_FLAG_CLOSED_RUBRIC",
+    "L1_DROP_WRONG_COURT",
+    "L1_DROP_WRONG_LETTER",
+    "L1_DROP_RUBRIC_OUT",
+    "L1_SIGNAL_RUBRIC_FROM_TITLE",
+]
+
+
+@pytest.mark.parametrize("docket,area,title,text", CASES)
+def test_every_rule_is_evaluated_once_and_the_hits_are_the_fired_ones(docket, area, title, text):
+    for eng in (V100, V110):
+        d = eng.decide(docket, {"hf_legal_area": area}, title, text)
+        assert [e.ordinal for e in d.evaluations] == list(range(1, 10))
+        assert [e.rule_code for e in d.evaluations] == RULE_ORDER
+        assert all(e.effect == eng.rules[r].effect for e, r in zip(d.evaluations, CHECK_ORDER, strict=True))
+        fired = [e for e in d.evaluations if e.outcome == "fired"]
+        assert sorted(e.rule_code for e in fired) == sorted(h.rule_code for h in d.hits)
+        for h in d.hits:  # the fired evaluation carries the hit's evidence
+            e = next(e for e in fired if e.rule_code == h.rule_code)
+            assert (e.char_start, e.char_end, e.matched_text) == (h.evidence.start, h.evidence.end, h.evidence.matched)
+        subject = [e for e in fired if e.rule_code.startswith(("L1_KEEP_RUBRIC", "L1_DROP_"))]
+        assert len(subject) == 1
+        decisive = [e for e in fired if e.effect == ("keep" if d.kept else "drop")]
+        assert d.reason_code == decisive[0].rule_code  # lowest ordinal (evaluations are in ordinal order)
+        for e in d.evaluations:
+            assert (e.outcome == "not_applicable") == (e.evidence_field is None)
+            if e.outcome == "not_applicable":
+                assert e.detail["why"]
+
+
+def _ledger(d) -> dict[str, tuple]:
+    return {e.rule_code: (e.outcome, e.evidence_field, e.examined_value, e.detail.get("why")) for e in d.evaluations}
+
+
+def test_outcomes_on_a_wrong_court_without_text():
+    """F-03: no text and a court outside the list. The court rule fires on the docket head; the rules that need an
+    allowed court are not applicable, and so are the text rules: the explanation can say the text was not checked."""
+    d = V110.decide("5A_1/2026", {"hf_legal_area": "Erbrecht"}, None, None)
+    led = _ledger(d)
+    assert led["L1_DROP_WRONG_COURT"] == ("fired", "docket", "5A", None)
+    for code in ("L1_DROP_WRONG_LETTER", "L1_KEEP_RUBRIC_MISSING", "L1_KEEP_RUBRIC", "L1_DROP_RUBRIC_OUT"):
+        assert led[code] == ("not_applicable", None, None, "court_not_listed")
+    for code in ("L1_KEEP_ACCIDENT_TERM", "L1_KEEP_CONTRACT_TERM", "L1_FLAG_CLOSED_RUBRIC"):
+        assert led[code] == ("not_applicable", None, None, "text_absent")
+    assert led["L1_SIGNAL_RUBRIC_FROM_TITLE"] == ("not_fired", "rubric:hf_legal_area", "Erbrecht", None)
+    assert (d.in_suva_scope, d.reason_code) == ("out_of_scope", "L1_DROP_WRONG_COURT")
+
+
+def test_outcomes_on_a_wrong_letter_a_missing_rubric_and_a_kept_rubric():
+    letter = _ledger(V110.decide("4B_1/2025", {"hf_legal_area": "Vertragsrecht"}, None, None))
+    assert letter["L1_DROP_WRONG_COURT"] == ("not_fired", "docket", "4B", None)
+    assert letter["L1_DROP_WRONG_LETTER"] == ("fired", "docket", "4B", None)
+    for code in ("L1_KEEP_RUBRIC_MISSING", "L1_KEEP_RUBRIC", "L1_DROP_RUBRIC_OUT"):
+        assert letter[code] == ("not_applicable", None, None, "letter_not_listed")
+    missing = _ledger(V110.decide("8C_1/2025", {"hf_legal_area": None}, None, None))
+    assert missing["L1_KEEP_RUBRIC_MISSING"] == ("fired", "docket", "8C", None)
+    for code in ("L1_KEEP_RUBRIC", "L1_DROP_RUBRIC_OUT"):
+        assert missing[code] == ("not_applicable", None, None, "rubric_missing")
+    kept = V110.decide("8C_1/2025", {"hf_legal_area": "Unfallversicherung"}, None, "Das Taggeld wird gekürzt.")
+    led = _ledger(kept)
+    assert led["L1_KEEP_RUBRIC"] == ("fired", "rubric:hf_legal_area", "Unfallversicherung", None)
+    assert led["L1_DROP_RUBRIC_OUT"] == ("not_fired", "rubric:hf_legal_area", "Unfallversicherung", None)
+    assert led["L1_KEEP_RUBRIC_MISSING"] == ("not_fired", "rubric:hf_legal_area", "Unfallversicherung", None)
+    accident = next(e for e in kept.evaluations if e.rule_code == "L1_KEEP_ACCIDENT_TERM")
+    assert (accident.outcome, accident.evidence_field, accident.examined_value) == ("not_fired", "full_text", None)
+    assert accident.detail == {"pattern": "accident_terms", "text_chars": 25}
+
+
+def test_the_title_signal_fires_only_when_the_rubric_came_from_the_title():
+    titled = V110.decide("9C_1/2025", {"hf_legal_area": None}, "Berufliche Vorsorge,", None)
+    signal = next(e for e in titled.evaluations if e.rule_code == "L1_SIGNAL_RUBRIC_FROM_TITLE")
+    assert (signal.outcome, signal.evidence_field, signal.matched_text) == (
+        "fired",
+        "gegenstand",
+        "Berufliche Vorsorge",
+    )
+    listed = V110.decide("9C_1/2025", {"hf_legal_area": "Berufliche Vorsorge"}, "Berufliche Vorsorge,", None)
+    signal = next(e for e in listed.evaluations if e.rule_code == "L1_SIGNAL_RUBRIC_FROM_TITLE")
+    assert (signal.outcome, signal.detail) == ("not_fired", {"rubric_source": "hf_legal_area"})
+
+
+def test_a_blocked_contract_term_keeps_its_term_and_offsets():
+    """F-02: the contract term matched on a closed rubric is recorded as blocked, with the exact slice of the text."""
+    text = "Steuerfrage nach Art. 14 VVG, impôt."
+    d = V110.decide("9C_1/2025", {"hf_legal_area": "Finances publiques & droit fiscal"}, None, text)
+    blocked = next(e for e in d.evaluations if e.rule_code == "L1_KEEP_CONTRACT_TERM")
+    assert blocked.outcome == "blocked" and blocked.evidence_field == "full_text"
+    assert text[blocked.char_start : blocked.char_end] == blocked.matched_text == "VVG"
+    assert blocked.detail == {
+        "pattern": "contract_terms",
+        "blocked_by": "L1_FLAG_CLOSED_RUBRIC",
+        "closed_rubric_match": "finances publiques",
+    }
+    flag = next(e for e in d.evaluations if e.rule_code == "L1_FLAG_CLOSED_RUBRIC")
+    assert (flag.outcome, flag.evidence_field, flag.matched_text) == (
+        "fired",
+        "rubric:hf_legal_area",
+        "finances publiques",
+    )
+    assert (d.in_suva_scope, d.reason_code) == ("out_of_scope", "L1_DROP_RUBRIC_OUT")
+    assert {h.rule_code for h in d.hits} == {"L1_DROP_RUBRIC_OUT", "L1_FLAG_CLOSED_RUBRIC"}  # the hits as before
+
+
+def test_absent_text_makes_the_text_rules_not_applicable_with_why():
+    for text in (None, "", "   \n"):
+        d = V110.decide("8C_1/2025", {"hf_legal_area": "Unfallversicherung"}, None, text)
+        for e in d.evaluations:
+            if e.rule_code in ("L1_KEEP_ACCIDENT_TERM", "L1_KEEP_CONTRACT_TERM", "L1_FLAG_CLOSED_RUBRIC"):
+                assert (e.outcome, e.evidence_field, e.char_start, e.detail) == (
+                    "not_applicable",
+                    None,
+                    None,
+                    {"why": "text_absent"},
+                )
+
+
+def test_the_decisive_rule_is_the_fired_keep_with_the_lowest_ordinal():
+    """F-13: precedence follows the version's ordinals, not the order the engine happens to evaluate in."""
+    case = ("8C_1/2025", {"hf_legal_area": "Unfallversicherung"}, None, "Die Suva ist Partei.")
+    assert V110.decide(*case).reason_code == "L1_KEEP_RUBRIC"
+    order = {"L1_KEEP_ACCIDENT_TERM": 1, "L1_KEEP_RUBRIC": 3}
+    swapped = [RuleSpec(r.rule_code, r.check, r.effect, order.get(r.rule_code, r.ordinal)) for r in specs([1, 1, 0])]
+    d = Layer1Engine(V110.config, swapped).decide(*case)
+    assert d.reason_code == "L1_KEEP_ACCIDENT_TERM"
+    assert [e.rule_code for e in d.evaluations][:3] == [
+        "L1_KEEP_ACCIDENT_TERM",
+        "L1_KEEP_RUBRIC_MISSING",
+        "L1_KEEP_RUBRIC",
+    ]
 
 
 def test_fingerprint_changes_with_any_input():
@@ -144,3 +371,85 @@ def test_fingerprint_changes_with_any_input():
     assert base == fingerprint("cv", "8C_1/2025", "2026-04-02", {"hf_legal_area": "x"}, "t", "a" * 64)
     assert base != fingerprint("cv2", "8C_1/2025", "2026-04-02", {"hf_legal_area": "x"}, "t", "a" * 64)
     assert base != fingerprint("cv", "8C_1/2025", "2026-04-02", {"hf_legal_area": "y"}, "t", "a" * 64)
+
+
+def test_make_run_s2_says_when_the_recall_check_is_skipped(monkeypatch, capsys):
+    """F-14: with no Suva label loaded, S2 of `make run` says the blocking recall check did not run.
+
+    Mocks (declared, G9): `src.db.pg.connect` returns a fake connection whose counts are 5 rulings and 0 labels, and
+    `src.layer1.run.run_layer1` returns a fixed summary. No database is touched; the DB path is tested in
+    tests/test_layer1_db.py (recall exits 1 when a labelled ruling is dropped).
+    """
+    import src.db.pg as pg
+    import src.layer1.run as layer1_run
+    from src import cli
+
+    class FakeCursor:
+        counts = iter([(5,), (0,)])  # SELECT count(*) FROM corpus.ruling, then FROM gold.label
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql):
+            assert sql.startswith("SELECT count(*) FROM ")
+
+        def fetchone(self):
+            return next(self.counts)
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    summary = {"kept": 3, "rulings": 5, "profile": "default V0.2.0", "version": "V1.1.0", "golden": "not_comparable"}
+    monkeypatch.setenv("DATABASE_URL", "postgresql://unused.invalid/none")
+    monkeypatch.setattr(pg, "connect", lambda **kw: FakeConnection())
+    monkeypatch.setattr(layer1_run, "run_layer1", lambda conn, **kw: summary | {"files": "data/runs/x"})
+    assert cli.run_layer1_stage() == 0
+    out = capsys.readouterr().out
+    assert "run S2 layer 1: 3 of 5 kept (default V0.2.0, layer1_filter V1.1.0, golden not_comparable)" in out
+    assert "SKIPPED run S2 recall: gold.label is empty, so the blocking recall check did not run" in out
+
+
+def test_golden_status_of_a_database_run():
+    """§2.4 Golden in every run: matched, mismatch (the run then fails) or not comparable, with the reason."""
+    from src.layer1.golden import compare_run, digest
+
+    lines = ['{"docket": "a"}', '{"docket": "b"}']
+    stored = {
+        "version": "V1.1.0",
+        "ingest_version": "V1.0.0",
+        "rulings": 2,
+        "kept": 1,
+        "dropped": 1,
+        "by_reason": {"L1_DROP_WRONG_COURT": 1, "L1_KEEP_RUBRIC": 1},
+        "decisions_sha256": digest(lines),
+    }
+    run = {
+        "population": None,
+        "snapshot_pinned": True,
+        "ingest_versions": {"V1.0.0"},
+        "lines": lines,
+        "kept": 1,
+        "by_reason": {"L1_KEEP_RUBRIC": 1, "L1_DROP_WRONG_COURT": 1},
+    }
+    assert compare_run(stored, **run)["status"] == "matched"
+    changed = compare_run(stored, **run | {"lines": ['{"docket": "a"}', '{"docket": "c"}']})
+    assert (changed["status"], changed["differs"]) == ("mismatch", ["decisions_sha256"])
+    reasons = {
+        "no expected file": compare_run(None, **run),
+        "population": compare_run(stored, **run | {"population": "2026Q2_decision"}),
+        "not loaded from the snapshot": compare_run(stored, **run | {"snapshot_pinned": False}),
+        "loaded by ingest V0.9.0": compare_run(stored, **run | {"ingest_versions": {"V0.9.0"}}),
+        "1 rulings decided": compare_run(stored, **run | {"lines": lines[:1]}),
+    }
+    for expected, result in reasons.items():
+        assert result["status"] == "not_comparable" and expected in result["reason"]

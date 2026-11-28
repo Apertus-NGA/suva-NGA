@@ -1,0 +1,41 @@
+{
+  "canonical": "layer1-golden-1",
+  "step": "ingest",
+  "version": "V1.0.0",
+  "snapshot": {
+    "hf_revision": "35b17aa9c3fad71011b72f78f6ab79650ec0cf96",
+    "file_sha256": "d2b2df1dedb05c62d91d834ddb6ba8084c31fae61a427fd4541a72ed35bb3711"
+  },
+  "rulings": 6055,
+  "counters": {
+    "out_of_window": 21214,
+    "rows_read": 27286,
+    "twins": 17
+  },
+  "populations": {
+    "2025Q4_decision": {
+      "members": 1931,
+      "manifest_sha256": "fce72ae1d3d6ef077259855781575c0b906962c76bae06dc4b2d5d982a7fc4cf"
+    },
+    "2026Q1_decision": {
+      "members": 2005,
+      "manifest_sha256": "1129d278b8b82717073fcc7c502e4f6faf4ea6abc63893fce732db0b81686ead"
+    },
+    "2026Q2_decision": {
+      "members": 2096,
+      "manifest_sha256": "5efd8ae76347c21dfa3bb3dc59b18825a2c18fa9769a03785e795b14e5ce9e5e"
+    },
+    "2026Q2_publication": {
+      "members": 2060,
+      "manifest_sha256": "0495bcd56af1ccbd64ed58fcbc9b0645f6057c3a1e9fe0e79021890ecd8e1468"
+    },
+    "2026Q2_union": {
+      "members": 2677,
+      "manifest_sha256": "c80d5f130190cdbadfe706012824144545093e09e7efc6ad2b6a41fd65ed0ab1"
+    },
+    "suva_reference": {
+      "members": 23,
+      "manifest_sha256": "a47b2337b87407c51942a1afd94afd80db20bd0e96a3c8e2d171872b6a697d4b"
+    }
+  }
+}

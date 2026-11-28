@@ -2,9 +2,11 @@
 -- File: 20_corpus.sql (rulings and what their sources say)
 -- Date: 2026-11-28
 -- Description: A ruling is split by source, never one flat row (D-062): identity, source references (HF
---              ids, twins), publication observations (exact or approximate), text versions, versioned
---              segmentations and their considerations (the court's numbered Erwägungen), parses, ingest
---              issues (G5's counted reasons), populations. Never ingested: judges, clerks (D-038),
+--              ids, twins; one per snapshot), the rows of a source file not loaded and why (ingest
+--              exclusions, F-04), publication observations (exact or approximate), text versions (never
+--              blank, by the engine's definition of whitespace), versioned segmentations and their
+--              considerations (the court's numbered Erwägungen), parses, ingest issues (G5's counted
+--              reasons), populations. Never ingested: judges, clerks (D-038),
 --              legal_area, outcome, marked_for_publication (D-011). The scope label is NOT here (D-063).
 -- SGBD: PostgreSQL 17
 -- Doc: docs/DB_DDL_PLANNING.md §8
@@ -43,10 +45,34 @@ CREATE TABLE IF NOT EXISTS corpus.ruling_source_ref (
   snapshot_id   uuid NOT NULL REFERENCES ops.source_snapshot(snapshot_id) ON DELETE RESTRICT,
   is_twin       boolean NOT NULL DEFAULT false,
   created_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (source, external_id)
+  PRIMARY KEY (snapshot_id, source, external_id)
 );
-COMMENT ON TABLE corpus.ruling_source_ref IS 'Every source row behind a ruling (hf_decision_id, aza_id, team_list_2096), twins included: an HF -DYYYYMMDD row is a twin only when its base row has the same date. Append-only.';
+COMMENT ON TABLE corpus.ruling_source_ref IS 'Every source row behind a ruling (hf_decision_id, aza_id, team_list_2096), twins included, per snapshot: an HF -DYYYYMMDD row is a twin only when its base row has the same date. One row per (snapshot, source, external_id): a new revision of the file records the rows it loads again, so every snapshot closes on its own (corpus.v_ingest_closure, F-04), and a row whose docket or date changed points to its new ruling. A (snapshot, source, external_id) is either here or in corpus.ingest_exclusion, never both (trigger). Append-only.';
 CREATE INDEX IF NOT EXISTS ruling_source_ref_ruling_ix ON corpus.ruling_source_ref (ruling_id);
+CREATE INDEX IF NOT EXISTS ruling_source_ref_external_ix ON corpus.ruling_source_ref (source, external_id);
+
+CREATE TABLE IF NOT EXISTS corpus.ingest_exclusion (
+  snapshot_id           uuid NOT NULL REFERENCES ops.source_snapshot(snapshot_id) ON DELETE RESTRICT,
+  source                text NOT NULL CONSTRAINT ingest_exclusion_source_chk CHECK (source IN ('hf_decision_id', 'aza_id', 'team_list_2096')),
+  external_id           text NOT NULL CHECK (length(btrim(external_id)) > 0),
+  docket_raw            text,
+  decision_date         date,
+  reason_code           text NOT NULL REFERENCES ops.reason_code(code) ON DELETE RESTRICT,
+  detail                jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(detail) = 'object'),
+  component_version_id  uuid NOT NULL REFERENCES ops.component_version(component_version_id) ON DELETE RESTRICT,
+  run_id                uuid NOT NULL REFERENCES ops.pipeline_run(run_id) ON DELETE RESTRICT,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (snapshot_id, source, external_id)
+);
+COMMENT ON TABLE corpus.ingest_exclusion IS
+  'Every row of a source file that was NOT loaded, with its reason (G5, F-04): OUT_OF_WINDOW (in no population window), ING_TWIN_SAME_DATE (a same-date duplicate row that is not a source ref: its base row is not loaded, detail.base_reason naming why; or its base is loaded but the certified window filter does not read the twin, detail.base_loaded = true and detail.why = twin_not_read, so the ruling is loaded without this twin id among its refs), ING_DECISION_DATE_MISSING, ING_DOCKET_MALFORMED (in a window, not a docket), ING_SOURCE_ID_MISSING and ING_SOURCE_ID_DUPLICATE (a row without a usable id of its own, recorded as row:<index>). With corpus.ruling_source_ref it accounts for every row: ops.source_snapshot.row_count = refs + exclusions (corpus.v_ingest_closure). A (snapshot, source, external_id) is either here or a source ref, never both (trigger). Append-only.';
+COMMENT ON COLUMN corpus.ingest_exclusion.source IS 'The kind of source row id, as in corpus.ruling_source_ref; it fixes the kind of file the snapshot must be (trigger): hf_decision_id -> hf_bger, aza_id -> bger_neuheiten or bger_ruling_page, team_list_2096 -> team_list_2096.';
+COMMENT ON COLUMN corpus.ingest_exclusion.reason_code IS 'An ingest reason (domain ingest), or OUT_OF_WINDOW (trigger).';
+COMMENT ON COLUMN corpus.ingest_exclusion.external_id IS 'The row''s id in the source (hf_decision_id: the HF decision_id). A row without a usable id (missing or duplicate) is recorded as row:<index> in the file.';
+COMMENT ON COLUMN corpus.ingest_exclusion.docket_raw IS 'The docket exactly as the source wrote it, unchecked: a malformed docket is a reason to exclude, not to refuse the row.';
+COMMENT ON COLUMN corpus.ingest_exclusion.detail IS 'The values the decision compared: decision, publication and first-seen dates, the base id of a twin (with base_reason, or base_loaded and why), the windows. Identity fields only, never ruling text.';
+COMMENT ON COLUMN corpus.ingest_exclusion.component_version_id IS 'The ingest step version whose windows and rules decided the exclusion (trigger: an ingest version).';
+CREATE INDEX IF NOT EXISTS ingest_exclusion_reason_ix ON corpus.ingest_exclusion (snapshot_id, reason_code);
 
 CREATE TABLE IF NOT EXISTS corpus.publication_observation (
   observation_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,7 +107,8 @@ CREATE TABLE IF NOT EXISTS corpus.ruling_text (
   text_id          uuid PRIMARY KEY,
   ruling_id        uuid NOT NULL REFERENCES corpus.ruling(ruling_id) ON DELETE RESTRICT,
   source           ops.text_source NOT NULL,
-  content          text NOT NULL CHECK (length(btrim(content)) > 0),
+  content          text NOT NULL CONSTRAINT ruling_text_content_visible_chk
+                     CHECK (content ~ '[^\t\n\v\f\r\u001c-\u001f \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]'),
   content_sha256   char(64) NOT NULL CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
   char_length      integer GENERATED ALWAYS AS (char_length(content)) STORED,
   clean_length     integer CHECK (clean_length >= 0),
@@ -95,6 +122,8 @@ CREATE TABLE IF NOT EXISTS corpus.ruling_text (
 CREATE UNIQUE INDEX IF NOT EXISTS ruling_text_one_primary_uix ON corpus.ruling_text (ruling_id) WHERE is_primary;
 COMMENT ON TABLE corpus.ruling_text IS
   'Text versions of a ruling. A second text (e.g. a bger.ch fidelity sample) is a new row, never an overwrite. content_sha256 is checked by trigger. Id = uuid5(''text|<ruling_id>|<source>|<content_sha256>''). Only is_primary may change.';
+COMMENT ON COLUMN corpus.ruling_text.content IS
+  'The text, with at least one character that is not whitespace. Whitespace is the set of Python''s str.isspace() (tab, newline, no-break and other Unicode spaces), the definition the layer-1 engine and the HF loader use for an absent text (text.strip() == ''''): a blank text is no text (ING_TEXT_MISSING), never a row, so layer 1 never meets a stored text it treats as absent (its trigger refuses why text_absent on an assessment with an input text). tests/test_layer1_db.py proves the two definitions agree.';
 
 CREATE TABLE IF NOT EXISTS corpus.segmentation (
   segmentation_id       uuid PRIMARY KEY,

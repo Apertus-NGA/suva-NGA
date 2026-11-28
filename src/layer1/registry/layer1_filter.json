@@ -242,7 +242,9 @@
         "L1_DROP_RUBRIC_OUT",
         "L1_SIGNAL_RUBRIC_FROM_TITLE"
       ],
-      "changelog": "Reproduces src/courts.py at 4c246a8 decision for decision (subject OR text; title fallback; closed rubrics block contract terms)."
+      "changelog": "Reproduces src/courts.py at 4c246a8 decision for decision (subject OR text; title fallback; closed rubrics block contract terms).",
+      "decision": "D-073",
+      "validation": "expected/layer1/V1.0.0.json"
     },
     {
       "version": [
@@ -342,7 +344,9 @@
         "L1_DROP_RUBRIC_OUT",
         "L1_SIGNAL_RUBRIC_FROM_TITLE"
       ],
-      "changelog": "NFKC, typographic apostrophes and no-break spaces normalised before matching; accident terms widened to the plural and compound forms of PR #36 (Unfallversicherungsgesetz, Unfallversicherer, assureur-accidents, assicuratore infortuni). Same rules; outputs may change, so re-measured (D-064 minor)."
+      "changelog": "NFKC, typographic apostrophes and no-break spaces normalised before matching; accident terms widened to the plural and compound forms of PR #36 (Unfallversicherungsgesetz, Unfallversicherer, assureur-accidents, assicuratore infortuni). Same rules; outputs may change, so re-measured (D-064 minor).",
+      "decision": "D-073",
+      "validation": "expected/layer1/V1.1.0.json"
     }
   ]
 }

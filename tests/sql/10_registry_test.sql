@@ -1,5 +1,6 @@
 -- Registry (D-064): deterministic ids, insert-only versions (only status changes), changelog and bump rules,
--- schema subjects, rules bound to their step, profiles refusing draft steps, audit of status changes.
+-- schema subjects, rules bound to their step, profiles refusing draft steps, audit of status changes, the decision
+-- and validation references of a step version and the decision of a profile version (F-12).
 BEGIN;
 \ir _fixtures.sql
 
@@ -60,6 +61,32 @@ SELECT pg_temp.expect_error($q$
   INSERT INTO ops.pipeline_profile_step (profile_version_id, step, component_version_id)
   VALUES ((SELECT profile_version_id FROM ops.pipeline_profile_version WHERE profile_code = 'default' AND v_minor = 1), 'verify', pg_temp.cv('parse'))$q$,
   'is a parse version');
+
+-- a step version names its decision (D-NNN) and its expected file; both are insert-only like the rest of the row
+INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id, config, config_sha256, code_path, code_sha256, bump_kind,
+                                  previous_version_id, changelog, decision_ref, validation_ref)
+VALUES ('verify', 'decided', 1, 2, 0, (SELECT json_schema_id FROM ops.json_schema WHERE schema_code = 'test.step_config'), '{}', repeat('4', 64), 'x',
+        repeat('5', 64), 'minor', pg_temp.cv('verify'), 'decided and validated', 'D-073', 'expected/layer1/V1.1.0.json');
+SELECT pg_temp.expect_error(format($q$
+  INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id, config, config_sha256, code_path, code_sha256, bump_kind,
+                                    previous_version_id, changelog, decision_ref, validation_ref)
+  VALUES ('verify', 'x', 1, 3, 0, (SELECT json_schema_id FROM ops.json_schema WHERE schema_code = 'test.step_config'), '{}', repeat('4', 64), 'x',
+          repeat('5', 64), 'minor', pg_temp.cv('verify'), 'bad reference', %L, %L)$q$, v.d, v.e), 'component_version_(decision|validation)_ref_chk')
+FROM (VALUES ('D-73', NULL), ('d-073', NULL), ('D-0731', NULL), (NULL, 'docs/x.json'), (NULL, 'expected/layer1/V1.1.0.txt'),
+             (NULL, 'expected/../x.json'), (NULL, 'expected/layer1/../../x.json'), (NULL, '/expected/layer1/V1.1.0.json')) AS v(d, e);
+SELECT pg_temp.expect_error($q$UPDATE ops.component_version SET decision_ref = 'D-074' WHERE step = 'verify' AND v_minor = 2$q$, 'only .* may change');
+SELECT pg_temp.expect_error($q$UPDATE ops.component_version SET validation_ref = NULL WHERE step = 'verify' AND v_minor = 2$q$, 'only .* may change');
+-- a profile version names its decision too (D-NNN), insert-only
+INSERT INTO ops.pipeline_profile_version (profile_code, v_major, v_minor, v_patch, bump_kind, previous_version_id, changelog, decision_ref)
+VALUES ('default', 1, 2, 0, 'minor', (SELECT profile_version_id FROM ops.pipeline_profile_version WHERE profile_code = 'default' AND v_minor = 1),
+        'decided', 'D-073');
+SELECT pg_temp.expect_error(format($q$
+  INSERT INTO ops.pipeline_profile_version (profile_code, v_major, v_minor, v_patch, bump_kind, previous_version_id, changelog, decision_ref)
+  VALUES ('default', 1, 3, 0, 'minor', (SELECT profile_version_id FROM ops.pipeline_profile_version WHERE profile_code = 'default' AND v_minor = 2),
+          'bad reference', %L)$q$, d), 'pipeline_profile_version_decision_ref_chk')
+FROM unnest(ARRAY['D-73', 'd-073', 'D-0731', '']) AS d;
+SELECT pg_temp.expect_error($q$UPDATE ops.pipeline_profile_version SET decision_ref = 'D-074' WHERE profile_code = 'default' AND v_minor = 2$q$,
+  'only .* may change');
 
 -- one default profile only
 SELECT pg_temp.expect_error($q$INSERT INTO ops.pipeline_profile (profile_code, name, is_default) VALUES ('other', 'Other', true)$q$, 'duplicate key');

@@ -4,8 +4,12 @@
 -- Description: Triggers that enforce what a CHECK or a foreign key cannot: deterministic uuid5 ids,
 --              append-only facts (with the columns allowed to change), cross-table validation (a step
 --              version pinned by the run's profile, citations from the same segmentation, scorer
---              comparability, review/target consistency), version numbering, the German + French pair
---              of every summary version (deferred to commit), the release gate, and the audit log.
+--              comparability, review/target consistency, each ledger row against its rule version, a
+--              source row either loaded or excluded, serialised per snapshot across sessions, an exclusion's
+--              reason and file kind), version numbering,
+--              the rule set of a used or pinned step version sealed, the German + French pair of every summary
+--              version and the complete rule ledger of every assessment (both deferred to commit; a ledger is
+--              sealed once committed), the release gate, and the audit log.
 --              Trigger names start with a number: PostgreSQL fires same-event triggers in name order.
 -- SGBD: PostgreSQL 17
 -- Doc: docs/DB_DDL_PLANNING.md §7.8, §8.3, §9.2, §10.2, §12.2, §13.5, §13.7, §15.7
@@ -59,7 +63,7 @@ BEGIN
     ('ops.component_version_prompt', ''), ('ops.component_version_rule', ''), ('ops.pipeline_profile_step', ''),
     ('ops.log_event', ''), ('audit.change_log', ''),
     ('corpus.ruling', ''), ('corpus.ruling_source_ref', ''), ('corpus.publication_observation', ''), ('corpus.subject_observation', ''),
-    ('corpus.consideration', ''), ('corpus.ruling_parse', ''), ('corpus.ingest_issue', ''),
+    ('corpus.consideration', ''), ('corpus.ruling_parse', ''), ('corpus.ingest_issue', ''), ('corpus.ingest_exclusion', ''),
     ('corpus.population_member', ''),
     ('triage.assessment', ''), ('triage.assessment_reason', ''), ('triage.llm_judgement', ''),
     ('triage.justification', ''), ('triage.assessment_evidence', ''), ('triage.threshold', ''),
@@ -137,12 +141,26 @@ CREATE OR REPLACE TRIGGER t30_schema_subject BEFORE INSERT ON summ.preset_versio
 CREATE OR REPLACE TRIGGER t30_schema_subject BEFORE INSERT ON gold.expert_review
   FOR EACH ROW EXECUTE FUNCTION ops.check_schema_subject('review_schema_id', 'review_payload');
 
+-- A rule belongs to the step of its version. The rule set of a version is sealed once an assessment uses it or a
+-- profile pins it (F-10): a rule added later would leave every certified ledger of that version incomplete, or let
+-- a row for it be added afterwards. Reloading an identical binding (the registry loader's ON CONFLICT DO NOTHING)
+-- passes; anything else is a new version.
 CREATE OR REPLACE FUNCTION ops.check_component_version_rule() RETURNS trigger
   LANGUAGE plpgsql AS $$
+DECLARE
+  cv ops.component_version%ROWTYPE;
 BEGIN
-  IF (SELECT step FROM ops.rule WHERE rule_id = NEW.rule_id)
-     IS DISTINCT FROM (SELECT step FROM ops.component_version WHERE component_version_id = NEW.component_version_id) THEN
+  SELECT * INTO cv FROM ops.component_version WHERE component_version_id = NEW.component_version_id;
+  IF (SELECT step FROM ops.rule WHERE rule_id = NEW.rule_id) IS DISTINCT FROM cv.step THEN
     RAISE EXCEPTION 'rule % does not belong to the step of component version %', NEW.rule_id, NEW.component_version_id;
+  END IF;
+  IF (EXISTS (SELECT 1 FROM triage.assessment a WHERE a.component_version_id = NEW.component_version_id)
+      OR EXISTS (SELECT 1 FROM ops.pipeline_profile_step ps WHERE ps.component_version_id = NEW.component_version_id))
+     AND NOT EXISTS (SELECT 1 FROM ops.component_version_rule r
+                     WHERE r.component_version_id = NEW.component_version_id AND r.rule_id = NEW.rule_id
+                       AND r.ordinal = NEW.ordinal AND r.enabled = NEW.enabled AND r.params = NEW.params) THEN
+    RAISE EXCEPTION 'component version % (%): its rule set is sealed (used by an assessment or pinned by a profile); a new or changed rule binding needs a new version',
+      cv.version_label, cv.step;
   END IF;
   RETURN NEW;
 END $$;
@@ -279,6 +297,72 @@ END $$;
 CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON corpus.ruling_parse
   FOR EACH ROW EXECUTE FUNCTION corpus.check_parse();
 
+-- Ingest exclusion ledger (F-04): decided by an ingest step version, for an ingest reason (or OUT_OF_WINDOW), on a
+-- snapshot of the kind of file the source row comes from (otherwise the closure of that snapshot is wrong).
+CREATE OR REPLACE FUNCTION corpus.check_ingest_exclusion() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+DECLARE
+  r_domain   ops.reason_domain;
+  snap_kind  ops.source_kind;
+  kinds      ops.source_kind[] := CASE NEW.source
+                                    WHEN 'hf_decision_id' THEN ARRAY['hf_bger']::ops.source_kind[]
+                                    WHEN 'aza_id'         THEN ARRAY['bger_neuheiten', 'bger_ruling_page']::ops.source_kind[]
+                                    WHEN 'team_list_2096' THEN ARRAY['team_list_2096']::ops.source_kind[]
+                                  END;
+BEGIN
+  IF (SELECT step FROM ops.component_version WHERE component_version_id = NEW.component_version_id) IS DISTINCT FROM 'ingest' THEN
+    RAISE EXCEPTION 'ingest_exclusion %/%: component version % is not an ingest version', NEW.source, NEW.external_id, NEW.component_version_id;
+  END IF;
+  SELECT rc.domain INTO r_domain FROM ops.reason_code rc WHERE rc.code = NEW.reason_code;
+  IF FOUND AND r_domain <> 'ingest' AND NEW.reason_code <> 'OUT_OF_WINDOW' THEN  -- an unknown code: the foreign key says so
+    RAISE EXCEPTION 'ingest_exclusion %/%: reason % is not an ingest reason (domain %); only ingest reasons and OUT_OF_WINDOW exclude a source row',
+      NEW.source, NEW.external_id, NEW.reason_code, r_domain;
+  END IF;
+  SELECT s.source INTO snap_kind FROM ops.source_snapshot s WHERE s.snapshot_id = NEW.snapshot_id;
+  IF FOUND AND kinds IS NOT NULL AND snap_kind <> ALL (kinds) THEN  -- an unknown source: ingest_exclusion_source_chk says so
+    RAISE EXCEPTION 'ingest_exclusion %/%: a % row cannot come from a % snapshot (expected %)', NEW.source, NEW.external_id, NEW.source, snap_kind, kinds;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON corpus.ingest_exclusion
+  FOR EACH ROW EXECUTE FUNCTION corpus.check_ingest_exclusion();
+
+-- A source row of a snapshot is either loaded (corpus.ruling_source_ref) or excluded (corpus.ingest_exclusion),
+-- never both: checked on insert into either table, so the closure row_count = refs + exclusions counts each row once.
+-- Across sessions the check is serialised per snapshot: corpus.lock_source_rows() takes a transaction-level advisory
+-- lock, so a second transaction writing rows of the same snapshot waits for the first to end, and its EXISTS (a new
+-- statement under READ COMMITTED, the pipeline's isolation) then sees the first one's committed rows. One lock per
+-- snapshot, not per row: a load writes ~195,000 rows in one transaction, more distinct locks than the shared lock
+-- table holds (max_locks_per_transaction). The loader takes the same lock before it writes (src/ingest/hf_base.py),
+-- so its closure check never runs beside another load of the snapshot.
+CREATE OR REPLACE FUNCTION corpus.lock_source_rows(p_snapshot_id uuid) RETURNS void
+  LANGUAGE sql VOLATILE AS $$
+  SELECT pg_advisory_xact_lock(hashtextextended('corpus.source_row|' || p_snapshot_id::text, 0));
+$$;
+COMMENT ON FUNCTION corpus.lock_source_rows(uuid) IS 'Serialises the writes of source refs and ingest exclusions of one snapshot across transactions (advisory lock held until commit or rollback): the exclusivity trigger t31_exclusive and the HF loader take it.';
+
+CREATE OR REPLACE FUNCTION corpus.check_source_row_exclusive() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM corpus.lock_source_rows(NEW.snapshot_id);
+  IF TG_TABLE_NAME = 'ingest_exclusion' THEN
+    IF EXISTS (SELECT 1 FROM corpus.ruling_source_ref r
+               WHERE r.source = NEW.source AND r.external_id = NEW.external_id AND r.snapshot_id = NEW.snapshot_id) THEN
+      RAISE EXCEPTION 'ingest_exclusion %/%: this source row of snapshot % is loaded (corpus.ruling_source_ref), it cannot also be excluded',
+        NEW.source, NEW.external_id, NEW.snapshot_id;
+    END IF;
+  ELSIF EXISTS (SELECT 1 FROM corpus.ingest_exclusion x
+                WHERE x.snapshot_id = NEW.snapshot_id AND x.source = NEW.source AND x.external_id = NEW.external_id) THEN
+    RAISE EXCEPTION 'ruling_source_ref %/%: this source row of snapshot % is excluded (corpus.ingest_exclusion), it cannot also be loaded',
+      NEW.source, NEW.external_id, NEW.snapshot_id;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER t31_exclusive BEFORE INSERT ON corpus.ingest_exclusion
+  FOR EACH ROW EXECUTE FUNCTION corpus.check_source_row_exclusive();
+CREATE OR REPLACE TRIGGER t31_exclusive BEFORE INSERT ON corpus.ruling_source_ref
+  FOR EACH ROW EXECUTE FUNCTION corpus.check_source_row_exclusive();
+
 CREATE OR REPLACE FUNCTION corpus.check_population_frozen() RETURNS trigger
   LANGUAGE plpgsql AS $$
 BEGIN
@@ -337,27 +421,192 @@ END $$;
 CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.assessment
   FOR EACH ROW EXECUTE FUNCTION triage.check_assessment();
 
+-- One ledger row (F-10). The assessment was inserted in this transaction: a ledger is written with its assessment
+-- and sealed at that commit, so no row is added to a committed assessment. The rule is an enabled rule of the
+-- assessment's step version, at its ordinal, with its reason code and its kind as effect. A not_applicable row says
+-- why (layer 1: one of five preconditions; text_absent only without a text). Only a keep is blocked, by another
+-- enabled flag of the version (t50_ledger checks that it fired; layer 1 also names the closed rubric). full_text
+-- evidence: on a text, a fired or blocked row carries the offsets of its match, which is the exact slice of the
+-- stored text; without a text, nothing was searched, so only not_applicable, or a rule that fires on the missing text
+-- itself (no offsets, no match).
 CREATE OR REPLACE FUNCTION triage.check_assessment_reason() RETURNS trigger
   LANGUAGE plpgsql AS $$
 DECLARE
-  a triage.assessment%ROWTYPE;
+  a        record;
+  vr       record;
+  br       record;
+  t_len    integer;
+  t_slice  text;
+  why      text := NEW.detail ->> 'why';
+  blocker  text := NEW.detail ->> 'blocked_by';
 BEGIN
-  SELECT * INTO a FROM triage.assessment WHERE assessment_id = NEW.assessment_id;
-  IF NOT EXISTS (SELECT 1 FROM ops.component_version_rule r
-                 WHERE r.component_version_id = a.component_version_id AND r.rule_id = NEW.rule_id) THEN
+  SELECT t.*, t.xmin AS row_xmin INTO a FROM triage.assessment t WHERE t.assessment_id = NEW.assessment_id;
+  IF FOUND AND NOT ops.inserted_in_current_xact(a.row_xmin) THEN
+    RAISE EXCEPTION 'assessment_reason: assessment % is already committed: its ledger was certified at that commit and is sealed (a ledger is written in the transaction of its assessment)',
+      NEW.assessment_id;
+  END IF;
+  SELECT cvr.ordinal, cvr.enabled, rl.rule_code, rl.kind, rl.reason_code INTO vr
+  FROM ops.component_version_rule cvr JOIN ops.rule rl ON rl.rule_id = cvr.rule_id
+  WHERE cvr.component_version_id = a.component_version_id AND cvr.rule_id = NEW.rule_id;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'assessment_reason: rule % is not a rule of the assessment''s step version', NEW.rule_id;
   END IF;
-  IF (SELECT reason_code FROM ops.rule WHERE rule_id = NEW.rule_id) <> NEW.reason_code THEN
+  IF vr.reason_code <> NEW.reason_code THEN
     RAISE EXCEPTION 'assessment_reason: reason_code must be the rule''s reason code';
+  END IF;
+  IF NEW.effect <> vr.kind THEN
+    RAISE EXCEPTION 'assessment_reason: rule %: effect % must be the rule''s kind %', vr.rule_code, NEW.effect, vr.kind;
+  END IF;
+  IF NOT vr.enabled THEN
+    RAISE EXCEPTION 'assessment_reason: rule % is disabled in the assessment''s step version', vr.rule_code;
+  END IF;
+  IF NEW.ordinal <> vr.ordinal THEN
+    RAISE EXCEPTION 'assessment_reason: rule %: ordinal % must be the rule''s ordinal % in the step version', vr.rule_code, NEW.ordinal, vr.ordinal;
   END IF;
   IF NEW.evidence_consideration_id IS NOT NULL
      AND (SELECT segmentation_id FROM corpus.consideration WHERE consideration_id = NEW.evidence_consideration_id) IS DISTINCT FROM a.input_segmentation_id THEN
     RAISE EXCEPTION 'assessment_reason: evidence must come from the assessment''s input segmentation (G1)';
   END IF;
+  IF NEW.outcome = 'not_applicable' THEN
+    IF coalesce(btrim(why), '') = '' THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: not_applicable needs detail.why', vr.rule_code;
+    END IF;
+    IF a.step = 'layer1_filter'
+       AND why NOT IN ('court_not_listed', 'letter_not_listed', 'rubric_missing', 'text_absent', 'gegenstand_absent') THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: detail.why % is not one of court_not_listed, letter_not_listed, rubric_missing, text_absent, gegenstand_absent',
+        vr.rule_code, why;
+    END IF;
+    IF why = 'text_absent' AND a.input_text_id IS NOT NULL THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: why text_absent, but the assessment has an input text (%): its text rules run on it',
+        vr.rule_code, a.input_text_id;
+    END IF;
+  END IF;
+  IF NEW.outcome = 'blocked' THEN
+    IF vr.kind <> 'keep' THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: only a keep rule can be blocked, not a % rule', vr.rule_code, vr.kind;
+    END IF;
+    SELECT cvr.enabled, rl.kind, rl.rule_id INTO br
+    FROM ops.component_version_rule cvr JOIN ops.rule rl ON rl.rule_id = cvr.rule_id
+    WHERE cvr.component_version_id = a.component_version_id AND rl.rule_code = blocker;
+    IF NOT FOUND OR NOT br.enabled OR br.kind <> 'flag' OR br.rule_id = NEW.rule_id THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: blocked needs detail.blocked_by naming another enabled flag rule of the same step version, got %',
+        vr.rule_code, coalesce(blocker, 'nothing');
+    END IF;
+    IF a.step = 'layer1_filter' AND coalesce(btrim(NEW.detail ->> 'closed_rubric_match'), '') = '' THEN
+      RAISE EXCEPTION 'assessment_reason: rule %: a blocked layer-1 row needs detail.closed_rubric_match (the closed rubric that blocks it)', vr.rule_code;
+    END IF;
+  END IF;
+  IF NEW.evidence_field = 'full_text' THEN
+    IF a.input_text_id IS NULL THEN
+      IF NEW.outcome IN ('not_fired', 'blocked') OR NEW.char_start IS NOT NULL OR NEW.matched_text IS NOT NULL THEN
+        RAISE EXCEPTION 'assessment_reason: rule %: the assessment has no input text, so no text was searched: a text rule is not_applicable (why text_absent), and only a rule that fires on the missing text names full_text, without offsets or match',
+          vr.rule_code;
+      END IF;
+    ELSE
+      IF NEW.outcome IN ('fired', 'blocked') AND NEW.char_start IS NULL THEN
+        RAISE EXCEPTION 'assessment_reason: rule %: a full-text match needs its offsets in the input text', vr.rule_code;
+      END IF;
+      IF NEW.char_start IS NOT NULL THEN
+        -- content || '' reads the whole text first: substr() on a compressed text decompresses only a byte prefix,
+        -- which can end inside a multibyte character ("invalid byte sequence", PostgreSQL 17).
+        SELECT char_length, left(substr(content || '', NEW.char_start + 1, NEW.char_end - NEW.char_start), 300)
+          INTO t_len, t_slice
+          FROM corpus.ruling_text WHERE text_id = a.input_text_id;
+        IF NEW.char_end > t_len THEN
+          RAISE EXCEPTION 'assessment_reason: rule %: offsets [%, %) beyond the input text (% characters)', vr.rule_code, NEW.char_start, NEW.char_end, t_len;
+        END IF;
+        IF NEW.matched_text IS DISTINCT FROM t_slice THEN
+          RAISE EXCEPTION 'assessment_reason: rule %: matched_text must equal the input text slice [%, %)', vr.rule_code, NEW.char_start, NEW.char_end;
+        END IF;
+      END IF;
+    END IF;
+  END IF;
   RETURN NEW;
 END $$;
 CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.assessment_reason
   FOR EACH ROW EXECUTE FUNCTION triage.check_assessment_reason();
+
+-- The ledger of one assessment is complete and agrees with its decision (F-10). Deferred to commit, because the
+-- assessment row is written before its ledger rows. Every drop (out_of_scope) is certified, whatever its outcome
+-- (G5); a failed or skipped assessment that keeps the ruling (potentially) needs no ledger. Completeness applies to
+-- a version with rules; check rules are excepted: assessment_reason refuses effect 'check' (they are recorded by
+-- summ.verification_check and triage.justification instead). A blocked row's blocker fired in the same ledger.
+-- Layer 1: potentially <=> a keep fired, and the reason is the decisive rule's (the fired keep, else the fired
+-- drop, with the lowest ordinal; F-13).
+CREATE OR REPLACE FUNCTION triage.check_assessment_ledger() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+DECLARE
+  missing    text;
+  extra      text;
+  unfired    text;
+  keeps      integer;
+  keep_code  text;
+  drops      integer;
+  drop_code  text;
+BEGIN
+  IF NEW.outcome <> 'ok' AND NEW.in_suva_scope <> 'out_of_scope' THEN
+    RETURN NULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM ops.component_version_rule cvr JOIN ops.rule rl ON rl.rule_id = cvr.rule_id
+             WHERE cvr.component_version_id = NEW.component_version_id AND cvr.enabled AND rl.kind <> 'check') THEN
+    SELECT string_agg(v.rule_code, ', ' ORDER BY v.ordinal) FILTER (WHERE ar.rule_id IS NULL),
+           string_agg(coalesce(rl.rule_code, ar.rule_id::text), ', ' ORDER BY ar.ordinal) FILTER (WHERE v.rule_id IS NULL)
+      INTO missing, extra
+      FROM (SELECT cvr.rule_id, cvr.ordinal, rl2.rule_code
+              FROM ops.component_version_rule cvr JOIN ops.rule rl2 ON rl2.rule_id = cvr.rule_id
+             WHERE cvr.component_version_id = NEW.component_version_id AND cvr.enabled AND rl2.kind <> 'check') v
+      FULL JOIN (SELECT * FROM triage.assessment_reason WHERE assessment_id = NEW.assessment_id) ar ON ar.rule_id = v.rule_id
+      LEFT JOIN ops.rule rl ON rl.rule_id = ar.rule_id;
+    IF missing IS NOT NULL THEN
+      RAISE EXCEPTION 'assessment % (%): ledger incomplete, no row for the enabled rule(s) %', NEW.assessment_id, NEW.step, missing;
+    END IF;
+    IF extra IS NOT NULL THEN
+      RAISE EXCEPTION 'assessment % (%): ledger rows for rule(s) % that are not enabled rules of its step version', NEW.assessment_id, NEW.step, extra;
+    END IF;
+    SELECT string_agg(rl.rule_code || ' (by ' || coalesce(ar.detail ->> 'blocked_by', '?') || ')', ', ' ORDER BY ar.ordinal)
+      INTO unfired
+      FROM triage.assessment_reason ar JOIN ops.rule rl ON rl.rule_id = ar.rule_id
+     WHERE ar.assessment_id = NEW.assessment_id AND ar.outcome = 'blocked'
+       AND NOT EXISTS (SELECT 1 FROM triage.assessment_reason b JOIN ops.rule brl ON brl.rule_id = b.rule_id
+                       WHERE b.assessment_id = NEW.assessment_id AND b.outcome = 'fired' AND brl.rule_code = ar.detail ->> 'blocked_by');
+    IF unfired IS NOT NULL THEN
+      RAISE EXCEPTION 'assessment % (%): blocked rule(s) % name a blocker that did not fire', NEW.assessment_id, NEW.step, unfired;
+    END IF;
+  END IF;
+  IF NEW.step <> 'layer1_filter' THEN
+    RETURN NULL;
+  END IF;
+  SELECT count(*) FILTER (WHERE effect = 'keep' AND outcome = 'fired'),
+         (array_agg(reason_code ORDER BY ordinal) FILTER (WHERE effect = 'keep' AND outcome = 'fired'))[1],
+         count(*) FILTER (WHERE effect = 'drop' AND outcome = 'fired'),
+         (array_agg(reason_code ORDER BY ordinal) FILTER (WHERE effect = 'drop' AND outcome = 'fired'))[1]
+    INTO keeps, keep_code, drops, drop_code
+    FROM triage.assessment_reason WHERE assessment_id = NEW.assessment_id;
+  IF NEW.in_suva_scope = 'potentially' THEN
+    IF keeps = 0 THEN
+      RAISE EXCEPTION 'assessment % (layer1_filter): kept (potentially) but no keep rule fired', NEW.assessment_id;
+    END IF;
+    IF NEW.reason_code IS DISTINCT FROM keep_code THEN
+      RAISE EXCEPTION 'assessment % (layer1_filter): reason_code % must be % (the fired keep rule with the lowest ordinal)',
+        NEW.assessment_id, coalesce(NEW.reason_code, 'NULL'), keep_code;
+    END IF;
+  ELSIF NEW.in_suva_scope = 'out_of_scope' THEN
+    IF keeps > 0 THEN
+      RAISE EXCEPTION 'assessment % (layer1_filter): dropped (out_of_scope) although keep rule % fired', NEW.assessment_id, keep_code;
+    END IF;
+    IF drops = 0 THEN
+      RAISE EXCEPTION 'assessment % (layer1_filter): dropped (out_of_scope) but no drop rule fired', NEW.assessment_id;
+    END IF;
+    IF NEW.reason_code IS DISTINCT FROM drop_code THEN
+      RAISE EXCEPTION 'assessment % (layer1_filter): reason_code % must be % (the fired drop rule with the lowest ordinal)',
+        NEW.assessment_id, coalesce(NEW.reason_code, 'NULL'), drop_code;
+    END IF;
+  END IF;
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS t50_ledger ON triage.assessment;
+CREATE CONSTRAINT TRIGGER t50_ledger AFTER INSERT ON triage.assessment
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION triage.check_assessment_ledger();
 
 -- TG_ARGV[0] = the step the detail row belongs to.
 CREATE OR REPLACE FUNCTION triage.check_detail_step() RETURNS trigger

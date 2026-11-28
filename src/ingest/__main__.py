@@ -1,7 +1,8 @@
-"""Ingest commands (docs/DB_DDL_PLANNING.md §8). Needs DATABASE_URL.
+"""Ingest commands (docs/DB_DDL_PLANNING.md §8). Needs DATABASE_URL; runs as DB_PIPELINE_ROLE (src.db.pg).
 
 python -m src.ingest registry               load step versions, rules and profiles (src/*/registry, src/db/seed)
-python -m src.ingest base --parquet PATH    the HF base dataset (pinned voilaj/swiss-caselaw data/bger.parquet)
+python -m src.ingest base --parquet PATH    the HF base dataset (pinned voilaj/swiss-caselaw data/bger.parquet);
+                                            every row of the file loaded or excluded with its reason (F-04)
 python -m src.ingest gold                   Suva's labels from judgements/ (columns A-B, export links; D-051)
 """
 

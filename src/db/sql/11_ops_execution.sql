@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS ops.source_snapshot (
   CONSTRAINT source_snapshot_uq UNIQUE NULLS NOT DISTINCT (source, revision, file_sha256)
 );
 COMMENT ON TABLE ops.source_snapshot IS 'Every input file a load read: source, revision (HF commit), hash, size. The root of every lineage. Append-only.';
+COMMENT ON COLUMN ops.source_snapshot.row_count IS 'Every row of the source file, read or not (for hf_bger: all rows of the parquet, not only those a filter let through). Closure (F-04): row_count = loaded source refs + recorded exclusions (corpus.v_ingest_closure).';
 
 CREATE TABLE IF NOT EXISTS ops.pipeline_run (
   run_id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
