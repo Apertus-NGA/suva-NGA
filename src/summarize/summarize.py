@@ -1,45 +1,29 @@
-"""Write a Suva fiche in German and in French, each on its own.
+"""Write a Suva fiche in German and in French, each on its own: prompts, the checker and the model call.
 
-Reads the local cache data/cache. Writes nothing to Hugging Face.
-The key stays in .env and is never printed.
+The runner is src/summarize/pipeline.py (database in, database out). The key stays in .env and is never printed.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import re
 import sys
 from pathlib import Path
 
 if __package__:
-    from .prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from .prompts import VERSION, glossary_block, sigil_hint, sigils, system_prompt
 else:
-    from prompts import VERSION, category_of, glossary_block, sigil_hint, sigils, system_prompt
+    from prompts import VERSION, glossary_block, sigil_hint, sigils, system_prompt
 
 ROOT = Path(__file__).resolve().parents[2]
-CACHE = ROOT / "data" / "cache"
 # Tone only: one short fiche (remand) and one dismissal.
 # The text of those rulings is not put in the prompt: it leaked into the outcome.
 FEW_SHOT = ("8C_177/2025", "8C_224/2025")
-EXCLUDED = frozenset({"8C_21/2025", "8C_44/2025", "8C_455/2025"})
 ORDER_MARKERS = (
     "Demnach erkennt das Bundesgericht",
     "Par ces motifs, le Tribunal fédéral prononce",
     "Per questi motivi, il Tribunale federale pronuncia",
 )
-
-
-def _gate(docket: str, area: object, text: str, title: object = None):
-    """The script is launched from src/summarize: courts.py lives in src/."""
-    src = str(ROOT / "src")
-    if src not in sys.path:
-        sys.path.insert(0, src)
-    from courts import area_for_gate, decide
-
-    filled = area_for_gate(area, title)
-    return decide(docket, area, text, title), filled
 
 
 def load_env() -> None:
@@ -338,41 +322,6 @@ def chat(messages: list[dict], mode: str = "live", store_dir: Path | None = None
         client.close()
 
 
-def load_tables():
-    import pandas as pd
-
-    rulings_path = CACHE / "rulings.parquet"
-    gold_path = CACHE / "gold_summaries.parquet"
-    if not rulings_path.exists() or not gold_path.exists():
-        raise SystemExit(f"local cache missing: {CACHE}")
-    rulings = pd.read_parquet(rulings_path)
-    gold = pd.read_parquet(gold_path)
-    gold = gold[gold.is_current]
-    return rulings, gold
-
-
-def row_for(rulings, docket: str) -> dict:
-    found = rulings[rulings.docket == docket]
-    if found.empty:
-        raise SystemExit(f"ruling missing from the cache: {docket}")
-    row = found.iloc[0]
-    return {
-        "docket": row.docket,
-        "decision_date": str(row.decision_date)[:10],
-        "division": row.division,
-        "area": row.area if isinstance(row.area, str) and row.area.strip() else None,
-        "title": row.subject if isinstance(row.subject, str) and row.subject.strip() else None,
-        "text": clean(row.text),
-    }
-
-
-def gold_body(gold, docket: str, language: str) -> str:
-    found = gold[(gold.docket == docket) & (gold.language == language)]
-    if found.empty:
-        return ""
-    return clean(found.iloc[0].body)
-
-
 LAW_ALIASES = {
     "uvg": ("uvg", "laa"),
     "atsg": ("atsg", "lpga"),
@@ -429,10 +378,6 @@ def outcome_of(order: str) -> str:
     if "gutgeheissen" in low or "admis" in low or "accolto" in low:
         return "admitted"
     return ""
-
-
-def _tail(text: str) -> str:
-    return text.strip()[-280:].lower()
 
 
 def _article_in_source(number: str, law: str, source: str) -> bool:
@@ -704,69 +649,3 @@ def write_fiche(language: str, target: dict, examples: list[dict], category: str
         if len(_critical(language, revised, target["text"], target["docket"])) < len(issue):
             text = revised
     return text, review(language, text, target["text"], target["docket"])
-
-
-def summarize(docket: str) -> dict:
-    rulings, gold = load_tables()
-    target = row_for(rulings, docket)
-    if docket in FEW_SHOT or docket in EXCLUDED:
-        raise SystemExit(f"{docket} is a few-shot example or is excluded from it")
-    decision, filled = _gate(target["docket"], target["area"], target["text"], target["title"])
-    if not decision.kept:
-        raise SystemExit(
-            f"{docket} does not pass the filter ({target['division']}, {filled}, {decision.subject}, {decision.text})"
-        )
-    category = category_of(filled if isinstance(filled, str) else None)
-    out = {
-        "docket": docket,
-        "model": os.environ["LLM_NAME"],
-        "filter": {"kept": decision.kept, "subject": decision.subject, "text": decision.text},
-        "prompt": VERSION,
-        "category": category,
-        "languages": {},
-    }
-    for language in ("de", "fr"):
-        examples = [{"docket": shot, "body": gold_body(gold, shot, language)} for shot in FEW_SHOT]
-        text, issue = write_fiche(language, target, examples, category)
-        out["languages"][language] = {
-            "generated": text,
-            "gold": gold_body(gold, docket, language),
-            "problems": issue,
-        }
-        print(f"{language} {len(text)} characters {issue or 'ok'}", flush=True)
-    return out
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("dockets", nargs="*")
-    args = parser.parse_args()
-    load_env()
-    dockets = args.dockets or ["8C_78/2025"]
-    failed: list[str] = []
-    dest = ROOT / "data" / "trial"
-    dest.mkdir(parents=True, exist_ok=True)
-    for index, docket in enumerate(dockets, start=1):
-        path = dest / (docket.replace("/", "_") + ".json")
-        if path.exists():
-            print(f"{index}/{len(dockets)} {docket} already written", flush=True)
-            continue
-        print(f"{index}/{len(dockets)} {docket}", flush=True)
-        try:
-            result = summarize(docket)
-        except (SystemExit, TimeoutError) as exc:
-            failed.append(f"{docket}: {exc}")
-            print(f"failed {docket}: {exc}", flush=True)
-            continue
-        path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(path, flush=True)
-        for language, payload in result["languages"].items():
-            critical = [item for item in payload["problems"] if str(item).startswith("critique")]
-            if critical:
-                failed.append(f"{docket} {language}: {', '.join(critical)}")
-    if failed:
-        raise SystemExit(" ; ".join(failed))
-
-
-if __name__ == "__main__":
-    main()
