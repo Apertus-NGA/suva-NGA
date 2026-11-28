@@ -144,8 +144,12 @@ def ruling_page(conn, ruling_id: int) -> dict:
             "SELECT language, body FROM gold_summaries WHERE ruling_id = %s AND is_current", (ruling_id,)
         ).fetchall()
     )
+    prediction = conn.execute(
+        "SELECT explanation FROM predictions WHERE ruling_id = %s AND is_current", (ruling_id,)
+    ).fetchone()
     return {
         "ruling": ruling,
+        "explanation": prediction[0] if prediction else None,  # why the current score; built by code (G1)
         "text": queries.display_text(text[0]) if text else None,  # tidied for reading; the stored text is untouched
         "text_source": text[1] if text else None,
         "prompt_category": pipeline.route(ruling["area"]),

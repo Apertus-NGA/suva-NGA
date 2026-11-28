@@ -143,6 +143,7 @@ export type Summary = {
 
 export type RulingDetail = {
   ruling: Ruling;
+  explanation: string | null; // why the current score, built by code from the rules that apply; German
   text: string | null;
   text_source: string | null;
   prompt_category: string;

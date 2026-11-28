@@ -142,6 +142,12 @@ export function RulingPage({ rulingId, onBack, onChanged }: Props) {
 
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
           {actionFailed && <p className="rounded-md bg-surface px-4 py-2.5 text-[13px] text-ink">{t("page.actionError")}</p>}
+          {detail.explanation && (
+            <section className="rounded-xl bg-surface px-5 py-4">
+              <h2 className="text-[13px] font-medium text-ink">{t("page.why")}</h2>
+              <p lang="de" className="mt-1.5 text-[13px] leading-5 text-muted">{detail.explanation}</p>
+            </section>
+          )}
           {!hasSummary && (
             <section className="rounded-xl bg-surface px-5 py-5">
               <h2 className="text-[13px] font-medium text-ink">{t("page.summaries")}</h2>
