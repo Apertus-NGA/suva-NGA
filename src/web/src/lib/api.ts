@@ -19,6 +19,7 @@ export type Ruling = {
   title: string | null; // the subject without the repeated area; null when it says no more than the area
   publication_source: string | null; // "bger_list" when the publication date is confirmed by bger.ch
   ingested_at: string | null; // set when the ruling was added by an update
+  is_new: boolean; // added by the latest update
   outcome: string | null;
   official_url: string | null;
   label: Label;
@@ -79,6 +80,11 @@ export type UpdatesStatus = {
   current: { published_from: string; published_to: string } | null;
   last: UpdateRun | null;
   last_error: string | null;
+  /** How the assessment (triage) after the last update went; null before any, or while it runs. */
+  last_assessment:
+    | { status: "ok"; mode: "LIVE" | "REPLAY"; assessed: number; suspected_relevant: number }
+    | { status: "failed"; error: string }
+    | null;
   next_range: { published_from: string; published_to: string } | null;
   ingested_rulings: number;
 };

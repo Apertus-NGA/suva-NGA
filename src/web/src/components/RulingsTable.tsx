@@ -97,7 +97,7 @@ export function RulingsTable({ rulings, sort, order, onSort, onDecide, onOpen }:
                 <span className="truncate text-ink" title={ruling.subject ?? undefined}>
                   {ruling.title ?? ruling.area ?? "–"}
                 </span>
-                {ruling.ingested_at && (
+                {ruling.is_new && (
                   <span className="shrink-0 rounded border border-line-strong px-1 text-[11px] leading-4 text-muted">{t("ruling.new")}</span>
                 )}
               </div>

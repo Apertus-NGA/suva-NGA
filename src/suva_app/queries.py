@@ -45,6 +45,8 @@ WITH base AS (
            r.subject, r.outcome, r.official_url,
            r.field_sources ->> 'publication_date' AS publication_source,
            i.ingested_at,
+           coalesce(i.ingested_at >= (SELECT max(started_at) FROM ingest_runs WHERE command = 'ingest'), false)
+               AS is_new,  -- added by the latest update
            v.relevance AS label, v.basis AS label_basis,
            round(p.score * 100)::int AS score, p.relevant AS predicted_relevant,
            EXISTS (SELECT 1 FROM gold_summaries g WHERE g.ruling_id = r.id AND g.is_current) AS has_gold_summary,
@@ -83,6 +85,8 @@ class RulingFilters:
     starred: bool | None = None  # marked for publication in the official collection
     predicted_relevant: bool | None = None  # the system's decision
     ingested: bool | None = None  # added by a live update (True) / part of the base dataset
+    # The inbox: assessed relevant and not reviewed, or added by the latest update and not decided by an expert.
+    inbox: bool | None = None
     summarised: bool | None = None  # has a summary: Suva's reference one or a generated one
     score_min: int | None = None  # 0..100
     score_max: int | None = None
@@ -124,6 +128,8 @@ def _where(f: RulingFilters) -> tuple[str, list]:
         add("(has_gold_summary OR has_summary)" if f.summarised else "NOT (has_gold_summary OR has_summary)")
     if f.ingested is not None:
         add("ingested_at IS NOT NULL" if f.ingested else "ingested_at IS NULL")
+    if f.inbox:
+        add("(status = 'ai_relevant' OR (is_new AND label_basis IS DISTINCT FROM 'expert_override'))")
     if f.score_min is not None:
         add("score >= %s", f.score_min)
     if f.score_max is not None:

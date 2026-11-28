@@ -135,6 +135,7 @@ def test_row_shape(db_conn, data):
         "topic": "UV",
         "publication_source": None,
         "ingested_at": None,
+        "is_new": False,
         "title": "Kausalzusammenhang",
         "status": "expert_confirmed",
     }
@@ -359,6 +360,30 @@ def test_ingested_filter_and_fields(db_conn, data):
     rows = {r["docket"]: r for r in queries.list_rulings(db_conn)["items"]}
     assert rows["8C_607/2025"]["ingested_at"] is not None and rows["8C_72/2025"]["ingested_at"] is None
     assert rows["8C_72/2025"]["publication_source"] == "bger_list" and rows["8C_607/2025"]["publication_source"] is None
+
+
+def _update_added(conn, docket, decided, at):
+    """An update that started at `at` and added one ruling a minute later."""
+    conn.execute("INSERT INTO ingest_runs (command, started_at) VALUES ('ingest', %s)", (at,))
+    conn.execute(
+        "INSERT INTO ingested_rulings (docket, decision_date, published_from, published_to, ingested_at) "
+        "VALUES (%s, %s, '2026-07-01', '2026-07-02', %s::timestamptz + interval '1 minute')",
+        (docket, decided, at),
+    )
+
+
+def test_inbox_holds_the_ai_relevant_and_the_undecided_rulings_of_the_latest_update(db_conn, data):
+    from suva_app import feedback
+
+    inbox = RulingFilters(inbox=True)
+    assert _dockets(db_conn, inbox) == ["8C_607/2025"]  # assessed relevant, not reviewed
+    _update_added(db_conn, "9C_10/2025", "2025-11-03", "2026-07-01 08:00+00")  # an earlier update
+    _update_added(db_conn, "7B_5/2026", "2026-05-12", "2026-08-01 08:00+00")  # the latest: not assessed yet
+    assert sorted(_dockets(db_conn, inbox)) == ["7B_5/2026", "8C_607/2025"]
+    rows = {r["docket"]: r for r in queries.list_rulings(db_conn)["items"]}
+    assert [d for d, r in rows.items() if r["is_new"]] == ["7B_5/2026"]  # only the latest update's rulings are new
+    feedback.decide_relevance(db_conn, data["other"], "mark_not_relevant")  # decided: it leaves the inbox
+    assert _dockets(db_conn, inbox) == ["8C_607/2025"]
 
 
 # --- summaries and the learning numbers ---------------------------------------------------------------------

@@ -87,6 +87,13 @@ export function UpdateControl({ status, failedToStart, onStart, onShowAdded }: P
                     ))}
                   </ul>
                   {!!last.not_confirmed_by_bger && <p className="text-muted">{t("update.unconfirmed", { n: last.not_confirmed_by_bger })}</p>}
+                  {status?.last_assessment && (
+                    <p className={status.last_assessment.status === "ok" ? "text-muted" : "text-ink"}>
+                      {status.last_assessment.status === "ok"
+                        ? t("update.assessed", { n: status.last_assessment.suspected_relevant })
+                        : t("update.notAssessed")}
+                    </p>
+                  )}
                 </>
               )
             )}

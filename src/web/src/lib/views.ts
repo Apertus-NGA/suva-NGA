@@ -27,7 +27,8 @@ export const VIEWS: View[] = [
     name: "nav.inbox",
     title: "nav.inbox",
     hint: "view.inbox.hint",
-    scope: { status: ["ai_relevant"] },
+    // Assessed relevant and not reviewed, plus everything the latest update added until an expert decides on it.
+    scope: { inbox: "true" },
     hiddenFilters: ["status", "assessment"],
     sort: { sort: "score", order: "desc" },
   },
