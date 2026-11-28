@@ -75,3 +75,49 @@ layer1: ## run layer 1 on the default profile (PROFILE=..., POPULATION=...): fil
 
 layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 	$(PY) -m src.layer1 recall --profile $(or $(PROFILE),default)
+
+# --- Cluster (docs/DEPLOY.md). The compose jobs call the first four targets inside the app image; the cluster-*
+# targets wrap docker compose on the host. Never `docker compose down -v` (G12): volumes hold the database.
+.PHONY: db-logins fetch-base bootstrap load cluster-env cluster-config cluster-build cluster-up cluster-down cluster-ps cluster-logs cluster-backup
+CLUSTER_PROFILES = --profile sovereign --profile ui --profile ops
+CLUSTER_BUILD_ENV = GIT_COMMIT=$$(git rev-parse HEAD 2>/dev/null) GIT_DIRTY=$$(test -z "$$(git status --porcelain 2>/dev/null)" && echo 0 || echo 1)
+
+db-logins: ## set the passwords of the login roles from SUVA_*_PASSWORD (owner, after db-deploy)
+	$(PY) -m src.db.logins
+
+fetch-base: ## download the pinned HF base file into HF_BASE_DIR (default data/hf), checked by SHA-256
+	$(PY) -m src.ingest.fetch --dest $(or $(HF_BASE_DIR),data/hf)
+
+bootstrap: ## the cluster's migrate job: schema (idempotent), then the login passwords (owner)
+	@$(MAKE) --no-print-directory db-deploy
+	@$(MAKE) --no-print-directory db-logins
+
+load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's labels (pipeline login)
+	@$(MAKE) --no-print-directory db-registry
+	@$(MAKE) --no-print-directory ingest-base PARQUET=$(PARQUET)
+	@$(MAKE) --no-print-directory ingest-gold
+
+cluster-env: ## generate the cluster's missing secrets into .env (never overwrites, never prints; mode 600)
+	python3 -m src.db.logins --init-env .env
+
+cluster-config: ## validate docker-compose.yml with the current .env, every profile
+	docker compose $(CLUSTER_PROFILES) config --quiet
+
+cluster-build: ## build the app image, labelled with the current commit
+	$(CLUSTER_BUILD_ENV) docker compose build
+
+cluster-up: ## build, then run the pipeline job; db, migrate, fetch and load run first (docs/DEPLOY.md §3)
+	$(CLUSTER_BUILD_ENV) docker compose build
+	docker compose run --rm pipeline
+
+cluster-down: ## stop the cluster; volumes (database, runs, results) are kept
+	docker compose $(CLUSTER_PROFILES) down
+
+cluster-ps: ## state of every service, one-shot jobs included
+	docker compose ps --all
+
+cluster-logs: ## follow the logs of every service
+	docker compose logs --follow --tail 100
+
+cluster-backup: ## pg_dump of the database into the backups volume (profile ops)
+	docker compose --profile ops run --rm backup
