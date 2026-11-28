@@ -7,6 +7,10 @@ environments, tool caches and tmp/ (scratch). That covers data/derived/, data/pu
 logs, llm_calls, caches, prompts, exports, UI pages, docs and the report. Archives (.zip, .gz) are read inside,
 member by member: their compressed bytes would hide a real value and match by chance. Limit: text inside
 compressed PDF streams (the report PDF) is not read; check the report's Markdown source instead.
+logs, llm_calls, caches, prompts, exports, UI pages, docs and the report. Limit: text inside compressed PDF
+streams (the report PDF) is not read; check the report's Markdown source instead.
+Not scanned: the data layer's stores (DATA_STORES), which may keep the author field and the workbook's
+hyperlink target as data (D-051 as amended); all of them are git-ignored.
 """
 
 from __future__ import annotations
@@ -20,6 +24,18 @@ from tests.suva_forbidden import Forbidden, load, scan
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {".git", "judgements", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache",
              ".mypy_cache", ".cache", "tmp"}  # fmt: skip
+# The database dump, the data layer's local copies of it and the raw downloads of public sources
+# (docs/DATA_LAYER.md): data, not text we write.
+DATA_STORES = (
+    "db/init",
+    "data/dump",
+    "data/raw",
+    "data/snapshot",
+    "data/tables",
+    "data/publish",
+    "data/published",
+    "research/cache",
+)
 SKIP_FILES = {"28112026 HackApertus – Challenge Pitch.pdf"}
 SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2"}
 
@@ -29,6 +45,8 @@ def generated_files() -> list[Path]:
     for path in ROOT.rglob("*"):
         rel = path.relative_to(ROOT)
         if not path.is_file() or set(rel.parts) & SKIP_DIRS or path.name in SKIP_FILES:
+            continue
+        if rel.as_posix().startswith(tuple(store + "/" for store in DATA_STORES)):
             continue
         if path.suffix.lower() in SKIP_SUFFIXES or path.name.startswith("~$"):
             continue

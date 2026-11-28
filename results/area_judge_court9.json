@@ -1,0 +1,21 @@
+{
+ "court": "9",
+ "drop_below": 0.1,
+ "failed": 0,
+ "in_scope": 124,
+ "in_scope_kept": 124,
+ "in_scope_kept_by_top_answer": 124,
+ "modes": [
+  "LIVE"
+ ],
+ "no_answer": 0,
+ "out_of_scope": 176,
+ "out_of_scope_dropped": 153,
+ "out_of_scope_dropped_by_top_answer": 168,
+ "prompt": "area_judge@2",
+ "repeated": 50,
+ "repeated_same_decision": 50,
+ "rulings": 300,
+ "same_matter": 230,
+ "seed": 1
+}

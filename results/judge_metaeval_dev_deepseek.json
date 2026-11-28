@@ -1,0 +1,281 @@
+{
+  "rubric": "judge-v3",
+  "judge_model": "deepseek-ai/DeepSeek-V4-Pro",
+  "served_models": [
+    "deepseek/deepseek-v4-pro"
+  ],
+  "reasoning_effort": "high",
+  "split": "dev",
+  "cases": 75,
+  "skipped": {
+    "no_source": 0,
+    "source_too_long": 0
+  },
+  "repetitions": 1,
+  "thresholds": {
+    "sensitivity": 0.8,
+    "specificity": 0.8,
+    "self_agreement": 0.9,
+    "unusable_share": 0.05,
+    "human_kappa": 0.6
+  },
+  "tokens": {
+    "prompt_tokens": 617860,
+    "completion_tokens": 448914,
+    "calls": 75,
+    "cost_usd": 1.9369
+  },
+  "criteria": {
+    "T1": {
+      "name": "Swiss legal terminology",
+      "sensitivity": {
+        "n": 4,
+        "rate": 1.0,
+        "ci95": [
+          0.5101,
+          1.0
+        ]
+      },
+      "specificity": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "kappa_vs_known_label": 1.0,
+      "unusable": {
+        "n": 10,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.2775
+        ]
+      },
+      "suva_texts_passing": {
+        "n": 6,
+        "rate": 0.6667,
+        "ci95": [
+          0.3,
+          0.9032
+        ]
+      },
+      "by_defect": {
+        "foreign_legal_terms": {
+          "n": 4,
+          "rate": 1.0,
+          "ci95": [
+            0.5101,
+            1.0
+          ]
+        }
+      },
+      "validated": true
+    },
+    "T3": {
+      "name": "Language quality",
+      "sensitivity": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "specificity": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "kappa_vs_known_label": 1.0,
+      "unusable": {
+        "n": 12,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.2425
+        ]
+      },
+      "suva_texts_passing": {
+        "n": 6,
+        "rate": 0.1667,
+        "ci95": [
+          0.0301,
+          0.5635
+        ]
+      },
+      "by_defect": {
+        "other_language_sentence": {
+          "n": 6,
+          "rate": 1.0,
+          "ci95": [
+            0.6097,
+            1.0
+          ]
+        }
+      },
+      "validated": true
+    },
+    "F1": {
+      "name": "Facts supported by the ruling",
+      "sensitivity": {
+        "n": 9,
+        "rate": 1.0,
+        "ci95": [
+          0.7008,
+          1.0
+        ]
+      },
+      "specificity": {
+        "n": 6,
+        "rate": 0.8333,
+        "ci95": [
+          0.4365,
+          0.9699
+        ]
+      },
+      "kappa_vs_known_label": 0.8571,
+      "unusable": {
+        "n": 15,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.2039
+        ]
+      },
+      "suva_texts_passing": {
+        "n": 6,
+        "rate": 0.8333,
+        "ci95": [
+          0.4365,
+          0.9699
+        ]
+      },
+      "by_defect": {
+        "altered_number": {
+          "n": 3,
+          "rate": 1.0,
+          "ci95": [
+            0.4385,
+            1.0
+          ]
+        },
+        "invented_fact": {
+          "n": 6,
+          "rate": 1.0,
+          "ci95": [
+            0.6097,
+            1.0
+          ]
+        }
+      },
+      "validated": true
+    },
+    "F2": {
+      "name": "Legal content faithful",
+      "sensitivity": {
+        "n": 8,
+        "rate": 1.0,
+        "ci95": [
+          0.6756,
+          1.0
+        ]
+      },
+      "specificity": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "kappa_vs_known_label": 1.0,
+      "unusable": {
+        "n": 14,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.2153
+        ]
+      },
+      "suva_texts_passing": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "by_defect": {
+        "flipped_strength": {
+          "n": 2,
+          "rate": 1.0,
+          "ci95": [
+            0.3424,
+            1.0
+          ]
+        },
+        "invented_holding": {
+          "n": 6,
+          "rate": 1.0,
+          "ci95": [
+            0.6097,
+            1.0
+          ]
+        }
+      },
+      "validated": true
+    },
+    "C2": {
+      "name": "Main disputed question resolved in substance",
+      "sensitivity": {
+        "n": 6,
+        "rate": 1.0,
+        "ci95": [
+          0.6097,
+          1.0
+        ]
+      },
+      "specificity": {
+        "n": 6,
+        "rate": 0.6667,
+        "ci95": [
+          0.3,
+          0.9032
+        ]
+      },
+      "kappa_vs_known_label": 0.6667,
+      "unusable": {
+        "n": 12,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.2425
+        ]
+      },
+      "suva_texts_passing": {
+        "n": 6,
+        "rate": 0.6667,
+        "ci95": [
+          0.3,
+          0.9032
+        ]
+      },
+      "by_defect": {
+        "facts_and_outcome_only": {
+          "n": 6,
+          "rate": 1.0,
+          "ci95": [
+            0.6097,
+            1.0
+          ]
+        }
+      },
+      "validated": false
+    }
+  }
+}

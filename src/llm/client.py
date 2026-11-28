@@ -36,6 +36,10 @@ from src.llm.served_model import REPO_ROOT, ServedModelError, canonical, check_s
 
 DEFAULT_STORE = REPO_ROOT / "data" / "derived" / "llm"
 ENDPOINT = "/chat/completions"  # the only Keera endpoint that returns log-probabilities (docs/LESSONS.md K5)
+# Answers committed with the repo, so a fresh clone replays without the gateway. Read-only: live answers are
+# written to the store above. Filled by `make replay-cache` with the answers one full run reads, no others.
+SHIPPED_STORE = REPO_ROOT / "replay" / "llm"
+_USED: set[str] = set()  # cache keys read or written by any client of this process (the summariser opens its own)
 MAX_ATTEMPTS = 4
 BACKOFF_CAP_S = 30.0
 ErrorKind = Literal[
@@ -122,6 +126,7 @@ def _sha(obj: Any) -> str:
 class LLMClient:
     cfg: LLMConfig
     store_dir: Path = DEFAULT_STORE
+    shipped_dir: Path | None = None  # a second, read-only store looked up after `store_dir`
     transport: httpx.BaseTransport | None = None  # tests inject a declared mock here (G9)
     sleep: Any = time.sleep
     observer: Any = None  # called with each `llm_calls` record (attempt or cache hit); must not raise
@@ -129,6 +134,7 @@ class LLMClient:
     _slots: threading.BoundedSemaphore = field(init=False, repr=False)
     _log_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
     _local: threading.local = field(default_factory=threading.local, init=False, repr=False)
+    used: set[str] = field(default_factory=set, init=False, repr=False)  # cache keys this client read or wrote
 
     def __post_init__(self) -> None:
         self._slots = threading.BoundedSemaphore(self.cfg.concurrency)
@@ -312,22 +318,32 @@ class LLMClient:
         return result
 
     # -- stores -------------------------------------------------------------------------------------------
-    def _cache_path(self, key: str) -> Path:
-        return self.store_dir / "cache" / key[:2] / f"{key}.json"
+    def _cache_path(self, key: str, store: Path | None = None) -> Path:
+        return (store or self.store_dir) / "cache" / key[:2] / f"{key}.json"
+
+    def _stores(self) -> list[Path]:
+        return [self.store_dir, *([self.shipped_dir] if self.shipped_dir else [])]
 
     def _cache_get(self, key: str) -> LLMResult | None:
-        path = self._cache_path(key)
-        if not path.is_file():
+        path = next((p for p in (self._cache_path(key, s) for s in self._stores()) if p.is_file()), None)
+        if path is None:
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
+        with self._log_lock:
+            self.used.add(key)
+            _USED.add(key)
         return LLMResult(**{**data, "mode": "REPLAY", "latency_s": None, "attempts": 0})
 
     def _replay_model(self, size: str) -> str | None:
         """Replay mode may run without LLM_NAME (D-032): use the model the last live run requested."""
-        path = self.store_dir / "replay_models.json"
-        if self.cfg.mode != "replay" or not path.is_file():
+        if self.cfg.mode != "replay":
             return None
-        return json.loads(path.read_text(encoding="utf-8")).get(size)
+        for store in self._stores():
+            path = store / "replay_models.json"
+            model = json.loads(path.read_text(encoding="utf-8")).get(size) if path.is_file() else None
+            if model:
+                return model
+        return None
 
     def _record_replay_model(self, size: str, model: str) -> None:
         path = self.store_dir / "replay_models.json"
@@ -341,6 +357,9 @@ class LLMClient:
         """Only valid outputs from an allowed model reach here (ARCHITECTURE §4.8)."""
         path = self._cache_path(result.cache_key)
         path.parent.mkdir(parents=True, exist_ok=True)
+        with self._log_lock:
+            self.used.add(result.cache_key)
+            _USED.add(result.cache_key)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(result.__dict__, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
@@ -402,7 +421,36 @@ class LLMClient:
 
 def client_from_env(mode: Literal["live", "replay"], store_dir: Path = DEFAULT_STORE) -> LLMClient:
     """Build a client from the environment; raises ConfigError with a clear message (G3)."""
-    return LLMClient(LLMConfig.from_env(mode), store_dir=store_dir)
+    shipped = SHIPPED_STORE if store_dir == DEFAULT_STORE else None
+    return LLMClient(LLMConfig.from_env(mode), store_dir=store_dir, shipped_dir=shipped)
+
+
+def export_answers(dest: Path, client: LLMClient | None = None) -> int:
+    """Copy the answers a run used, and the replay model names, into `dest` (the shipped store's layout).
+    With `client`: the answers that client used; without: those every client of this process used, looked up
+    in the default and the shipped store. Add-only: an answer already in `dest` is left as it is.
+    Returns how many answers `dest` gained."""
+    keys = client.used if client else _USED
+    stores = client._stores() if client else [DEFAULT_STORE, SHIPPED_STORE]
+    added = 0
+    for key in sorted(keys):
+        paths = (s / "cache" / key[:2] / f"{key}.json" for s in stores)
+        source = next((p for p in paths if p.is_file()), None)
+        target = dest / "cache" / key[:2] / f"{key}.json"
+        if source is None or target.is_file():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        added += 1
+    models: dict[str, str] = {}
+    for store in (dest, *reversed(stores)):  # the local store's names win
+        path = store / "replay_models.json"
+        if path.is_file():
+            models.update(json.loads(path.read_text(encoding="utf-8")))
+    if models:
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "replay_models.json").write_text(json.dumps(models, sort_keys=True) + "\n", encoding="utf-8")
+    return added
 
 
 __all__ = [
@@ -414,5 +462,6 @@ __all__ = [
     "ServedModelError",
     "classify_error",
     "client_from_env",
+    "export_answers",
     "estimate_tokens",
 ]

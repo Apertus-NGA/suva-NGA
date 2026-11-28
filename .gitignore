@@ -42,3 +42,32 @@ tmp/
 ~$*
 # Per-run outputs of the pipeline steps (decisions, logs, manifests): rebuilt by the runs, loaded into the DB (D-061)
 data/runs/
+
+# --- Data layer, web UI and research (appended) ---
+# Crawled bger.ch pages (re-creatable with src/bger_news.py)
+data/cache/
+
+# Raw downloaded source files (re-creatable; hashes are in data/manifest.json)
+data/raw/
+
+# Published raw snapshot and database dump (hosted on Hugging Face, not in git)
+data/snapshot/
+data/dump/
+
+# Local staging and the downloaded dump (both come from / go to Hugging Face)
+data/publish/
+data/published/
+db/init/*.sql.gz
+data/tables/
+
+# Web UI
+node_modules/
+src/web/dist/
+
+# Research caches and per-ruling outputs (large, re-creatable; kept out of git)
+research/cache/
+research/out/
+
+# --- Notebooks (appended, G13d) ---
+# Local notebooks and their outputs (they can hold Suva author fields, D-051); kept out of git
+notebooks/

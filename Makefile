@@ -8,20 +8,48 @@ ARGS ?=
 # DB target: DATABASE_URL when set (CI), else psql inside the compose service db (docs/DB_DDL_PLANNING.md §15)
 DB_TARGET ?= $(if $(DATABASE_URL),,--compose)
 
-.PHONY: help run run-live serve smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall layer1-golden layer1-verify layer1-validate
+.PHONY: help run run-live serve summaries replay-cache triage pipeline pipeline-live api bridge smoke-llm warmup crawl refit eval eval-private claims check db-up db-deploy db-reset db-test db-registry ingest-base ingest-gold layer1 layer1-recall layer1-golden layer1-verify layer1-validate
 
 help: ## list the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
-run: ## end-to-end run from the committed snapshot (MODE=replay|live, SERVE=0 to skip serving)
-	$(PY) -m src.cli run --mode $(MODE) $(ARGS)
-	@if [ "$(SERVE)" != "0" ]; then $(MAKE) --no-print-directory serve; fi
+SUMMARY_LIMIT ?=
+WRITE ?= 0
+RUN_FLAGS = $(if $(SUMMARY_LIMIT),--summary-limit $(SUMMARY_LIMIT),) $(if $(filter 0,$(SERVE)),--no-serve,)
 
-run-live: ## the same pipeline with real calls; needs LLM_* and ARGS="--limit N" or ARGS="--all"
+# --- Suva Scout (the product the judges run): its own tables (db/migrations) on the local database scout-db.
+run: ## end to end, REPLAY (no gateway call, answers in replay/llm): db up + migrate, ingest if empty, triage, v3 summaries, serve the UI on 127.0.0.1:8000; SERVE=0 stops before serving; SUMMARY_LIMIT=N caps the summaries
+	$(PY) -m src.scout_cli run --mode $(MODE) $(RUN_FLAGS) $(ARGS)
+
+run-live: ## the same with real Apertus calls (needs LLM_*); ARGS="--limit N": smoke; ARGS="--all": full triage written
+	$(PY) -m src.scout_cli run --mode live $(RUN_FLAGS) $(ARGS)
+
+serve: ## serve Suva Scout (API and UI) on 127.0.0.1:8000
+	$(PY) -m src.scout_cli serve
+
+summaries: ## batch v3 summaries (DE + FR), resumable (MODE=replay|live; ARGS="--workers 8 --limit N --dry-run")
+	$(PY) -m src.summarize.batch --mode $(MODE) $(ARGS)
+
+replay-cache: ## fill replay/llm (committed) with the cached Apertus answers one full run reads; no gateway call
+	$(PY) -m src.scout_cli replay-cache
+
+triage: ## relevance pipeline -> results/triage_pipeline.json (MODE=replay|live; WRITE=1 stores predictions)
+	$(PY) -m src.triage.pipeline --mode $(MODE) $(if $(filter 1,$(WRITE)),--write,) $(ARGS)
+
+# --- The six-schema data layer (src/db/sql), its pipeline (layer 1, layer 2) and its HTTP API (docs/API.md).
+pipeline: ## the six-schema pipeline from the loaded base (MODE=replay|live, SERVE=0 to skip serving its API)
+	$(PY) -m src.cli run --mode $(MODE) $(ARGS)
+	@if [ "$(SERVE)" != "0" ]; then $(MAKE) --no-print-directory api; fi
+
+pipeline-live: ## the same with real calls; needs LLM_* and ARGS="--limit N" or ARGS="--all"
 	$(PY) -m src.cli run --mode live $(ARGS)
 
-serve: ## serve the API and the UI only
+api: ## serve the six-schema HTTP API (src/api, docs/API.md)
 	$(PY) -m src.cli serve $(ARGS)
+
+bridge: ## copy Suva Scout's stored scores into the six-schema database as layer 2 and ranking (D-094): make bridge FROM=<Scout database URL>
+	$(PY) -m src.scorer export --from-url $(or $(FROM),postgresql://suva@localhost:54329/suva)
+	$(PY) -m src.scorer load
 
 smoke-llm: ## gateway probe -> results/gateway_probe.json (ARGS="--long --sizes 8000,16000 --ramp 1,2,4")
 	$(PY) -m src.cli smoke-llm $(ARGS)
