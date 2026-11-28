@@ -1,7 +1,7 @@
 """Triage steps 3b to 5: the Apertus consensus, the score, the cut and the explanation.
 
 - consensus: the six readings, each standardised, averaged with equal weights. Nothing is fitted to labels.
-- score: a sign-constrained logistic regression on twelve code-read facts and the consensus, trained on the
+- score: a sign-constrained logistic regression on eleven code-read facts and the consensus, trained on the
   kept rulings of the listed quarters (Suva's list as labels, closed world, Q-04). Each rule may move the score
   only in the direction a lawyer expects (``SIGNS``); a rule the labels do not support gets weight 0, it never
   turns against its meaning.
@@ -32,7 +32,6 @@ FEATURES = [
     "consensus",
     "core_topics",
     "long_accident",
-    "long_disability",
     "other_accident_insurer",
 ]
 # The only direction each rule may move the score: +1 towards relevant, -1 away from it. Fixed before fitting.
@@ -48,7 +47,6 @@ SIGNS = {
     "consensus": 1,
     "core_topics": 1,
     "long_accident": 1,
-    "long_disability": -1,
     "other_accident_insurer": 1,
 }
 RULE_DE = {
@@ -63,7 +61,6 @@ RULE_DE = {
     "consensus": "Apertus-Lesungen: rechtliche Aussage über den Einzelfall hinaus",
     "core_topics": "Kernthemen der Unfallversicherung im Text",
     "long_accident": "ausführliches Urteil in der Unfall- oder Militärversicherung",
-    "long_disability": "ausführliches Urteil in der Invalidenversicherung",
     "other_accident_insurer": "anderer Unfallversicherer ist Partei",
 }
 CORE_SHARE = 0.40  # share of the kept accident / military / disability rulings promoted to "suspected relevant"
@@ -120,8 +117,10 @@ def features(signals: dict[str, Any], consensus: float) -> list[float]:
         float(bool(signals.get("single_judge"))),
         float(consensus),
         float(signals.get("core_topics") or 0),
+        # A long ruling counts in accident and military insurance only. In disability insurance it looked like a
+        # reason against in the two listed quarters (0 of 19 picked), but Suva summarised all three long
+        # disability rulings of Q3/2025, which the fit never saw: that rule did not hold and was removed.
         float(bool(signals.get("long_ruling")) and area in ("UV", "MV")),
-        float(bool(signals.get("long_ruling")) and area == "IV"),
         float(bool(signals.get("other_accident_insurer"))),
     ]
 

@@ -172,6 +172,9 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
             if chosen:
                 ruling["tier"] = "suspected_relevant"
     failed = sum(1 for r in core for v in r["readings"].values() if v is None)
+    # Rulings Suva summarised outside the listed quarters: relevant to Suva, never used as labels. A check the
+    # fit cannot have learned: how many of them score above the frozen threshold.
+    unseen = [r for r in kept if r["basis"] == "gold_summary_only" and r["y"] is None]
     summary = {
         "version": VERSION,
         "rulings": len(prepared),
@@ -187,6 +190,11 @@ def run(conn: Any, client: Any, workers: int = 5, limit: int | None = None) -> d
         "rule_weights": {k: {a: round(b, 4) for a, b in v.items()} for k, v in model.weights().items()},
         "intercept": round(model.model.intercept_, 4),
         "out_of_quarter": measured,
+        "summarised_by_suva_not_in_training": {
+            "rulings": len(unseen),
+            "scored_above_threshold": sum(1 for r in unseen if r["score"] >= model.threshold),
+            "scored_below_0.10": sum(1 for r in unseen if r["score"] < 0.10),
+        },
         "by_quarter": {
             q: {
                 "kept": sum(1 for r in kept if r["quarter"] == q),
