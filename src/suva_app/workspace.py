@@ -110,6 +110,23 @@ def _language(language: str) -> str:
 # --- reading -----------------------------------------------------------------------------------------------
 
 
+def refine_checks(steps: list[dict] | None) -> list[dict]:
+    """What the refine loop checked on this summary, for the expert: per step its status and, per finding, what was
+    found, whether the edit was kept, the passage it rests on and why an edit was refused (src/summarize/refine)."""
+    out = []
+    for step in steps or []:
+        findings = [
+            {
+                k: f.get(k)
+                for k in ("reason", "accepted", "evidence", "quote", "why_not", "text", "status", "entailment")
+                if f.get(k) is not None
+            }
+            for f in step.get("findings", [])
+        ]
+        out.append({"step": step["step"], "status": step["status"], "findings": findings, "note": step.get("note")})
+    return out
+
+
 def ruling_page(conn, ruling_id: int) -> dict:
     """Everything the ruling page shows: facts, status, full text, both summaries, Suva's own summary if any."""
     from . import queries, relevance
@@ -128,15 +145,18 @@ def ruling_page(conn, ruling_id: int) -> dict:
     for language in LANGUAGES:
         current = conn.execute(
             """SELECT s.id, s.version, s.origin, s.body, s.confirmed_at, s.created_at,
-                      m.params ->> 'category', m.params -> 'problems' -> %s
+                      m.params ->> 'category', m.params -> 'problems' -> %s, m.params -> 'refine' -> %s -> 'steps',
+                      m.params -> 'refine' -> %s -> 'confidence', m.params -> 'writer' ->> %s
                FROM summaries s LEFT JOIN model_runs m ON m.id = s.run_id
                WHERE s.ruling_id = %s AND s.language = %s AND s.is_current""",
-            (language, ruling_id, language),
+            (language, language, language, language, ruling_id, language),
         ).fetchone()
         summaries[language] = current and {
             "id": current[0], "version": current[1], "origin": current[2], "body": current[3],
             "confirmed": current[4] is not None, "confirmed_at": current[4], "created_at": current[5],
-            "category": current[6], "problems": current[7] or [],
+            "category": current[6], "problems": current[7] or [], "checks": refine_checks(current[8]),
+            # how far the fiche was verified (src/summarize/v3/confidence.py); None for a fiche without a trace
+            "confidence": current[9], "writer": current[10],
         }  # fmt: skip
     # Suva's own summary: the texts only. Its author and file name are never sent to the interface.
     reference = dict(

@@ -1,0 +1,243 @@
+{
+  "run": "r7",
+  "set": "iterate",
+  "judge_repetition": 0,
+  "judge": "provisional (rubric not validated, docs/JUDGE.md §5)",
+  "bars": [
+    {
+      "id": "R-B1",
+      "metric": "code checks failing (sum over summaries)",
+      "rule": "after < before"
+    },
+    {
+      "id": "R-B2",
+      "metric": "usable share (all critical criteria pass)",
+      "rule": "after >= before + 0.10"
+    },
+    {
+      "id": "R-B3",
+      "metric": "mean judge score",
+      "rule": "after > before"
+    },
+    {
+      "id": "R-B4",
+      "metric": "F1, F2, F3 pass rates",
+      "rule": "no drop of more than 0.05"
+    },
+    {
+      "id": "R-B5",
+      "metric": "Apertus calls per summary, median",
+      "rule": "<= 20"
+    }
+  ],
+  "all": {
+    "summaries": 24,
+    "before": {
+      "mean_score": 0.758,
+      "usable_share": 0.583,
+      "criteria": {
+        "C1": 0.87,
+        "C2": 0.826,
+        "F1": 0.75,
+        "F2": 1.0,
+        "F3": 0.917,
+        "F4": 0.917,
+        "R1": 0.042,
+        "T1": 0.833,
+        "T2": 0.792,
+        "T3": 0.542,
+        "T4": 0.792
+      }
+    },
+    "after": {
+      "mean_score": 0.779,
+      "usable_share": 0.583,
+      "criteria": {
+        "C1": 0.957,
+        "C2": 0.826,
+        "F1": 0.833,
+        "F2": 1.0,
+        "F3": 0.917,
+        "F4": 0.875,
+        "R1": 0.0,
+        "T1": 0.792,
+        "T2": 0.833,
+        "T3": 0.667,
+        "T4": 0.792
+      }
+    },
+    "code_checks_failing": {
+      "before": 21,
+      "after": 16
+    }
+  },
+  "by_language": {
+    "de": {
+      "summaries": 12,
+      "before": {
+        "mean_score": 0.747,
+        "usable_share": 0.583,
+        "criteria": {
+          "C1": 0.909,
+          "C2": 0.75,
+          "F1": 0.667,
+          "F2": 1.0,
+          "F3": 0.917,
+          "F4": 0.917,
+          "R1": 0.083,
+          "T1": 0.75,
+          "T2": 0.833,
+          "T3": 0.583,
+          "T4": 0.833
+        }
+      },
+      "after": {
+        "mean_score": 0.759,
+        "usable_share": 0.5,
+        "criteria": {
+          "C1": 1.0,
+          "C2": 0.833,
+          "F1": 0.75,
+          "F2": 1.0,
+          "F3": 0.917,
+          "F4": 0.917,
+          "R1": 0.0,
+          "T1": 0.667,
+          "T2": 0.917,
+          "T3": 0.583,
+          "T4": 0.833
+        }
+      },
+      "code_checks_failing": {
+        "before": 11,
+        "after": 9
+      }
+    },
+    "fr": {
+      "summaries": 12,
+      "before": {
+        "mean_score": 0.769,
+        "usable_share": 0.583,
+        "criteria": {
+          "C1": 0.833,
+          "C2": 0.909,
+          "F1": 0.833,
+          "F2": 1.0,
+          "F3": 0.917,
+          "F4": 0.917,
+          "R1": 0.0,
+          "T1": 0.917,
+          "T2": 0.75,
+          "T3": 0.5,
+          "T4": 0.75
+        }
+      },
+      "after": {
+        "mean_score": 0.799,
+        "usable_share": 0.667,
+        "criteria": {
+          "C1": 0.917,
+          "C2": 0.818,
+          "F1": 0.917,
+          "F2": 1.0,
+          "F3": 0.917,
+          "F4": 0.833,
+          "R1": 0.0,
+          "T1": 0.917,
+          "T2": 0.75,
+          "T3": 0.75,
+          "T4": 0.75
+        }
+      },
+      "code_checks_failing": {
+        "before": 10,
+        "after": 7
+      }
+    }
+  },
+  "steps": {
+    "form": {
+      "passed": 24,
+      "corrected": 0,
+      "needs_review": 0,
+      "skipped": 0,
+      "patches_kept": 0,
+      "patches_refused": 0,
+      "calls": 0
+    },
+    "facts": {
+      "passed": 8,
+      "corrected": 3,
+      "needs_review": 13,
+      "skipped": 0,
+      "patches_kept": 6,
+      "patches_refused": 25,
+      "calls": 80
+    },
+    "context": {
+      "passed": 13,
+      "corrected": 0,
+      "needs_review": 11,
+      "skipped": 0,
+      "patches_kept": 0,
+      "patches_refused": 11,
+      "calls": 16
+    },
+    "holding": {
+      "passed": 11,
+      "corrected": 9,
+      "needs_review": 0,
+      "skipped": 4,
+      "patches_kept": 9,
+      "patches_refused": 0,
+      "calls": 39
+    },
+    "economy": {
+      "passed": 22,
+      "corrected": 0,
+      "needs_review": 2,
+      "skipped": 0,
+      "patches_kept": 0,
+      "patches_refused": 2,
+      "calls": 2
+    },
+    "terms": {
+      "passed": 12,
+      "corrected": 1,
+      "needs_review": 11,
+      "skipped": 0,
+      "patches_kept": 2,
+      "patches_refused": 14,
+      "calls": 24
+    },
+    "language": {
+      "passed": 12,
+      "corrected": 9,
+      "needs_review": 3,
+      "skipped": 0,
+      "patches_kept": 10,
+      "patches_refused": 3,
+      "calls": 50
+    },
+    "length": {
+      "passed": 24,
+      "corrected": 0,
+      "needs_review": 0,
+      "skipped": 0,
+      "patches_kept": 0,
+      "patches_refused": 0,
+      "calls": 0
+    },
+    "form_final": {
+      "passed": 24,
+      "corrected": 0,
+      "needs_review": 0,
+      "skipped": 0,
+      "patches_kept": 0,
+      "patches_refused": 0,
+      "calls": 0
+    }
+  },
+  "calls_per_summary_median": 9.0,
+  "changed_summaries": 14
+}

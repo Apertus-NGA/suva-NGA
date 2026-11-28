@@ -1,0 +1,116 @@
+{
+  "set": "holdout",
+  "name": "c14",
+  "rulings_scored": 16,
+  "errors": 0,
+  "chosen_median": 7.0,
+  "sentence_recall": 0.251,
+  "consideration_recall": 0.312,
+  "soft_sentence_recall": 0.274,
+  "ranked_consideration_recall": 0.286,
+  "random_sentence_recall": 0.121,
+  "per_ruling": [
+    {
+      "docket": "8C_129/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.17
+    },
+    {
+      "docket": "8C_145/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    },
+    {
+      "docket": "8C_154/2025",
+      "sentence_recall": 0.5,
+      "consideration_recall": 0.5
+    },
+    {
+      "docket": "8C_172/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.25
+    },
+    {
+      "docket": "8C_179/2025",
+      "sentence_recall": 0.33,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_180/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    },
+    {
+      "docket": "8C_241/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    },
+    {
+      "docket": "8C_330/2025",
+      "sentence_recall": 1.0,
+      "consideration_recall": 1.0
+    },
+    {
+      "docket": "8C_334/2025",
+      "sentence_recall": 0.29,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_356/2025",
+      "sentence_recall": 0.09,
+      "consideration_recall": 0.25
+    },
+    {
+      "docket": "8C_399/2025",
+      "sentence_recall": 0.67,
+      "consideration_recall": 0.5
+    },
+    {
+      "docket": "8C_498/2024",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    },
+    {
+      "docket": "8C_607/2024",
+      "sentence_recall": 0.38,
+      "consideration_recall": 0.5
+    },
+    {
+      "docket": "8C_62/2025",
+      "sentence_recall": 0.29,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_7/2025",
+      "sentence_recall": 0.33,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_72/2025",
+      "sentence_recall": 0.14,
+      "consideration_recall": 0.5
+    }
+  ],
+  "bars": [
+    {
+      "id": "X-F1",
+      "metric": "share of Suva's matched sentences the code filter keeps",
+      "rule": ">= 0.90"
+    },
+    {
+      "id": "X-C1",
+      "metric": "sentence recall of the choice (mean per ruling)",
+      "rule": ">= 0.40"
+    },
+    {
+      "id": "X-C2",
+      "metric": "consideration recall of the choice (mean per ruling)",
+      "rule": ">= 0.60"
+    },
+    {
+      "id": "X-C3",
+      "metric": "sentence recall, choice minus a random choice of the same size",
+      "rule": ">= 0.20"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "set": "holdout",
+  "rulings": 16,
+  "rulings_with_matched_fiche": 16,
+  "sentences_median": 109.5,
+  "candidates_median": 61.5,
+  "suva_sentences_matched": 117,
+  "suva_sentences_kept_by_filter": 94,
+  "filter_keeps": 0.803,
+  "lost_by_reason": {
+    "reported": 17,
+    "admissibility": 1,
+    "proceedings": 1,
+    "party_argument": 2,
+    "operative": 1,
+    "procedural_law": 1
+  },
+  "match_rate": 0.791
+}

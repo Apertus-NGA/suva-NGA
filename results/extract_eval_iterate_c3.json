@@ -1,0 +1,91 @@
+{
+  "set": "iterate",
+  "name": "c3",
+  "rulings_scored": 11,
+  "errors": 0,
+  "chosen_median": 6,
+  "sentence_recall": 0.236,
+  "consideration_recall": 0.451,
+  "soft_sentence_recall": 0.275,
+  "ranked_consideration_recall": 0.419,
+  "random_sentence_recall": 0.071,
+  "per_ruling": [
+    {
+      "docket": "4A_106/2025",
+      "sentence_recall": 0.2,
+      "consideration_recall": 1.0
+    },
+    {
+      "docket": "8C_176/2025",
+      "sentence_recall": 0.06,
+      "consideration_recall": 0.43
+    },
+    {
+      "docket": "8C_178/2025",
+      "sentence_recall": 0.5,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_184/2025",
+      "sentence_recall": 0.08,
+      "consideration_recall": 0.2
+    },
+    {
+      "docket": "8C_311/2025",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    },
+    {
+      "docket": "8C_318/2025",
+      "sentence_recall": 0.07,
+      "consideration_recall": 0.5
+    },
+    {
+      "docket": "8C_517/2024",
+      "sentence_recall": 0.29,
+      "consideration_recall": 0.33
+    },
+    {
+      "docket": "8C_676/2024",
+      "sentence_recall": 0.4,
+      "consideration_recall": 0.67
+    },
+    {
+      "docket": "8C_687/2024",
+      "sentence_recall": 0.67,
+      "consideration_recall": 1.0
+    },
+    {
+      "docket": "8C_720/2024",
+      "sentence_recall": 0.33,
+      "consideration_recall": 0.5
+    },
+    {
+      "docket": "9C_581/2024",
+      "sentence_recall": 0.0,
+      "consideration_recall": 0.0
+    }
+  ],
+  "bars": [
+    {
+      "id": "X-F1",
+      "metric": "share of Suva's matched sentences the code filter keeps",
+      "rule": ">= 0.90"
+    },
+    {
+      "id": "X-C1",
+      "metric": "sentence recall of the choice (mean per ruling)",
+      "rule": ">= 0.40"
+    },
+    {
+      "id": "X-C2",
+      "metric": "consideration recall of the choice (mean per ruling)",
+      "rule": ">= 0.60"
+    },
+    {
+      "id": "X-C3",
+      "metric": "sentence recall, choice minus a random choice of the same size",
+      "rule": ">= 0.20"
+    }
+  ]
+}
