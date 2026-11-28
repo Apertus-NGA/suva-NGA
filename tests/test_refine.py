@@ -400,6 +400,11 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
         ]  # fmt: skip
         assert refine["draft"] and stored[language] == result["languages"][language]["text"]
     assert params["refine"]["record"]["status"] == "ok"
+    # the ruling page shows the expert each step of refine (src/suva_app/workspace.py)
+    from suva_app import workspace
+
+    page = workspace.ruling_page(db_conn, rid)
+    assert [c["step"] for c in page["summaries"]["de"]["checks"]][:3] == ["form", "facts", "context"]
     assert sum(v.startswith("record@5") for v, _ in fake.sent) == 1  # one shared reading for both languages
 
 

@@ -1,6 +1,6 @@
 import { Check, ChevronDown, LoaderCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { Summary, SummaryLanguage } from "../lib/api";
+import type { RefineCheck, Summary, SummaryLanguage } from "../lib/api";
 import { useI18n, type Key } from "../lib/i18n";
 import { Popover } from "./ui/Popover";
 import { cn } from "./ui/cn";
@@ -65,6 +65,7 @@ export function SummaryCard({ language, summary, revisions, busy, onConfirm, onU
             {t("summary.checker")}: {summary.problems.join(" · ")}
           </p>
         )}
+        {summary && !editing && (summary.checks?.length ?? 0) > 0 && <Checks checks={summary.checks} />}
       </div>
 
       {summary && (
@@ -165,5 +166,41 @@ export function Button({ primary = false, quiet = false, disabled = false, onCli
     >
       {children}
     </button>
+  );
+}
+
+
+const MARK: Record<RefineCheck["status"], string> = { passed: "✓", corrected: "✎", needs_review: "!", skipped: "–" };
+
+/** The refine trace: each step, what it found, what it changed and on which passage of the ruling. */
+function Checks({ checks }: { checks: RefineCheck[] }) {
+  const { t } = useI18n();
+  const changed = checks.filter((c) => c.status === "corrected").length;
+  const review = checks.filter((c) => c.status === "needs_review").length;
+  return (
+    <details className="mt-3 text-[12px] leading-[18px] text-muted">
+      <summary className="cursor-pointer select-none">
+        {t("summary.checks")}: {changed} {t("summary.checks.corrected")} · {review} {t("summary.checks.review")}
+      </summary>
+      <ul className="mt-2 space-y-1">
+        {checks.map((c) => (
+          <li key={c.step}>
+            <span className="font-medium text-ink">
+              {MARK[c.status]} {c.step}
+            </span>
+            {c.findings.map((f, i) => (
+              <div key={i} className="ml-4">
+                {f.accepted ? "✎ " : "· "}
+                {f.reason}
+                {f.evidence && ` (${f.evidence})`}
+                {f.quote && <span className="block italic">“{f.quote}”</span>}
+                {f.why_not && <span className="block">{f.why_not}</span>}
+              </div>
+            ))}
+            {c.note && <div className="ml-4">{c.note}</div>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

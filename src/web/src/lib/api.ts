@@ -139,6 +139,14 @@ export type Summary = {
   confirmed: boolean; // confirmed by an expert as final: a gold summary
   category: string | null; // the matter whose prompt wrote it
   problems: string[]; // what the code-side checker found
+  checks: RefineCheck[]; // what the refine loop checked, step by step (empty when refine did not run)
+};
+
+export type RefineCheck = {
+  step: string; // form, facts, context, holding, economy, terms, language, length, form_final
+  status: "passed" | "corrected" | "needs_review" | "skipped";
+  findings: { reason: string; accepted?: boolean; evidence?: string; quote?: string; why_not?: string }[];
+  note?: string | null;
 };
 
 export type RulingDetail = {
