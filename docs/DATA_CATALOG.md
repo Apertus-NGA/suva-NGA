@@ -1,6 +1,6 @@
 # suva-NGA data catalog: layers 1 and 2, layer 3 preview
 
-> **Status: measured snapshot, 28 Nov 2026, 10:40 CET, on `main` @ `14caaba`.** Owner: `lead`. Readers: whoever builds the UI or the API, human or agent. Out of date after any change to `src/db/sql/`, to the ingest, to layer 1 or layer 2, or when layer 3 or the ranking lands: regenerate it then.
+> **Status: measured snapshot, 28 Nov 2026, 10:40 CET, on `main` @ `14caaba`.** **Amended 28 Nov ~11:45 CET** for layer 2's DDL-1, DDL-2 and replay policy (branch `triage/layer2-ddl`); counts unchanged. Owner: `lead`. Readers: whoever builds the UI or the API, human or agent. Out of date after any change to `src/db/sql/`, to the ingest, to layer 1 or layer 2, or when layer 3 or the ranking lands: regenerate it then.
 
 An exhaustive, raw list of the data that exists. It makes no recommendation and no design decision.
 
@@ -150,7 +150,7 @@ UI writes (functions) ──►       gold.expert_review · summ.summary_version
 | `triage.v_export_ranked` | view | view | 0 | The delivered ranked list of the current release (D-046): score, rank, threshold and top-30 marks, both dates and every population of each ruling (D-050). Must equal the hashed results/ file. |
 | `triage.v_layer1_ledger` | view | view | 54,495 | Layer 1 rule by rule (F-01, F-02): one row per assessment and rule of its version, with the outcome (fired, not_fired, not_applicable, blocked), the evidence, the German and French labels, and is_decisive (the fired rule whose reason code is the decision's). O |
 | `triage.v_scope_current` | view | view | 6,055 | The pipeline label plus the latest expert scope review beside it (D-066): expert_implied_label = the pipeline label, flipped when the verdict is incorrect. The delivered list and the metrics never read expert_implied_label. |
-| `triage.v_scope_pipeline` | view | view | 6,055 | THE label (D-063): the default pipeline's furthest-step assessment per ruling, from its current release, else from its latest non-eval run. not_assessed = no row. |
+| `triage.v_scope_pipeline` | view | view | 6,055 | THE label (D-063): the default pipeline's furthest-step assessment per ruling, from its current release, else from its usable runs (succeeded or partial, not eval) and only along the lineage of its current layer-1 decision (DDL-2). not_assessed = no row. |
 | `triage.v_scope_trace` | view | view | 6,967 | The "show me why" panel: one row per step of the label's lineage, with run, profile and component versions, models, reasons (reason_count = rules that fired; evaluated_rule_count = ledger rows, every rule of the version), LLM call, input text, source snapshot, |
 
 ## 4. Ruling data (`corpus`)
@@ -274,6 +274,7 @@ Rule descriptions (`ops.rule.description`):
 - Version: `layer2_judge` V1.0.0, judge `apertus-v1-5-8b` (zero-shot, German question, answer read from the first token's log-probabilities: `max_tokens 1`, `top_logprobs 20`, `temperature 0`).
 - Who is judged: the rulings layer 1 kept (`potentially`) in the populations of the run. Here 912 of the 935 kept; the other 23 belong only to `suva_reference`, which was not in the run.
 - Label: always `potentially`. `outcome` = `ok | failed | skipped` (a failed or skipped call keeps `potentially`, with reason `L2_FAILED_CALL` or `L2_FAIL_NO_YESNO_TOKEN`). `score_source = judged`.
+- Since 28 Nov (after this snapshot): a replay run writes **no row** for a candidate without a recorded answer (`replay_misses.jsonl`, metric `replay_misses`, run `partial`), so an earlier judgement keeps its place in the label; and the trigger `t31_call` refuses a `triage.llm_judgement` row whose call is not its own (other run, ruling or step; another prompt than the one the call sent or the version declares; other models). `docs/LAYER2.md` §4, §7.
 - Languages of the judged rulings: de 573, fr 311, it 28.
 - `score_raw` (double, logit): 912 distinct values, min -22.250, max 29.000.
 - `score_0_100` (`numeric(5,2)`): 114 distinct values, min 0.00, max 100.00, **189 rulings at exactly 100.00**.
@@ -310,7 +311,7 @@ Measured live elsewhere (not in this snapshot): on 28 Nov ~06:50 CET, 383 of 383
 
 ## 7. The label views: what the pipeline says per ruling
 
-- **`triage.v_scope_pipeline`**: THE pipeline label per ruling = the furthest-step assessment of the default profile (from the current release when one exists, else from its latest non-eval run). A ruling with no row = not assessed. Columns: `pipeline_label`, `step`, `score_0_100`, `score_source`, `reason_code`, `reason_label_de/fr`, `explanation_de`, `outcome`, `mode`, `label_origin` (`release | latest_run`), `assessment_id`, `run_id`, `created_at`. It does **not** carry `score_raw` (that is on `triage.assessment`, via `assessment_id`).
+- **`triage.v_scope_pipeline`**: THE pipeline label per ruling = the furthest-step assessment of the default profile (from the current release when one exists, else from its usable runs, succeeded or partial and not eval, along the lineage of its current layer-1 decision: a judgement made on an older layer-1 decision, from a failed or aborted run, or with no layer-1 root never forms the label; DDL-2, 28 Nov). A ruling with no row = not assessed. Columns: `pipeline_label`, `step`, `score_0_100`, `score_source`, `reason_code`, `reason_label_de/fr`, `explanation_de`, `outcome`, `mode`, `label_origin` (`release | latest_run`), `assessment_id`, `run_id`, `created_at`. It does **not** carry `score_raw` (that is on `triage.assessment`, via `assessment_id`).
 - **`triage.v_scope_current`**: `v_scope_pipeline` + the latest expert scope review: `expert_verdict`, `reviewed_label`, `reviewed_assessment_id`, `review_is_stale`, `expert_implied_label`, `reviewed_by`, `reviewed_at` (all empty here).
 - **`triage.v_scope_trace`**: the "why" lineage, one row per step per ruling (`hop` 0 = furthest step, 1 = the step before). Per hop: label, score, reason and its German label, `explanation_de`, run, profile and component versions, code and config hashes, declared models, `reason_count`, `evaluated_rule_count`, the LLM call (served model, tokens, cache hit, finish reason, `p_yes`), text source and hash, source revision and file hash, span status, duration, event counts.
 - **`ops.v_ruling_timeline`**: every span and event of a ruling across runs (`kind` span|event, `step`, `code`, `level_or_status`, `message`, `attributes`, `duration_ms`, `ts`).
@@ -1963,7 +1964,7 @@ The pipeline label plus the latest expert scope review beside it (D-066): expert
 
 ### `triage.v_scope_pipeline` (view, 6,055 rows)
 
-THE label (D-063): the default pipeline's furthest-step assessment per ruling, from its current release, else from its latest non-eval run. not_assessed = no row.
+THE label (D-063): the default pipeline's furthest-step assessment per ruling, from its current release, else from its usable runs (succeeded or partial, not eval) and only along the lineage of its current layer-1 decision (DDL-2). not_assessed = no row.
 
 | Column | Type | Null | Filled | Comment |
 |---|---|---|---:|---|
