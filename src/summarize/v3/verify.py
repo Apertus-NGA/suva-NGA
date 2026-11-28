@@ -666,8 +666,10 @@ def verify(draft: list[Sentence], record: Record, language: str, ruling: dict, m
 
     `status`: "failed" when fewer than MIN_KEPT sentences are kept or no required proposition is stated (also
     when the record has none: there is then no holding of the court to state; the caller falls back to the old
-    writer); "needs_review" when a sentence was removed or repaired, a required proposition is missing, or the
-    record itself needs review; else "ok". `calls` counts the model calls made here.
+    writer); "needs_review" when a required proposition is missing, a proposition was stated by a sentence that
+    had to be removed and by no other, or the record itself needs review; else "ok". A repaired sentence passed
+    every check again, so it does not flag the fiche (first live run: every fiche was flagged). `calls` counts
+    the model calls made here.
     """
     start = model.calls
     source_language = ruling.get("language") or ruling_language(ruling["text"]) or language
@@ -684,9 +686,10 @@ def verify(draft: list[Sentence], record: Record, language: str, ruling: dict, m
     text, finish_notes = finish.finish(language, body, ruling["text"], ruling.get("starred"))
     text = with_admissibility(text, language, ruling["text"])
     required = {p.id for p in record.required()}
+    lost = {i for s in sentences if s.status == "removed" for i in s.propositions}  # said nowhere else: review
     if len(kept) < MIN_KEPT or not (required & _stated(sentences)):
         status = "failed"
-    elif missing or record.status != "ok" or any(s.status != "written" for s in sentences):
+    elif missing or record.status != "ok" or (lost - _stated(sentences)):
         status = "needs_review"
     else:
         status = "ok"

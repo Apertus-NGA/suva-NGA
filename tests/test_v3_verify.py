@@ -118,7 +118,8 @@ def test_a_lower_court_proposition_given_as_the_courts_holding_is_refused_by_cod
     repaired = fiche.sentences[1]
     assert repaired.status == "repaired" and repaired.text == S_LOWER and repaired.entailment == 0.97
     assert repaired.problems and all(p.startswith("attempt 1: speaker:") for p in repaired.problems)
-    assert fiche.status == "needs_review" and S_AS_COURT not in fiche.text and S_LOWER in fiche.text
+    # a repaired sentence passed every check again: it does not flag the fiche
+    assert fiche.status == "ok" and S_AS_COURT not in fiche.text and S_LOWER in fiche.text
     assert fiche.calls == 5
 
 
@@ -342,7 +343,7 @@ def test_a_sentence_that_repeats_an_earlier_one_is_removed():
     fiche = run(draft, Fake())
     assert [s.status for s in fiche.sentences] == ["written", "written", "removed", "written", "written"]
     assert "repeats an earlier sentence" in fiche.sentences[2].problems[0]
-    assert fiche.text.count("stürzte") == 1 and fiche.status == "needs_review"
+    assert fiche.text.count("stürzte") == 1 and fiche.status == "ok"  # its proposition is still stated once
     assert any("repeats" in note for note in fiche.notes)
     # a different sentence about the same proposition is not a repeat
     other = clean()
