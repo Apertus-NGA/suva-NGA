@@ -126,18 +126,18 @@ The digit is the court. Digit 3 is reserved and unused. Digits 11 to 15 are spec
 
 The letter is the kind of proceedings, on every court. C is a public-law appeal, A a civil appeal, B a criminal appeal, D a subsidiary constitutional appeal, F a revision, G an interpretation or a correction. Letters E and T to Z exist in the same note and almost never appear on the Neuheiten list.
 
-The subject is not in the number. It is the Neuheiten `Sachgebiet`, in the language of the decision, with a trailing `*` when the ruling is proposed for the official reporter (§3). Court 8 also hears unemployment insurance, supplementary benefits, family allowances and social assistance. Court 9 also hears old-age insurance, loss-of-earnings allowances and tax. Court 4 also hears general obligations, debt enforcement, company law and civil liability. On the Neuheiten pages of every day from 1 Aug 2025 to 31 Mar 2026 (243 pages, read 27 Nov in an ordinary browser): 209 rulings in 8C, of which 72 accident insurance, 62 disability insurance and 75 in the other subjects of that court (unemployment 30, supplementary benefits 26, social assistance 16, family allowances 3). Accident insurance is about a third of court 8. A gate on the digit 8 keeps the other two thirds, and it drops the six 9C rulings of Suva's list and `4A_106/2025`. Letters other than C are rare on that court in the same window (8F: 5, 8G: 1, no 8D). Military insurance is in this court's competence and in the signal list (§4); it did not appear on these pages.
+The subject is not in the number. It is the Neuheiten `Sachgebiet`, in the language of the decision, with a trailing `*` when the ruling is proposed for the official reporter (§3). Court 8 also hears unemployment insurance, supplementary benefits, family allowances and social assistance. Court 9 also hears old-age insurance, loss-of-earnings allowances and tax. Court 4 also hears general obligations, debt enforcement, company law and civil liability. On the Neuheiten pages of every day from 1 Aug 2025 to 31 Mar 2026 (243 pages, read 27 Nov in an ordinary browser): 209 rulings in 8C, of which 72 accident insurance, 62 disability insurance and 75 in the other subjects of that court (unemployment 30, supplementary benefits 26, social assistance 16, family allowances 3). Accident insurance is about a third of court 8. A gate on the digit 8 keeps the other two thirds, and it drops the six 9C rulings of Suva's list and `4A_106/2025`. Letters other than C are rare on that court in the same window (8F: 5, 8G: 1, no 8D). Military insurance is in this court's competence and in the signal list (§4); it did not appear on these pages. The candidate gate keeps the rubric anyway.
 
 | Prefix | Court | Matters on the Neuheiten line | For Suva |
 |---|---|---|---|
-| **8C** | 4th public-law court | **accident insurance (only on this court)**, disability insurance, unemployment, social assistance, military insurance, supplementary benefits, family allowances | accident and disability; the other subjects of the court are out |
+| **8C** | 4th public-law court | **accident insurance (only on this court)**, disability insurance, unemployment, social assistance, military insurance, supplementary benefits, family allowances | accident, disability and military insurance; the other subjects of the court are out |
 | **9C** | 3rd public-law court | **taxes** (since 2023; 96 of 203 rows in the window above), old-age, disability, health insurance, occupational pensions, loss-of-earnings allowances | disability, health insurance, occupational pensions; tax, old-age and loss-of-earnings are out |
 | 8D, 8F, 8G, 9D, 9F, 9G | same courts | D a subsidiary constitutional appeal, F a revision, G an interpretation or a correction. An 8F can be accident insurance (8F_12/2026) | same subjects as 8C and 9C; the letter does not add a subject |
-| 4A, 4D, 4F, 4G | 1st civil-law court | contract law, and separately liability, general obligations, debt enforcement, company law. Suva recourse actions exist (BGE 152 III 7) | contract law only. Suva summarised one 4A ruling, `judgements/Export_4A_106_2025.html`: daily sickness benefits under the Insurance Contract Act, filed under contract law (`Vertragsrecht`), not under its own rubric |
+| 4A, 4D, 4F, 4G | 1st civil-law court | contract law, and separately liability, general obligations, debt enforcement, company law. Suva recourse actions exist (BGE 152 III 7) | contract law and civil liability. Suva summarised one 4A ruling, `judgements/Export_4A_106_2025.html`: daily sickness benefits under the Insurance Contract Act, filed under contract law (`Vertragsrecht`), not under its own rubric |
 
 Disability insurance is handled by both 8C and 9C: it cannot be sorted by digit. Suva's own data confirms it: its list holds 53 rulings in 8C, 6 in 9C and 1 cantonal decision, and at least 7 of its 55 summaries concern disability insurance (`docs/SUVA_DATA.md` §2-3; scope: Q-06, Q-31).
 
-`src/courts.py` keeps a ruling when the digit, the letter and the subject line agree. The `*` is stripped before the comparison. Ingestion still stores every court (`docs/agents/crawl.md`); whether a net is used at all stays open (D-021). While Q-06 is open, this is the candidate gate, not a claim that no other court can be relevant.
+`src/courts.py` is the candidate gate (layer 1); its rules, reason codes and measured counts are in `docs/LAYER1.md`, and the proposal to adopt it is D-060. It makes two decisions and keeps a ruling when either keeps it. The **subject decision** needs an allowed digit and letter, then reads the matter: from the Neuheiten rubric when it is filled, otherwise from the start of the ruling's subject line (Hugging Face `title`, cut at the first bracket, comma or semicolon: `Invalidenversicherung, Invalidenrente` gives `Invalidenversicherung`). Matter names are matched by name, not as exact strings, by `src/areas.py`, the one reading of matter names that the gate and the summariser share. A filled rubric outside the tables below drops the ruling. When the rubric is empty and the subject line names no kept matter, or there is no subject line, code does not decide: Apertus reads the matter (`src/area_judge.py`), and the ruling is dropped only when Apertus gives the kept matters less than 10% probability. A failed or absent reading keeps it. The **text decision** keeps a ruling when the text names Suva, CNA, INSAI or an accident or military insurance term (`UVG`, `LAA`, `LAINF`, `MVG`, `Unfallversicherung`, `Unfallversicherungsgesetz`, `Unfallversicherer`, `assurance-accidents`, `assureur-accidents`, `assicurazione contro gli infortuni`, and the military rubrics). Both reasons are kept. The `*` is stripped before the subject comparison. Ingestion still stores every court (`docs/agents/crawl.md`); whether a net is used at all stays open (D-021). While Q-06 is open, this is the candidate gate, not a claim that no other court can be relevant.
 
 Courts 8 and 9, letters C, D, F and G:
 
@@ -145,18 +145,20 @@ Courts 8 and 9, letters C, D, F and G:
 |---|---|---|
 | Unfallversicherung | Assurance-accidents | Assicurazione contro gli infortuni |
 | Invalidenversicherung | Assurance-invalidité | Assicurazione per l'invalidità |
-| Krankenversicherung | Assurance-maladie | Assicurazione malattie ⚠ |
+| Krankenversicherung | Assurance-maladie | Assicurazione malattie ⚠, Assicurazione contro le malattie |
 | Berufliche Vorsorge | Prévoyance professionnelle | Previdenza professionale |
+| Militärversicherung | Assurance militaire | Assicurazione militare |
 
-The Italian health-insurance line did not occur in the window above; the usual Tribunal rubric is kept so a later Italian ruling is not dropped. The site spelled occupational pensions `Previdenza professionnale` once: that spelling is accepted too.
+The Italian health-insurance line did not occur in the window above; the usual Tribunal rubric is kept so a later Italian ruling is not dropped. The Neuheiten page wrote `Assicurazione contro le malattie` for `9C_636/2025`: that form is kept too. The site spelled occupational pensions `Previdenza professionnale` once: that spelling is accepted too.
 
 Court 4, letters A, D, F and G:
 
 | DE | FR | IT |
 |---|---|---|
 | Vertragsrecht | Droit des contrats | Diritto contrattuale |
+| Haftpflichtrecht | Assurance responsabilité civile | |
 
-On those pages the insurance cases inside contract law are a sub-line (`Taggeldversicherung`, `Krankentaggeldversicherung`, `Versicherungsvertrag`, `contrat d'assurance`), not a separate subject. Keeping the whole subject is wide: 115 of 197 rows in 4A were contract law. Liability (`Haftpflichtrecht`, `Assurance responsabilité civile`) is a different line and is not kept.
+On those pages the insurance cases inside contract law are a sub-line (`Taggeldversicherung`, `Krankentaggeldversicherung`, `Versicherungsvertrag`, `contrat d'assurance`), not a separate subject. Keeping the whole subject is wide: 115 of 197 rows in 4A were contract law. Liability (`Haftpflichtrecht`, `Assurance responsabilité civile`) is a different line and is kept. No Italian liability rubric was read on these pages, so none is listed.
 
 ## 6. Volumes (measured on 27 Nov where stated; the datasets of §10 confirm them)
 

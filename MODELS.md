@@ -9,10 +9,11 @@
 | Role | Model | Exact id / revision | Endpoint or source | Licence | Status |
 |---|---|---|---|---|---|
 | Core: relevance judgement on candidate rulings, key statement, summaries DE/FR | Apertus 1.5 70B (instruct, thinking off) | gateway `apertus-v1-5-70b`; Hugging Face `swiss-ai/Apertus-v1.5-70B` | Keera gateway (`LLM_BASE_URL`), or the endpoint the judges set in `LLM_BASE_URL` (CSCS possible) | check model card | DECIDED (Apertus mandatory); role split OPEN (D-021, D-022) |
+| Candidate gate: read a ruling's matter where code cannot (`src/area_judge.py`, D-060) | Apertus 1.5 70B (instruct, thinking off) | `LLM_NAME` (gateway `apertus-v1-5-70b`) | Keera gateway, through `src/llm/` | as the core row | PROPOSED (D-060) |
 | Light tasks: query translation, quick prioritisation, demo fallback | Apertus 1.5 8B | gateway `apertus-v1-5-8b`; Hugging Face `swiss-ai/Apertus-v1.5-8B` | Keera gateway, or the endpoint the judges set | check model card | OPEN (D-022); never excludes a ruling alone whatever the answer |
 | Embeddings for search and similar rulings | pplx-embed-context-v1-0.6b | `<revision>`; query-side model to fix | local; weights downloaded at image build time and never committed (the template's `.gitignore` excludes weight files), so a **build-time** external dependency listed in the report's Target architecture | MIT | DECIDED if search uses embeddings (D-005); whether it does is OPEN (D-033) |
 | Embedding baseline | bge-m3 | `<revision>` | local (weights downloaded at build time, as above) | MIT | OPEN (D-020) |
-| Learned relevance score | logistic regression on signals + Apertus probability | trained artefact `results/models/<hash>` | local (scikit-learn) | n/a (our model) | OPEN (D-021, option B only) |
+| Learned relevance score (`src/triage/scorer.py`, D-061) | logistic regression over code-read facts and the consensus of six Apertus 70B readings (`src/triage/readings.py`) | fitted at each run on Suva's list; parameters stored in `model_runs.params` | local (scikit-learn); the readings go through `src/llm/` | n/a (our model) | PROPOSED (D-061; D-021 option B) |
 | Evaluation judge (optional) | open-weights, other family than Apertus | `<id>` | `<endpoint>` | `<licence>` | OPEN (`docs/EVAL.md` §4); used only with published κ |
 
 `LLM_NAME` is "name and version of the model" (template `README.md`): the judges may set either size, in either form (gateway id or Hugging Face id). The client maps both forms, and the pipeline must complete when `LLM_NAME` is the 8B (`AGENTS.md` G3; D-032, Q-23).

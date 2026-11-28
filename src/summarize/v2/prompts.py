@@ -11,10 +11,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+try:
+    from src.areas import area_code
+except ModuleNotFoundError:  # launched as a script from src/summarize: areas.py lives in src/
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from areas import area_code
+
 VERSION = "v2"
 GLOSSARY = json.loads((Path(__file__).parent / "glossary.json").read_text(encoding="utf-8"))
 SOCIAL = frozenset({"uv", "iv", "kv"})
-_SUBJECTS = {key: frozenset(block["subjects"]) for key, block in GLOSSARY.items() if key != "common"}
+# Glossary key per matter code of src/areas.py. Military insurance and civil liability have no glossary.
+_BY_CODE = {"UV": "uv", "IV": "iv", "KV": "kv", "BV": "bv", "CONTRACT": "vvg"}
 
 _STYLE = {
     "de": (
@@ -118,12 +127,11 @@ _CLOSE = {
 
 
 def category_of(area: str | None) -> str:
-    """Matter key from the Neuheiten subject. A trailing asterisk is ignored."""
-    subject = (area or "").strip().casefold().rstrip("*").strip()
-    for key, names in _SUBJECTS.items():
-        if subject in names:
-            return key
-    return "other"
+    """Matter key from the Neuheiten subject or the subject line, read as the gate reads it (src/areas.py).
+
+    The ``subjects`` lists in glossary.json are the names this returns their key for (a test checks it).
+    """
+    return _BY_CODE.get(area_code(area) or "", "other")
 
 
 def _laws(category: str) -> list[dict]:

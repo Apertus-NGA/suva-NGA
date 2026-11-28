@@ -6,7 +6,9 @@ MODE ?= replay
 SERVE ?= 1
 ARGS ?=
 
-.PHONY: help run run-live serve smoke-llm warmup crawl refit eval eval-private claims check
+WRITE ?= 0
+
+.PHONY: help run run-live serve smoke-llm warmup crawl triage refit eval eval-private claims check
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -29,6 +31,9 @@ warmup: ## warm the 70B before a demo or a measurement
 
 crawl: ## Neuheiten lists and ruling pages, politely (>= 2 s between requests, cache)
 	$(PY) -m src.cli crawl $(ARGS)
+
+triage: ## relevance pipeline v1 -> results/triage_pipeline.json (MODE=replay|live; WRITE=1 stores predictions for the UI)
+	$(PY) -m src.triage.pipeline --mode $(MODE) $(if $(filter 1,$(WRITE)),--write,) $(ARGS)
 
 refit: ## rerun the scoring with the current labels, expert corrections included
 	$(PY) -m src.cli refit $(ARGS)
