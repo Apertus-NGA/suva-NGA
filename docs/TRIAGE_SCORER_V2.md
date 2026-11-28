@@ -18,9 +18,11 @@
    against its own meaning. Otherwise the model is v1's: L2, C = 1, balanced classes, standardised inputs.
 4. **The rule table is stored** with every run (`model_runs.params.rule_weights`, `intercept`) and in
    `results/triage_pipeline.json`, so any score can be recomputed by hand (section 4).
-5. **A check the fit cannot have learned**: the 23 rulings Suva summarised in Q3/2025 are relevant to Suva and
+5. **A development check, never labels**: the 23 rulings Suva summarised in Q3/2025 are relevant to Suva and
    are never used as labels. Every run reports how many of them score above the threshold
-   (`summarised_by_suva_not_in_training`).
+   (`summarised_by_suva_not_in_training`). That count is monitoring, not recall: Q3/2025 is for development
+   only and no recall is measured on it (Q-29, `docs/EVAL.md`). It informed one model choice, the removal of
+   a rule (section 2), so it is no longer unseen by the model.
 
 ## 2. The rules (fitted on the 646 kept rulings of Q4/2025 and Q1/2026, 59 relevant)
 
@@ -72,7 +74,8 @@ recall; L1 is never better. XGBoost was worse on every feature set (`results/tri
 
 Limits: 59 relevant rulings, so one ruling is 0.017 of recall. The 25,000-character cut was chosen after looking
 at both listed quarters. The Q3/2025 check holds only rulings Suva picked, so it can show a rule that hides
-relevant rulings, not one that promotes irrelevant ones.
+relevant rulings, not one that promotes irrelevant ones. It decided the removal of the long-disability rule, so it cannot
+also be reported as an independent test.
 
 ## 4. How a score is computed, so that it can be checked by hand
 

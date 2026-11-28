@@ -102,12 +102,8 @@ def main() -> None:
                 ask,
                 extras=qwen_comparison,
             )
-            text, notes = finish.finish(
-                task["language"], raw, task["target"]["text"], task["target"].get("starred")
-            )
-            problems = review(
-                task["language"], finish.without_note(text), task["target"]["text"], task["docket"]
-            )
+            text, notes = finish.finish(task["language"], raw, task["target"]["text"], task["target"].get("starred"))
+            problems = review(task["language"], finish.without_note(text), task["target"]["text"], task["docket"])
             row.update(
                 {
                     "chars": len(text),
