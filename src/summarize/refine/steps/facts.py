@@ -18,9 +18,9 @@ from src.summarize.refine import evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, editable, guarded, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, editable, guarded, polish, written_sentence_problems
 
-VERSION = "facts@4"
+VERSION = "facts@5"
 MAX_FIX = 3
 VERDICTS = ["same", "stronger_or_broader", "different", "not_in_ruling"]
 
@@ -29,7 +29,7 @@ DETECT = (
     "is 'same' only if a sentence of the ruling states it with the same content and the same strength.\n"
     "For every sentence of the summary below, in order:\n"
     "- a_sentence: its id;\n"
-    "- b_label: the label of the passage of the ruling that states it best;\n"
+    "- b_label: the label of the passage of the ruling that states it best ('none' if no passage does);\n"
     "- c_opening: the first eight to twelve words of the ruling sentence that states it, exactly;\n"
     "- d_verdict: 'same' if that ruling sentence says what the summary sentence says; 'stronger_or_broader' if the "
     "summary states it more firmly, more generally, or adds a detail; 'different' if the ruling says something "
@@ -41,8 +41,8 @@ REPAIR = (
     "Task: this sentence of a {lang} summary is not backed by the ruling ({verdict}):\n"
     "<sentence>\n{sentence}\n</sentence>\n"
     "{hint}"
-    "Rewrite it in {lang} so that it states only what the ruling says, keeping its place in the summary, or delete "
-    "it if the summary does not need it.\n"
+    "Rewrite it in {lang} so that it states only what the ruling says, keeping its place and its point in the "
+    "summary{delete}.\n"
     "- a_label, b_opening: the passage and the first eight to twelve words of the ruling sentence the new sentence "
     "rests on, exactly;\n- c_action: 'rewrite' or 'delete';\n"
     "- d_sentence: the new sentence in {lang} (empty for delete). One sentence, plain prose, the established Swiss "
@@ -77,7 +77,9 @@ def _summary_block(draft: Draft, ids: list[str]) -> str:
 def judge_sentences(draft: Draft, ids: list[str], ctx: Context, version: str) -> dict[str, dict]:
     """Sentence id -> {"label", "quote", "verdict", "verified"} from one call."""
     labels = list(ctx.parts)
-    item = obj({"a_sentence": enum(ids), "b_label": enum(labels), "c_opening": STRING, "d_verdict": enum(VERDICTS)})
+    item = obj(
+        {"a_sentence": enum(ids), "b_label": enum([*labels, "none"]), "c_opening": STRING, "d_verdict": enum(VERDICTS)}
+    )
     messages = evidence.messages(ctx.parts, f"{DETECT}\n\n<summary>\n{_summary_block(draft, ids)}\n</summary>")
     answer = ctx.model.ask(messages, "sentence_support", obj({"items": array(item)}), version, max_tokens=1200)
     out: dict[str, dict] = {}
@@ -109,19 +111,31 @@ class Facts(Step):
             {"a_label": enum(list(ctx.parts)), "b_opening": STRING, "c_action": enum(["rewrite", "delete"]),
              "d_sentence": STRING}
         )  # fmt: skip
+        # A sentence that says too much or the wrong thing is corrected, never dropped: dropping loses its point.
+        # Only a sentence the ruling does not state at all may be deleted, and only after a second call agrees.
+        may_delete = verdict["verdict"] == "not_in_ruling"
+        actions = ["rewrite", "delete"] if may_delete else ["rewrite"]
+        shape["properties"]["c_action"] = enum(actions)
+        delete = ", or delete it if the ruling does not state it at all" if may_delete else ""
         task = REPAIR.format(lang=lang, verdict=verdict["verdict"].replace("_", " "), sentence=sentence,
-                             hint=verdict.get("hint", ""))  # fmt: skip
+                             hint=verdict.get("hint", ""), delete=delete)  # fmt: skip
         messages = evidence.messages(ctx.parts, task)
         answer = ctx.model.ask(messages, "sentence_repair", shape, f"{VERSION}/repair", max_tokens=400)
         detail = {"verdict": verdict["verdict"], "detected_evidence_found": verdict["verified"],
                   "detected_by": verdict.get("by", "model")}  # fmt: skip
         if answer["c_action"] == "delete":
+
+            def confirm(before: Draft, after: Draft) -> list[str]:
+                sid = next((s.id for s in before.sentences if s.text == sentence), None)
+                second = judge_sentences(before, [sid], ctx, f"{VERSION}/confirm").get(sid, {}).get("verdict")
+                return [] if second == "not_in_ruling" else [f"second reading: {second or 'unchecked'}, not deleted"]
+
             return Candidate(
-                f"not backed by the ruling ({verdict['verdict']}): deleted", sentence, verdict["label"],
-                verdict["quote"], Patch("delete", "s0"), detail=detail,
+                "not in the ruling: deleted", sentence, verdict["label"], verdict["quote"], Patch("delete", "s0"),
+                guarded(confirm), detail,
             )  # fmt: skip
         found = evidence.find(answer["b_opening"], ctx.parts, answer["a_label"])
-        new = " ".join(answer["d_sentence"].split())
+        new = polish(answer["d_sentence"], ctx)
 
         def check(before: Draft, after: Draft) -> list[str]:
             problems = [] if found else ["the ruling sentence the repair rests on was not found"]

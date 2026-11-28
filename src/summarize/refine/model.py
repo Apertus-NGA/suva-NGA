@@ -83,8 +83,16 @@ def _valid(value, schema: dict, path: str = "$") -> None:
             raise ModelFailed(f"{path}: not a list")
         if "maxItems" in schema:
             del value[schema["maxItems"] :]  # extra items are ignored, never an error
+        kept = []
         for n, item in enumerate(value):
-            _valid(item, schema["items"], f"{path}[{n}]")
+            try:
+                _valid(item, schema["items"], f"{path}[{n}]")
+                kept.append(item)
+            except ModelFailed:
+                if schema["items"].get("type") != "object":
+                    raise
+                # one bad item of a list (an id that is not offered) is dropped; the rest of the answer stands
+        value[:] = kept
     elif kind == "string":
         if not isinstance(value, str):
             raise ModelFailed(f"{path}: not a string")

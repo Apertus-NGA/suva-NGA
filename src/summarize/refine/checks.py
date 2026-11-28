@@ -88,6 +88,20 @@ def run(text: str, language: str, source: str) -> dict[str, list[str]]:
     return found
 
 
+# Any sentence telling how the appeal ended, in either word order (wider than finish._STATES_OUTCOME).
+_RESTATES_OUTCOME = re.compile(
+    r"(?:Beschwerde|Rechtsmittel)\b[^.]{0,120}?\b(?:abgewiesen|gutgeheissen|abzuweisen|gutzuheissen|nicht eingetreten)"
+    r"|(?:weist|wies|heisst|hiess)\b[^.]{0,60}?\bBeschwerde\b"
+    r"|\brecours\b[^.]{0,120}?\b(?:rejet[ée]|admis|rejette|irrecevable)"
+    r"|\b(?:rejette|rejeta|admet|admit)\b[^.]{0,60}?\brecours\b",
+    re.IGNORECASE,
+)
+
+
+def restates_outcome(text: str) -> bool:
+    return bool(_RESTATES_OUTCOME.search(text))
+
+
 def failing(found: dict[str, list[str]]) -> dict[str, int]:
     return {name: len(items) for name, items in found.items() if items}
 

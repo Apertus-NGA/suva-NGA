@@ -14,7 +14,7 @@ from src.summarize.refine import evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Skip, Step
-from src.summarize.refine.steps.common import NAME, guarded, with_reference, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, guarded, polish, with_reference, written_sentence_problems
 
 VERSION = "holding@1"
 NONE = "none"
@@ -83,15 +83,20 @@ class Holding(Step):
     def _repair(self, draft, rule, answer, what, count, ctx, needs_rule: bool) -> Candidate:
         lang = NAME[ctx.language]
         ids = draft.ids(editable_only=False)
-        # Never after the outcome sentence or the closing note: a holding belongs before the result.
-        anchors = [s.id for s in draft.sentences if not s.locked] or ids
+        # Never after the last sentence, the outcome sentence or the closing note: a holding belongs before the result
+        # (the outcome checks read the last sentence).
+        body = [s.id for s in draft.sentences if not s.locked]
+        anchors = body[:-1] if len(body) > 1 and not any(s.locked for s in draft.sentences) else body
+        anchors = anchors or ids
         shape = obj({"a_after": enum(anchors), "b_text": STRING})
         prompt = REPAIR.format(count=count, lang=lang, what=what, label=rule["label"],
                                rule=evidence.as_data(rule["quote"]), answer_label=answer["label"],
                                answer=evidence.as_data(answer["quote"]), summary=draft.numbered())  # fmt: skip
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         reply = ctx.model.ask(messages, "holding_repair", shape, f"{VERSION}/repair", max_tokens=500)
-        text = with_reference(reply["b_text"], rule["label"] if needs_rule else answer["label"], ctx.language)
+        text = with_reference(
+            polish(reply["b_text"], ctx), rule["label"] if needs_rule else answer["label"], ctx.language
+        )
         after_sentence = draft.get(reply["a_after"]).text
 
         def check(before: Draft, after: Draft) -> list[str]:

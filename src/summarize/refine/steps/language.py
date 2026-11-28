@@ -15,9 +15,11 @@ from src.summarize.refine import checks
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, editable
+from src.summarize.refine.steps.common import NAME, editable, guarded, polish
+from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
+from src.summarize.refine.steps.facts import judge_sentences
 
-VERSION = "language@1"
+VERSION = "language@2"
 MAX_FIX = 3
 PROBLEMS = ["grammar", "calque_or_foreign_word", "wrong_word", "not_impersonal_register", "placeholder", "clumsy"]
 
@@ -36,10 +38,14 @@ DETECT = (
 REPAIR = (
     "Rewrite this sentence of a {lang} case-law digest. Problem: {problem} ('{span}').\n<sentence>\n{sentence}\n"
     "</sentence>\nKeep the same content, the same articles, consideration references and numbers, character for "
-    "character. Write natural Swiss legal {lang}{spelling}. Replace a placeholder by the party's role (for example "
-    "{roles}).\n- a_sentence: the rewritten sentence."
+    "character. Write natural Swiss legal {lang}{spelling}. Replace an anonymisation placeholder (A.________) by "
+    "the role this person has in this sentence ({roles}); never give a person someone else's role.\n"
+    "- a_sentence: the rewritten sentence."
 )
-_ROLES = {"de": "die versicherte Person, der Beschwerdeführer", "fr": "l'assuré, la recourante"}
+_ROLES = {
+    "de": "der Versicherte, die Beschwerdeführerin, der Gutachter, die Ärztin, der Arbeitgeber",
+    "fr": "l'assuré, la recourante, l'expert, le médecin, l'employeur",
+}
 _SPELLING = {"de": " (Swiss spelling: ss, never ß)", "fr": ""}
 _PLACEHOLDER = re.compile(checks.PLACEHOLDER)
 
@@ -79,7 +85,7 @@ class Language(Step):
                                spelling=_SPELLING[ctx.language], roles=_ROLES[ctx.language])  # fmt: skip
         messages = [{"role": "system", "content": SYSTEM.format(lang=lang)}, {"role": "user", "content": prompt}]
         new = ctx.model.ask(messages, "rewrite", obj({"a_sentence": STRING}), f"{VERSION}/repair", 400)["a_sentence"]
-        new = " ".join(new.split())
+        new = polish(new, ctx)
 
         def check(before: Draft, after: Draft) -> list[str]:
             problems = checks.same_identifiers(new, sentence)
@@ -93,6 +99,13 @@ class Language(Step):
                 problems.append("placeholder left")
             if ctx.language == "de" and "ß" in new:
                 problems.append("ß")
-            return problems
+            if checks.restates_outcome(new) and not checks.restates_outcome(sentence):
+                problems.append("states the outcome")
+            if problems or problem != "placeholder":
+                return problems
+            # a placeholder became a role: the facts check must agree it is that person's role in the ruling
+            target = next((s.id for s in after.sentences if s.text == new), None)
+            verdict = judge_sentences(after, [target], ctx, f"{FACTS_VERSION}/recheck").get(target, {}).get("verdict")
+            return [] if verdict == "same" else [f"re-check of the role: {verdict or 'unchecked'}"]
 
-        return Candidate(f"{problem}: {span}", sentence, patch=Patch("replace", "s0", new), verify=check)
+        return Candidate(f"{problem}: {span}", sentence, patch=Patch("replace", "s0", new), verify=guarded(check))

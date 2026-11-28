@@ -29,6 +29,14 @@ def with_reference(sentence: str, label: str | None, language: str) -> str:
     return sentence[:-1] + ref + "." if sentence.endswith(".") else sentence + ref + "."
 
 
+def polish(text: str, ctx) -> str:
+    """Code's normalisation of any model-written text before it is checked: the fiche language's abbreviations,
+    citation forms and spelling, no invented consideration reference (the same as the form step)."""
+    from src.summarize.refine.steps.form import fixed
+
+    return fixed(" ".join(text.split()), ctx.language, ctx.source)
+
+
 def written_sentence_problems(new: str, old: str, ctx, max_words: int = MAX_SENTENCE_WORDS) -> list[str]:
     """What code demands of any sentence a model wrote: the fiche's language, a sane length, no new identifier,
     no Markdown, no placeholder left."""
@@ -42,6 +50,10 @@ def written_sentence_problems(new: str, old: str, ctx, max_words: int = MAX_SENT
         problems.append(f"{len(new.split())} words, over {max_words}")
     if re.search(r"\*\*|^\s*[-•#]", new):
         problems.append("markup")
+    if checks.restates_outcome(new) and not checks.restates_outcome(old):
+        problems.append("states the outcome, which the code-written last sentence already states")
+    if re.search(r"_{3,}", new):
+        problems.append("anonymisation placeholder")
     problems += checks.new_identifiers(new, old, ctx.source)
     return problems
 

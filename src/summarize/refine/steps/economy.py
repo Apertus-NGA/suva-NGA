@@ -10,25 +10,15 @@ identifier.
 
 from __future__ import annotations
 
-import re
-
 from src.summarize.refine import checks
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME
+from src.summarize.refine.steps.common import NAME, polish
 
 VERSION = "economy@1"
 MAX_FIX = 2
 
-# Wider than finish._STATES_OUTCOME: any sentence telling how the appeal ended, in either word order.
-_OUTCOME = re.compile(
-    r"(?:Beschwerde|Rechtsmittel)\b[^.]{0,120}?\b(?:abgewiesen|gutgeheissen|abzuweisen|gutzuheissen|nicht eingetreten)"
-    r"|(?:weist|wies|heisst|hiess)\b[^.]{0,60}?\bBeschwerde\b"
-    r"|\brecours\b[^.]{0,120}?\b(?:rejet[ée]|admis|rejette|irrecevable)"
-    r"|\b(?:rejette|rejeta|admet|admit)\b[^.]{0,60}?\brecours\b",
-    re.IGNORECASE,
-)
 PROMPT = (
     "In this {lang} case-law summary the outcome of the appeal is already stated by the last sentence:\n"
     '"{outcome}"\nThis other sentence states the outcome too:\n<sentence>\n{sentence}\n</sentence>\n'
@@ -38,8 +28,7 @@ PROMPT = (
 )
 
 
-def restates(text: str) -> bool:
-    return bool(_OUTCOME.search(text))
+restates = checks.restates_outcome
 
 
 class Economy(Step):
@@ -59,7 +48,7 @@ class Economy(Step):
         answer = ctx.model.ask([{"role": "user", "content": prompt}], "economy", shape, VERSION, max_tokens=300)
         if answer["a_action"] == "delete":
             return Candidate("outcome stated twice: sentence deleted", sentence, patch=Patch("delete", "s0"))
-        new = " ".join(answer["b_sentence"].split())
+        new = polish(answer["b_sentence"], ctx)
 
         def check(before: Draft, after: Draft) -> list[str]:
             problems = ["still states the outcome"] if restates(new) else []

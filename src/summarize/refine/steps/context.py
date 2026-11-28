@@ -13,7 +13,7 @@ from src.summarize.refine import checks, evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, guarded, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, guarded, polish, written_sentence_problems
 from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
 from src.summarize.refine.steps.facts import judge_sentences
 
@@ -41,7 +41,7 @@ class ContextStep(Step):
         shape = obj({"a_label": enum(list(ctx.parts)), "b_opening": STRING, "c_text": STRING})
         answer = ctx.model.ask(evidence.messages(ctx.parts, task), "context", shape, VERSION, max_tokens=400)
         found = evidence.find(answer["b_opening"], ctx.parts, answer["a_label"], 2)
-        text = " ".join(answer["c_text"].split())
+        text = polish(answer["c_text"], ctx)
         first = draft.sentences[0].text
 
         def check(before: Draft, after: Draft) -> list[str]:
