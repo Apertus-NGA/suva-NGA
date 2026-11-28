@@ -14,7 +14,6 @@ help: ## list the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
 SUMMARY_LIMIT ?=
-WRITE ?= 0
 RUN_FLAGS = $(if $(SUMMARY_LIMIT),--summary-limit $(SUMMARY_LIMIT),) $(if $(filter 0,$(SERVE)),--no-serve,)
 
 # --- Suva Scout (the product the judges run): its own tables (db/migrations) on the local database scout-db.
