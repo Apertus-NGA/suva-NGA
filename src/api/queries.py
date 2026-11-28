@@ -15,6 +15,7 @@ from typing import Any
 import psycopg
 
 MAX_PAGE_SIZE = 200
+PRESET = "suva_house"  # the summary every in-scope ruling must have (D-067); the API reads only this preset
 
 # The ruling's status: the first matching row wins. An expert verdict survives a later model run (its staleness stays
 # visible in `expert.stale`). `ai_relevant` / `ai_not_relevant` only from a ranking step (in_scope / out_of_scope of a
@@ -88,7 +89,7 @@ WITH scope AS MATERIALIZED (
   LEFT JOIN triage.assessment u3 ON u3.assessment_id = u2.upstream_assessment_id
 ), summaries AS MATERIALIZED (
   SELECT c.ruling_id, coalesce(bool_or(c.expert_verdict = 'validated'), false) AS summary_validated
-  FROM summ.v_summary_current c GROUP BY c.ruling_id
+  FROM summ.v_summary_current c WHERE c.preset_code = 'suva_house' GROUP BY c.ruling_id
 ), latest_ingest AS (
   -- the latest usable INCREMENTAL ingest: the first ingest loads the base, so is_new needs a later one
   SELECT run_id FROM ops.pipeline_run
@@ -349,6 +350,7 @@ def relevance(conn: psycopg.Connection, row: dict[str, Any]) -> dict[str, Any]:
                         "decisive": x["is_decisive"],
                         "field": x["evidence_field"],
                         "examined_value": x["examined_value"],
+                        "text_id": str(x["input_text_id"]) if x["input_text_id"] else None,
                         "matched_text": x["matched_text"],
                         "char_start": x["char_start"],
                         "char_end": x["char_end"],
@@ -440,12 +442,13 @@ def ruling_text(conn: psycopg.Connection, text_id: Any) -> dict[str, Any] | None
 
 
 def summaries(conn: psycopg.Connection, ruling_id: Any) -> dict[str, Any]:
-    """The current summary per language (preset suva_house), its sentences and their status. Empty until layer 3."""
+    """The current summary per language (preset suva_house, the mandatory one), its sentences and their status.
+    Empty until layer 3."""
     out: dict[str, Any] = {"de": None, "fr": None}
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM summ.v_summary_current WHERE ruling_id = %s ORDER BY is_mandatory DESC, preset_code LIMIT 1",
-            [ruling_id],
+            "SELECT * FROM summ.v_summary_current WHERE ruling_id = %s AND preset_code = %s",
+            [ruling_id, PRESET],
         )
         cur_row = cur.fetchone()
         if cur_row is None:

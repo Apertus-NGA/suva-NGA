@@ -104,6 +104,7 @@ def test_the_ruling_page_shows_the_text_and_why(api):
     assert [h["step"] for h in rel["trace"]] == ["layer2_judge", "layer1_filter"]
     fired = [x for x in rel["layer1"] if x["char_start"] is not None]
     assert fired and all(detail["text"][x["char_start"] : x["char_end"]] == x["matched_text"] for x in fired)
+    assert {x["text_id"] for x in rel["layer1"]} == {detail["text_id"]}  # each rule names the text its offsets index
     (p_yes,) = stored(
         url,
         "SELECT j.p_yes FROM triage.llm_judgement j JOIN triage.assessment a USING (assessment_id)"
@@ -192,3 +193,22 @@ def test_the_api_launches_layer1_then_layer2_as_subprocesses(api):
     after = stored(url, "SELECT count(*) FROM ops.pipeline_run WHERE kind IN ('layer1', 'layer2')")[0][0]
     assert after == before + 2
     assert {r["run_id"] for r in status["recent"]} >= {s["run_id"] for s in job["steps"]}
+
+
+def test_a_read_session_is_one_read_only_repeatable_read_snapshot(api):
+    from src.api.db import connect
+    from src.api.settings import Settings
+
+    _, url = api
+    conn = connect(Settings(), read_only=True)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT current_setting('transaction_isolation') AS iso,"
+                " current_setting('transaction_read_only') AS ro,"
+                " current_user AS who, current_setting('app.actor') AS actor"
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    assert row == {"iso": "repeatable read", "ro": "on", "who": "suva_api", "actor": "expert"}

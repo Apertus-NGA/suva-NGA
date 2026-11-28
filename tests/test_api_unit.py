@@ -30,7 +30,14 @@ def test_settings_defaults_keep_runs_off_and_no_threshold():
 
 @pytest.mark.parametrize(
     "env",
-    [{"API_AI_RELEVANT_MIN_SCORE": "101"}, {"API_AI_RELEVANT_MIN_SCORE": "high"}, {"MODE": "fast"}, {"API_ACTOR": " "}],
+    [
+        {"API_AI_RELEVANT_MIN_SCORE": "101"},
+        {"API_AI_RELEVANT_MIN_SCORE": "high"},
+        {"MODE": "fast"},
+        {"API_ACTOR": " "},
+        {"API_MAX_DB_SESSIONS": "21"},
+        {"API_MAX_DB_SESSIONS": "0"},
+    ],
 )
 def test_settings_refuse_unusable_values(env):
     with pytest.raises(SettingsError):
@@ -195,3 +202,17 @@ def test_the_run_endpoint_maps_the_launcher_errors(monkeypatch):
     assert c.post("/api/runs", json={"mode": "live"}).status_code == 422
     r = c.post("/api/runs", json={"mode": "replay"})
     assert r.status_code == 202 and r.json()["enabled"] is True
+
+
+def test_a_request_waits_for_a_free_session_then_answers_503(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    s = settings(max_db_sessions=1, db_wait_s=0.05)
+    app = create_app(s, Launcher(s, FakeRunner({}), Path("/tmp/api-test-logs")))
+    assert app.state.db_slots.acquire(timeout=1)  # another request holds the only session
+    try:
+        r = TestClient(app).get("/api/learning")
+        assert r.status_code == 503 and r.headers["retry-after"] == "1" and "busy" in r.json()["detail"]
+    finally:
+        app.state.db_slots.release()
+    r = TestClient(app).get("/api/learning")  # the session is free again: now the missing DATABASE_URL answers
+    assert r.status_code == 503 and "DATABASE_URL" in r.json()["detail"]

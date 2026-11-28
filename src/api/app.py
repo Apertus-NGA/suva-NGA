@@ -8,6 +8,7 @@ Every error answers JSON {"detail": "..."}: 404 unknown id, 409 refused by the c
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
@@ -21,7 +22,7 @@ from pydantic import BaseModel, Field
 from src.db.pg import DatabaseNotConfigured
 
 from . import queries, writes
-from .db import ApiDatabaseError, connect
+from .db import ApiBusy, ApiDatabaseError, connect
 from .runs import Launcher, RunAlreadyRunning, RunsDisabled
 from .settings import Settings
 
@@ -40,11 +41,16 @@ def create_app(settings: Settings | None = None, launcher: Launcher | None = Non
         "Reads the data layer of src/db/sql; writes only through its functions (docs/API.md).",
     )
     app.state.settings = settings
+    app.state.db_slots = threading.BoundedSemaphore(settings.max_db_sessions)
     app.state.launcher = launcher or Launcher(settings)
 
     @app.exception_handler(DatabaseNotConfigured)
     async def _not_configured(_: Request, exc: DatabaseNotConfigured) -> JSONResponse:
         return JSONResponse(status_code=503, content={"detail": f"the database is not configured: {exc}"})
+
+    @app.exception_handler(ApiBusy)
+    async def _busy(_: Request, exc: ApiBusy) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": str(exc)}, headers={"Retry-After": "1"})
 
     @app.exception_handler(ApiDatabaseError)
     async def _unusable(_: Request, exc: ApiDatabaseError) -> JSONResponse:
@@ -66,11 +72,18 @@ def create_app(settings: Settings | None = None, launcher: Launcher | None = Non
 def _session(request: Request, *, read_only: bool) -> Iterator[psycopg.Connection]:
     """A database session for one request, opened in the endpoint body so that FastAPI has validated the input first
     (a bad parameter answers 422 without touching the database)."""
-    conn = connect(request.app.state.settings, read_only=read_only)
+    settings: Settings = request.app.state.settings
+    slots: threading.BoundedSemaphore = request.app.state.db_slots
+    if not slots.acquire(timeout=settings.db_wait_s):
+        raise ApiBusy(f"all {settings.max_db_sessions} database sessions are busy: retry in a moment")
     try:
-        yield conn
+        conn = connect(settings, read_only=read_only)
+        try:
+            yield conn
+        finally:
+            conn.close()
     finally:
-        conn.close()
+        slots.release()
 
 
 class RelevanceDecision(BaseModel):
@@ -154,15 +167,11 @@ def _routes(app: FastAPI) -> None:
         launcher: Launcher = request.app.state.launcher
         out = {"ok": True, "mode": settings.mode.upper(), "runs_enabled": settings.runs_enabled, "database": "ok"}
         try:
-            conn = connect(settings, read_only=True)
-        except (DatabaseNotConfigured, ApiDatabaseError) as exc:
-            return JSONResponse(status_code=503, content={**out, "ok": False, "database": str(exc)})
-        try:
-            with conn.cursor() as cur:
+            with _session(request, read_only=True) as conn, conn.cursor() as cur:
                 cur.execute("SELECT run_id::text, kind, started_at FROM ops.pipeline_run WHERE status = 'running'")
                 out["running_runs"] = cur.fetchall()
-        finally:
-            conn.close()
+        except (DatabaseNotConfigured, ApiDatabaseError, ApiBusy) as exc:
+            return JSONResponse(status_code=503, content={**out, "ok": False, "database": str(exc)})
         out["job"] = launcher.status()["current"]
         return out
 

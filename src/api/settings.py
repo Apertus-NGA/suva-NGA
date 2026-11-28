@@ -29,6 +29,8 @@ class Settings:
     layer2_store: str | None = None  # --store of a launched layer-2 run (replay cache); default: the client's own
     layer2_populations: tuple[str, ...] = ()  # --population of a launched layer-2 run; default: every kept ruling
     ai_relevant_min_score: float | None = None  # D-021 stays open: unset = only the ranking step makes ai_relevant
+    max_db_sessions: int = 12  # under the suva_api login's 20 connections (90_roles.sql)
+    db_wait_s: float = 5.0  # how long a request waits for a free session before 503
     host: str = "127.0.0.1"
     port: int = 8000
 
@@ -53,8 +55,15 @@ class Settings:
         try:
             timeout = int(env.get("API_STATEMENT_TIMEOUT_MS", "15000"))
             port = int(env.get("API_PORT", "8000"))
+            sessions = int(env.get("API_MAX_DB_SESSIONS", "12"))
         except ValueError as exc:
-            raise SettingsError(f"API_STATEMENT_TIMEOUT_MS and API_PORT must be integers: {exc}") from exc
+            raise SettingsError(
+                f"API_STATEMENT_TIMEOUT_MS, API_PORT, API_MAX_DB_SESSIONS must be integers: {exc}"
+            ) from exc
+        if not 1 <= sessions <= 20:
+            raise SettingsError(
+                f"API_MAX_DB_SESSIONS must be from 1 to 20 (the suva_api login allows 20), not {sessions}"
+            )
         populations = tuple(p.strip() for p in env.get("API_LAYER2_POPULATIONS", "").split(",") if p.strip())
         return cls(
             actor=actor,
@@ -66,6 +75,7 @@ class Settings:
             layer2_store=env.get("API_LAYER2_STORE", "").strip() or None,
             layer2_populations=populations,
             ai_relevant_min_score=threshold,
+            max_db_sessions=sessions,
             host=env.get("API_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=port,
         )

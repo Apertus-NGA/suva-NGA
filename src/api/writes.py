@@ -10,6 +10,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from . import queries
+from .queries import PRESET
 
 
 class NotFound(LookupError):
@@ -22,7 +23,6 @@ class Conflict(RuntimeError):
 
 RELEVANCE_ACTIONS = {"mark_relevant": "relevant", "mark_not_relevant": "not_relevant", "reopen": "withdrawn"}
 DOCKET = re.compile(r"^[0-9]{1,2}[A-Z]_[0-9]+/[0-9]{4}$")  # the DDL's own docket format (corpus.ruling)
-PRESET = "suva_house"
 
 
 def _db_message(exc: psycopg.Error) -> str:
@@ -172,9 +172,8 @@ def split_sentences(body: str) -> list[tuple[int, str]]:
 def _current_summary(conn: psycopg.Connection, ruling_id: str) -> dict[str, Any]:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM summ.v_summary_current WHERE ruling_id = %s::uuid ORDER BY is_mandatory DESC, preset_code"
-            " LIMIT 1",
-            [ruling_id],
+            "SELECT * FROM summ.v_summary_current WHERE ruling_id = %s::uuid AND preset_code = %s",
+            [ruling_id, PRESET],
         )
         r = cur.fetchone()
     if r is None:
