@@ -80,6 +80,10 @@ def test_every_ruling_is_listed_with_its_status_area_and_score(api):
     assert len(judged) == 3 and all(r["score_raw"] is not None and r["mode"] == "LIVE" for r in judged)
     assert all(r["explanation_de"] for r in page["items"])
     assert by["5A_1/2026"]["reason_code"].startswith("L1_DROP")
+    # added fields: the matter head the area is read from, the Neuheiten star, a linked Suva summary
+    assert all(set(r) >= {"rubric", "star", "has_reference"} for r in page["items"])
+    assert by["8C_493/2025"]["rubric"] and "unfallversicherung" in by["8C_493/2025"]["rubric"].lower()
+    assert not any(r["has_reference"] for r in page["items"])  # no gold.suva_summary loaded in this fixture
 
 
 def test_filters_and_facets_agree(api):
@@ -102,6 +106,8 @@ def test_the_ruling_page_shows_the_text_and_why(api):
     assert detail["text"].startswith("Die Suva ist Beschwerdegegnerin.")
     assert rel["state"] == "scored" and rel["label"] == "potentially" and rel["step"] == "layer2_judge"
     assert [h["step"] for h in rel["trace"]] == ["layer2_judge", "layer1_filter"]
+    # the 8B judge writes no signal reason: no rule, no reading, but Apertus read the ruling
+    assert rel["rules"] == [] and rel["readings"] == [] and rel["read_by_apertus"] is True
     fired = [x for x in rel["layer1"] if x["char_start"] is not None]
     assert fired and all(detail["text"][x["char_start"] : x["char_end"]] == x["matched_text"] for x in fired)
     assert {x["text_id"] for x in rel["layer1"]} == {detail["text_id"]}  # each rule names the text its offsets index
@@ -173,6 +179,7 @@ def test_scoring_describes_the_default_profile(api):
     assert s["profile"]["code"] == "default"
     assert {x["step"] for x in s["steps"]} >= {"layer1_filter", "layer2_judge"}
     assert len(s["layer1_rules"]) >= 9 and s["rules"] == []
+    assert s["intercept"] is None  # the default profile's judge is the 8B, not the fitted scorer (D-099)
 
 
 def test_the_api_launches_layer1_then_layer2_as_subprocesses(api):

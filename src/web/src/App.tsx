@@ -5,18 +5,19 @@ import { RulingPage } from "./components/RulingPage";
 import { RulingsTable } from "./components/RulingsTable";
 import { ScoringPage } from "./components/ScoringPage";
 import { SearchInput } from "./components/SearchInput";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { UpdateControl } from "./components/UpdateControl";
 import { cn } from "./components/ui/cn";
 import { DEFAULT_FILTERS, fromUrlParams, PAGE_SIZE, toUrlParams, type Filters } from "./lib/filters";
 import { useI18n } from "./lib/i18n";
-import { decideRelevance } from "./lib/api";
+import { decideRelevance, SIX_BACKEND } from "./lib/api";
 import { useFacets, useRulings } from "./lib/useRulings";
 import { useUpdates } from "./lib/useUpdates";
 import { DEFAULT_VIEW, openingFilters, viewOf, type ViewKey } from "./lib/views";
 
 /** `ruling` is set while one ruling is open; the list it was opened from stays in view and filters. */
-type Place = { view: ViewKey; filters: Filters; ruling: number | null };
+type Place = { view: ViewKey; filters: Filters; ruling: string | null };
 
 /** Where the user is, read from the address bar: the view (?view=) and its filters. */
 function placeFromUrl(): Place {
@@ -24,11 +25,14 @@ function placeFromUrl(): Place {
   const view = viewOf(params.get("view"));
   const filters = fromUrlParams(params);
   // A link without a sort opens the view in its own order (the inbox by score).
-  const ruling = Number(params.get("ruling"));
+  // The ruling id is kept as text: Scout's numbers and src/api's UUIDs alike.
+  const ruling = params.get("ruling")?.trim() ?? "";
+  // Scout's ids are positive integers (anything else opens no ruling, as before); src/api's are UUIDs.
+  const valid = SIX_BACKEND ? ruling !== "" : Number.isInteger(Number(ruling)) && Number(ruling) > 0;
   return {
     view: view.key,
     filters: params.has("sort") ? filters : openingFilters(view, filters),
-    ruling: Number.isInteger(ruling) && ruling > 0 ? ruling : null,
+    ruling: valid ? (SIX_BACKEND ? ruling : String(Number(ruling))) : null,
   };
 }
 
@@ -93,6 +97,7 @@ export default function App() {
     <div className="flex h-full min-w-[960px]">
       <Sidebar current={view.key} onSelect={open} placeholderScores={facets?.stub_scores ?? false} />
       <main className="flex min-w-0 flex-1 flex-col bg-canvas">
+        <ErrorBoundary resetKey={`${place.view}|${place.ruling ?? ""}`}>
         {place.ruling !== null ? (
           <RulingPage
             rulingId={place.ruling}
@@ -110,7 +115,7 @@ export default function App() {
             </div>
             <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
               {isList && <SearchInput value={filters.q} onChange={onSearch} placeholder={t("app.search")} clearLabel={t("app.clearSearch")} />}
-              {view.key === "inbox" && (
+              {view.key === "inbox" && !SIX_BACKEND && (
                 <UpdateControl
                   status={updates.status}
                   failedToStart={updates.error}
@@ -151,7 +156,11 @@ export default function App() {
                     order={filters.order}
                     onSort={(sort, order) => patch({ sort, order })}
                     // After a decision the list, the counts and the learning numbers are read again.
-                    onDecide={(ruling, action) => decideRelevance(ruling.id, action).finally(() => setAttempt((n) => n + 1))}
+                    onDecide={(ruling, action) =>
+                      decideRelevance(ruling.id, action)
+                        .catch(() => undefined) // a refused decision leaves the row as it was; the reload shows it
+                        .finally(() => setAttempt((n) => n + 1))
+                    }
                     onOpen={(ruling) => setPlace((p) => ({ ...p, ruling: ruling.id }))}
                   />
                 </div>
@@ -172,6 +181,7 @@ export default function App() {
         )}
           </>
         )}
+        </ErrorBoundary>
       </main>
     </div>
   );
