@@ -126,6 +126,8 @@ def refine_all(name_set: str, name: str, steps: list[str] | None = None) -> None
                                   ruling["lexicon"][lang], ruling["language"], chosen)  # fmt: skip
             rows.append({"docket": ruling["docket"], "language": lang, "record": record, **result.as_dict(),
                          "model_log": per.log})  # fmt: skip
+            steps = " ".join(f"{o.step}:{o.status}" for o in result.trace)
+            print(f"{ruling['docket']} {lang}: {result.calls} calls, {steps}", flush=True)
         return rows
 
     with ThreadPoolExecutor(WORKERS) as pool:

@@ -137,11 +137,23 @@ def test_an_id_outside_the_enum_is_rejected_and_the_budget_is_enforced():
     model = Model(lambda *a: json.dumps({"a_sentence": "s9"}), budget=2)
     with pytest.raises(ModelFailed, match="allowed ids"):
         model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
-    model = Model(lambda *a: "not json", budget=1)
-    with pytest.raises(ModelFailed, match="JSON"):
+    model = Model(lambda *a: "not json", budget=3)
+    with pytest.raises(ModelFailed, match="not valid JSON"):  # one targeted retry, then the item fails
         model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
+    assert model.calls == 2
     with pytest.raises(ModelFailed, match="budget"):
         model.ask([{"role": "user", "content": "x"}], "t", shape, "v")
+
+
+def test_an_invalid_answer_gets_one_retry_that_names_the_error():
+    answers = iter([json.dumps({"a_sentence": "s9"}), json.dumps({"a_sentence": "s2"})])
+    sent = []
+    model = Model(lambda messages, *a: sent.append(messages) or next(answers), budget=5)
+    assert model.ask([{"role": "user", "content": "x"}], "t", obj({"a_sentence": enum(["s1", "s2"])}), "v") == {
+        "a_sentence": "s2"
+    }
+    assert "'s9' is not one of the allowed ids" in sent[1][-1]["content"]
+    assert 'one of ["s1", "s2"]' in sent[0][-1]["content"]  # the format is stated in the prompt
 
 
 # --- the acceptance rule ----------------------------------------------------------------------------------------
@@ -188,32 +200,35 @@ def test_form_puts_references_in_the_fiche_language_and_drops_invented_ones():
 
 def test_facts_rewrites_an_unsupported_sentence_from_a_verified_quote():
     detect = {"items": [
-        {"a_sentence": "s1", "b_label": "facts", "c_quote": "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter", "d_verdict": "same"},
-        {"a_sentence": "s2", "b_label": "facts", "c_quote": "verneinte mit Einspracheentscheid vom 12. Oktober 2023", "d_verdict": "same"},
-        {"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "setzt einen natürlichen Kausalzusammenhang voraus", "d_verdict": "different"},
+        {"a_sentence": "s1", "b_label": "facts", "c_opening": "A. Der Versicherte stürzte am 7. Mai", "d_verdict": "same"},
+        {"a_sentence": "s2", "b_label": "facts", "c_opening": "Die Suva verneinte mit Einspracheentscheid vom", "d_verdict": "same"},
+        {"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "Die Leistungspflicht des Unfallversicherers setzt einen", "d_verdict": "different"},
     ]}  # fmt: skip
-    repair = {"a_quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus",
-              "b_action": "rewrite",
-              "c_sentence": "Das Bundesgericht hielt fest, dass die Leistungspflicht einen natürlichen Kausalzusammenhang voraussetzt."}  # fmt: skip
-    recheck = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "setzt einen natürlichen Kausalzusammenhang voraus", "d_verdict": "same"}]}  # fmt: skip
-    fake = Fake(**{"facts@1__detect": [detect], "facts@1__repair": [repair], "facts@1__recheck": [recheck]})
+    repair = {"a_label": "E.2.1", "b_opening": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen",
+              "c_action": "rewrite",
+              "d_sentence": "Das Bundesgericht hielt fest, dass die Leistungspflicht einen natürlichen Kausalzusammenhang voraussetzt."}  # fmt: skip
+    recheck = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "Die Leistungspflicht des Unfallversicherers setzt einen", "d_verdict": "same"}]}  # fmt: skip
+    fake = Fake(**{"facts@2__detect": [detect], "facts@2__repair": [repair], "facts@2__recheck": [recheck]})
     result = refine(DRAFT, ctx_for(fake), [Facts()])
     assert "ohne Kausalzusammenhang" not in result.text
     assert "natürlichen Kausalzusammenhang voraussetzt" in result.text
     assert result.trace[0].status == "corrected"
     # the ruling went to the model as labelled data
     assert "[E.2.1]" in fake.sent[0][1][1]["content"] and "<ruling>" in fake.sent[0][1][1]["content"]
+    # the evidence stored is the ruling's own sentence, copied by code from the pointer
+    finding = result.trace[0].findings[0]
+    assert finding["quote"].startswith("Die Leistungspflicht des Unfallversicherers") and finding["evidence"] == "E.2.1"
 
 
 def test_facts_refuses_a_repair_whose_quote_is_invented():
-    detect = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_quote": "x" * 30, "d_verdict": "not_in_ruling"}]}
-    repair = {"a_quote": "Das Bundesgericht hat dies nie gesagt, aber es klingt gut",
-              "b_action": "rewrite", "c_sentence": "Die Leistungspflicht besteht nach Art. 99 UVG immer."}  # fmt: skip
-    fake = Fake(**{"facts@1__detect": [detect], "facts@1__repair": [repair]})
+    detect = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "x " * 10, "d_verdict": "not_in_ruling"}]}
+    repair = {"a_label": "E.3", "b_opening": "Das Bundesgericht hat dies nie gesagt, aber",
+              "c_action": "rewrite", "d_sentence": "Die Leistungspflicht besteht nach Art. 99 UVG immer."}  # fmt: skip
+    fake = Fake(**{"facts@2__detect": [detect], "facts@2__repair": [repair]})
     result = refine(DRAFT, ctx_for(fake), [Facts()])
     assert result.text == Draft.from_text(DRAFT).render()
     why = result.trace[0].findings[0]["why_not"]
-    assert "quote is not in the ruling" in why and "99" in why
+    assert "was not found" in why and "99" in why
 
 
 RECORD = {
@@ -274,14 +289,19 @@ def test_record_moves_a_quote_to_its_real_passage_and_drops_an_invented_one():
     parts = evidence.passages(RULING)
     candidates, _ = evidence.rule_candidates(parts, merits=True)
     answer = {
-        "a_question": {"a_label": "E.2", "b_quote": "Streitig ist, ob die Suva ihre Leistungen zu Recht"},
-        "b_rules": [{"a_label": "E.3", "b_quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen"},
-                    {"a_label": "E.2.1", "b_quote": "Ein erfundener Grundsatz, den es nicht gibt"}],
-        "c_answer": {"a_label": "E.3", "b_quote": "Die Vorinstanz hat die Leistungseinstellung daher zu Recht"},
+        "a_question": {"a_label": "E.2", "b_opening": "Streitig ist, ob die Suva ihre Leistungen", "c_sentences": "1"},
+        "b_rules": [{"a_label": "E.3", "b_opening": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen", "c_sentences": "2"},
+                    {"a_label": "E.2.1", "b_opening": "Ein erfundener Grundsatz, den es nicht gibt", "c_sentences": "1"}],
+        "c_answer": {"a_label": "E.3", "b_opening": "Die Vorinstanz hat die Leistungseinstellung daher", "c_sentences": "1"},
         "d_facts": [],
     }  # fmt: skip
     record = validate(answer, parts, candidates)
-    assert record["rules"] == [{"label": "E.2.1", "quote": answer["b_rules"][0]["b_quote"], "moved_from": "E.3"}]
+    assert record["rules"] == [{
+        "label": "E.2.1",
+        "quote": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus "
+                 "(Art. 6 Abs. 1 UVG). Fällt dieser dahin, endet die Leistungspflicht.",
+        "moved_from": "E.3",
+    }]  # fmt: skip
     assert record["status"] == "ok"
     assert any("rule 1" in issue for issue in record["issues"])
 
@@ -317,3 +337,41 @@ def test_real_rulings_split_into_considerations_and_an_operative_part(corpus, do
     label = [lab for lab in parts if lab.startswith("E.")][2]
     sentence = next(s for s in parts[label].split(". ") if len(s) > 60)
     assert evidence.locate("  ".join(sentence.split()), parts) == label
+
+
+# --- the pipeline stores the draft, the refined text and the trace ---------------------------------------------------
+
+
+@pytest.mark.db
+def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn)
+    rule = {"a_label": "E.4.1", "b_opening": "Nach Art. 6 Abs. 1 UVG werden", "c_sentences": "1"}
+    answer = {"a_label": "E.4.2", "b_opening": "Hier fehlt der natürliche Kausalzusammenhang", "c_sentences": "1"}
+    fake = Fake(**{
+        "record@3__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer, "d_facts": []}],
+        "facts@2__detect": [{"items": []}, {"items": []}],
+        "holding@1__detect": [{"a_rule_sentence": "s1", "b_answer_sentence": "s1"}] * 2,
+        "terms@1": [{"items": []}, {"items": []}],
+        "language@1__detect": [{"items": []}, {"items": []}],
+    })  # fmt: skip
+    result = pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine=True, refine_transport=fake)
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    stored = dict(db_conn.execute("SELECT language, body FROM summaries WHERE ruling_id = %s", (rid,)).fetchall())
+    for language in ("de", "fr"):
+        refine = params["refine"][language]
+        assert [s["step"] for s in refine["steps"]] == [
+            "form", "facts", "holding", "terms", "language", "length", "form_final",
+        ]  # fmt: skip
+        assert refine["draft"] and stored[language] == result["languages"][language]["text"]
+    assert params["refine"]["record"]["status"] == "ok"
+    assert sum(v.startswith("record@3") for v, _ in fake.sent) == 1  # one shared reading for both languages
+
+
+def test_an_injected_ask_without_a_refine_transport_is_refused():
+    from src.summarize import pipeline
+
+    with pytest.raises(ValueError, match="refine_transport"):
+        pipeline.summarise_ruling(None, 1, ask=lambda m: "", refine=True)

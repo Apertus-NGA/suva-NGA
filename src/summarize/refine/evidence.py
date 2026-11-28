@@ -178,3 +178,47 @@ def labelled(parts: dict[str, str], labels: list[str] | None = None) -> str:
     chosen = labels if labels is not None else list(parts)
     body = "\n\n".join(f"[{label}]\n{as_data(parts[label])}" for label in chosen if label in parts)
     return f"<ruling>\n{body}\n</ruling>"
+
+
+# --- pointers: the model names where a sentence starts, code copies the sentence ---------------------------------
+
+MIN_OPENING_WORDS = 4
+_HEADING = re.compile(r"^\s*(?:\d{1,2}(?:\.\d{1,2})*\.?|[A-Z]\.)\s+")  # "2.1 " or "A. " before the sentence
+
+
+def sentences(passage: str) -> list[str]:
+    """The sentences of a passage, split by the same rules as a summary (abbreviations, ordinals, initials)."""
+    from src.summarize.refine.draft import split_sentences
+
+    return split_sentences(" ".join(passage.split()))
+
+
+def expand(opening: str, passage: str, count: int = 1) -> str | None:
+    """The `count` sentences of the passage that begin at (or contain) `opening`, copied from the ruling."""
+    words = opening.split()
+    if len(words) < MIN_OPENING_WORDS:
+        return None
+    needle = normalise(" ".join(words))
+    found = sentences(passage)
+    for index, sentence in enumerate(found):
+        if needle in normalise(sentence):
+            return _HEADING.sub("", " ".join(found[index : index + max(1, count)]))
+    # an opening that runs across a sentence boundary: look in the flattened passage
+    flat = " ".join(passage.split())
+    if needle in normalise(flat):
+        for index in range(len(found)):
+            if needle in normalise(" ".join(found[index : index + 2])):
+                return _HEADING.sub("", " ".join(found[index : index + max(2, count)]))
+    return None
+
+
+def find(opening: str, parts: dict[str, str], named: str | None = None, count: int = 1) -> tuple[str, str] | None:
+    """(label, sentences) of the passage that holds the opening: the named passage first, then any other."""
+    if not isinstance(opening, str):
+        return None
+    order = ([named] if named in parts else []) + [label for label in parts if label != named]
+    for label in order:
+        text = expand(opening, parts[label], count)
+        if text:
+            return label, text
+    return None

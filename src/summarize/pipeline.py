@@ -16,6 +16,9 @@ For one ruling the pipeline does, in order:
    the checker may ask the model for up to two repairs (src/summarize/summarize.py);
 4. finish each fiche by code (src/summarize/finish.py): outcome once, abbreviations in the fiche's language,
    only considerations that exist, Suva's closing note;
+4b. when refine is on (`--refine`, or SUMMARY_REFINE=1), improve each finished fiche step by step
+   (src/summarize/refine): Apertus proposes one narrow fix at a time, code verifies it; the draft and the trace
+   of every step are stored with the run;
 5. store both fiches as a new version in `summaries`, with a `model_runs` row naming the model, the prompt
    version, the route and what the checker found.
 
@@ -44,6 +47,7 @@ from src.summarize.prompts import VERSION as PROMPT_VERSION  # noqa: E402
 from src.summarize.prompts import category_of  # noqa: E402
 
 PIPELINE_VERSION = "1"
+REFINE_BUDGET = 60  # Apertus calls of refine per ruling: the shared record and both languages
 LANGUAGES = ("de", "fr")
 MODES = ("live", "replay")
 CATEGORIES = ("uv", "iv", "kv", "bv", "vvg", "other")
@@ -65,7 +69,7 @@ def route(area: str | None) -> str:
 
 def load_ruling(conn, ruling_id: int) -> dict:
     row = conn.execute(
-        f"""SELECT r.id, r.docket, r.decision_date::text, r.division, {_AREA}, r.starred, t.text
+        f"""SELECT r.id, r.docket, r.decision_date::text, r.division, {_AREA}, r.starred, t.text, r.language
             FROM rulings r LEFT JOIN ruling_texts t ON t.ruling_id = r.id AND t.is_canonical AND t.bad_reason IS NULL
             WHERE r.id = %s""",
         (ruling_id,),
@@ -74,7 +78,7 @@ def load_ruling(conn, ruling_id: int) -> dict:
         raise NotSummarisable(f"no ruling with id {ruling_id}")
     if not row[6]:
         raise NotSummarisable(f"{row[1]} has no usable text")
-    keys = ("id", "docket", "decision_date", "division", "area", "starred", "text")
+    keys = ("id", "docket", "decision_date", "division", "area", "starred", "text", "language")
     ruling = dict(zip(keys, row, strict=True))
     ruling["text"] = summarize.clean(ruling["text"])
     return ruling
@@ -93,17 +97,68 @@ def examples(conn, language: str, target_docket: str) -> list[dict]:
     return [{"docket": d, "body": summarize.clean(rows[d])} for d in wanted if d in rows]
 
 
-def write(ruling: dict, shots: dict[str, list[dict]], ask: Ask | None = None) -> dict:
-    """Both fiches of one ruling, finished. Nothing is stored here."""
+def lexicon(conn, language: str, target_docket: str) -> str:
+    """Suva's summaries in one language, the target's own excluded: where refine's terms step finds a term
+    attested (src/summarize/refine/steps/terms.py). Read at run time, never copied (D-031)."""
+    rows = conn.execute(
+        """SELECT g.body FROM gold_summaries g JOIN rulings r ON r.id = g.ruling_id
+           WHERE g.is_current AND g.language = %s AND r.docket <> %s""",
+        (language, target_docket),
+    ).fetchall()
+    return "\n".join(body for (body,) in rows)
+
+
+def write(
+    ruling: dict,
+    shots: dict[str, list[dict]],
+    ask: Ask | None = None,
+    refine_model=None,
+    lexicons: dict[str, str] | None = None,
+) -> dict:
+    """Both fiches of one ruling, finished, and refined when `refine_model` is given. Nothing is stored here."""
     category = route(ruling["area"])
     result = {"docket": ruling["docket"], "category": category, "languages": {}}
+    record = None
     for language in LANGUAGES:
         raw, _ = summarize.write_fiche(language, ruling, shots[language], category, ask)
         text, notes = finish.finish(language, raw, ruling["text"], ruling["starred"])
+        fiche = {"text": text, "raw": raw, "finish_notes": notes}
+        if refine_model is not None:
+            from src.summarize import refine
+
+            if record is None:  # one shared reading of the ruling for both languages
+                record = refine.read_record(ruling["text"], refine.evidence.passages(ruling["text"]), refine_model)
+            refined = refine.refine_fiche(
+                text, language, ruling["text"], category, refine_model, record,
+                (lexicons or {}).get(language, ""), ruling.get("language"),
+            )  # fmt: skip
+            fiche["text"], fiche["refine"] = refined.text, refined.as_dict()
         # The checker looks for the outcome at the end of the fiche, so it reads the text without the closing note.
-        problems = summarize.review(language, finish.without_note(text), ruling["text"], ruling["docket"])
-        result["languages"][language] = {"text": text, "raw": raw, "problems": problems, "finish_notes": notes}
+        fiche["problems"] = summarize.review(
+            language, finish.without_note(fiche["text"]), ruling["text"], ruling["docket"]
+        )
+        result["languages"][language] = fiche
+    if record is not None:
+        result["record"] = record
     return result
+
+
+def _refine_params(result: dict) -> dict | None:
+    """What the run stores about refine: per language the draft, the step statuses and the checks."""
+    out = {}
+    for language, fiche in result["languages"].items():
+        trace = fiche.get("refine")
+        if trace:
+            out[language] = {
+                "version": trace["version"], "draft": trace["draft"], "calls": trace["calls"],
+                "checks_before": trace["checks_before"], "checks_after": trace["checks_after"],
+                "steps": trace["trace"],
+            }  # fmt: skip
+    if not out:
+        return None
+    record = result.get("record") or {}
+    out["record"] = {k: record.get(k) for k in ("version", "status", "question", "rules", "answer", "issues")}
+    return out
 
 
 def store(conn, ruling_id: int, result: dict, model: str) -> dict:
@@ -119,6 +174,8 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
             "problems": {lang: p["problems"] for lang, p in result["languages"].items()},
             "finish_notes": {lang: p["finish_notes"] for lang, p in result["languages"].items()},
         }
+        if refined := _refine_params(result):
+            params["refine"] = refined
         out["run_id"] = conn.execute(
             "INSERT INTO model_runs (kind, models, params) VALUES ('summary', %s, %s) RETURNING id",
             (Jsonb([{"name": model, "role": "writes the German and French fiche"}]), Jsonb(params)),
@@ -145,20 +202,41 @@ def store(conn, ruling_id: int, result: dict, model: str) -> dict:
     return out
 
 
+def refine_on() -> bool:
+    return os.environ.get("SUMMARY_REFINE", "0").strip() in ("1", "true", "yes", "on")
+
+
 def summarise_ruling(
-    conn, ruling_id: int, ask: Ask | None = None, model: str | None = None, mode: str = "live"
+    conn,
+    ruling_id: int,
+    ask: Ask | None = None,
+    model: str | None = None,
+    mode: str = "live",
+    refine: bool | None = None,
+    refine_transport=None,
 ) -> dict:
     """Route, write, finish and store the fiches of one ruling. Returns the result with what was stored.
 
     Without `ask`, the model is reached through `summarize.chat` in `mode`: "live" calls the gateway,
     "replay" answers from the client's replay cache and raises `ReplayMiss` (nothing stored) on a miss.
     With `ask`, the caller's function answers and `mode` is recorded as "injected".
+    `refine` (default: SUMMARY_REFINE) refines each fiche; its calls go through `refine_transport`, or through the
+    shared client in `mode` when none is given and no `ask` was injected.
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
+    refining = refine if refine is not None else refine_on()
+    if refining and refine_transport is None and ask is not None:
+        raise ValueError("an injected ask needs an injected refine_transport")
     ruling = load_ruling(conn, ruling_id)
     shots = {language: examples(conn, language, ruling["docket"]) for language in LANGUAGES}
-    result = write(ruling, shots, ask or functools.partial(_chat, mode=mode))
+    refine_model = None
+    if refining:
+        from src.summarize.refine import Model, gateway
+
+        refine_model = Model(refine_transport or gateway(mode), budget=REFINE_BUDGET)
+    lexicons = {language: lexicon(conn, language, ruling["docket"]) for language in LANGUAGES} if refine_model else None
+    result = write(ruling, shots, ask or functools.partial(_chat, mode=mode), refine_model, lexicons)
     result["mode"] = "injected" if ask is not None else mode
     result["stored"] = store(conn, ruling_id, result, model or os.environ.get("LLM_NAME") or "unknown")
     return result
@@ -203,6 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--mode", choices=MODES, default="live", help="live: call Apertus; replay: answer from the replay cache only"
     )
+    parser.add_argument("--refine", action="store_true", help="refine each fiche step by step (or SUMMARY_REFINE=1)")
     args = parser.parse_args(argv)
 
     from suva_data import db
@@ -228,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             continue
         try:
-            result = summarise_ruling(conn, ruling_id, mode=args.mode)
+            result = summarise_ruling(conn, ruling_id, mode=args.mode, refine=args.refine or refine_on())
         except (NotSummarisable, ReplayMiss, SystemExit) as e:
             failed += 1
             print(f"  failed: {e}", flush=True)

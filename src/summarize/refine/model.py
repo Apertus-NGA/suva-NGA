@@ -1,9 +1,12 @@
 """The one seam to Apertus for refine: a strict-JSON call through the project's client (AGENTS.md G2, G3).
 
 A step builds its messages and a JSON schema whose ids are enums of this draft and this ruling, and calls
-`Model.ask`. The answer is parsed and checked against the schema's enums here, so a step only ever sees ids that
-exist. Strict mode returns keys in alphabetical order (docs/LESSONS.md K3), so fields are prefixed `a_`, `b_`, …
-in the order the model should think: evidence first, verdict last.
+`Model.ask`. The schema is written into the prompt and the call uses JSON mode (`json_object`): measured on
+28 Nov, strict `json_schema` decoding of a long ruling looped on whitespace until max_tokens (1,800 tokens of
+blanks, 161 s), while JSON mode answered the same request. The answer is parsed and checked against the schema
+here (types, required keys, enums), so a step only ever sees ids that exist; an invalid answer gets one targeted
+retry that names the error. Fields are prefixed `a_`, `b_`, … in the order the model should think: evidence
+first, verdict last.
 
 Tests pass `FakeModel`-style objects with the same `ask` signature; nothing here calls the gateway in a test.
 """
@@ -45,6 +48,24 @@ def array(items: dict, max_items: int | None = None) -> dict:
 STRING = {"type": "string"}
 
 
+def _template(schema: dict) -> str:
+    kind = schema.get("type")
+    if kind == "object":
+        inner = ", ".join(f'"{k}": {_template(v)}' for k, v in schema["properties"].items())
+        return "{" + inner + "}"
+    if kind == "array":
+        cap = f", at most {schema['maxItems']}" if "maxItems" in schema else ""
+        return f"[{_template(schema['items'])}, ...{cap}]"
+    if "enum" in schema:
+        return "one of " + json.dumps(schema["enum"], ensure_ascii=False)
+    return '"..."'
+
+
+def describe(schema: dict) -> str:
+    """The answer format as the prompt states it."""
+    return "Answer with one JSON object, on as few lines as possible, in exactly this format:\n" + _template(schema)
+
+
 def _valid(value, schema: dict, path: str = "$") -> None:
     """Enforce what the step relies on, whatever the endpoint did with `strict`: types, required keys, enums."""
     kind = schema.get("type")
@@ -60,6 +81,8 @@ def _valid(value, schema: dict, path: str = "$") -> None:
     elif kind == "array":
         if not isinstance(value, list):
             raise ModelFailed(f"{path}: not a list")
+        if "maxItems" in schema:
+            del value[schema["maxItems"] :]  # extra items are ignored, never an error
         for n, item in enumerate(value):
             _valid(item, schema["items"], f"{path}[{n}]")
     elif kind == "string":
@@ -83,27 +106,39 @@ class Model:
     def remaining(self) -> int:
         return self.budget - self.calls
 
-    def ask(self, messages: list[dict], name: str, schema: dict, prompt_version: str, max_tokens: int = 800) -> dict:
+    def _call(self, messages: list[dict], prompt_version: str, max_tokens: int) -> str:
         with self._lock:
             if self.calls >= self.budget:
                 raise ModelFailed("call budget exhausted")
             self.calls += 1
-        response_format = {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}
         try:
-            raw = self.transport(messages, response_format, prompt_version, max_tokens)
+            return self.transport(messages, {"type": "json_object"}, prompt_version, max_tokens)
         except ModelFailed:
             raise
         except Exception as exc:  # noqa: BLE001  a failed call is never a "no": the item goes to needs_review
             self.log.append({"prompt": prompt_version, "error": f"{type(exc).__name__}: {exc}"[:300]})
             raise ModelFailed(f"call failed: {type(exc).__name__}: {exc}") from exc
-        try:
-            answer = json.loads(raw)
-        except ValueError as exc:
-            self.log.append({"prompt": prompt_version, "error": "invalid JSON"})
-            raise ModelFailed("the answer is not valid JSON") from exc
-        _valid(answer, schema)
-        self.log.append({"prompt": prompt_version, "ok": True})
-        return answer
+
+    def ask(self, messages: list[dict], name: str, schema: dict, prompt_version: str, max_tokens: int = 800) -> dict:
+        """The validated answer. One retry when the answer is not valid JSON or breaks the schema."""
+        sent = [*messages[:-1], {**messages[-1], "content": messages[-1]["content"] + "\n\n" + describe(schema)}]
+        for attempt in range(2):
+            raw = self._call(sent, prompt_version if attempt == 0 else f"{prompt_version}/retry", max_tokens)
+            try:
+                answer = json.loads(raw)
+                _valid(answer, schema)
+            except (ValueError, ModelFailed) as exc:
+                reason = "not valid JSON" if not isinstance(exc, ModelFailed) else str(exc)
+                self.log.append({"prompt": prompt_version, "error": reason, "attempt": attempt})
+                if attempt == 1:
+                    raise ModelFailed(f"invalid answer: {reason}") from exc
+                sent = [*sent, {"role": "assistant", "content": raw[:4000]},
+                        {"role": "user", "content": f"That answer is invalid ({reason}). Answer again with one "
+                         "JSON object that follows the format exactly, and nothing else."}]  # fmt: skip
+                continue
+            self.log.append({"prompt": prompt_version, "ok": True, "attempt": attempt})
+            return answer
+        raise AssertionError("unreachable")
 
 
 def gateway(mode: str = "live", client=None) -> Transport:
