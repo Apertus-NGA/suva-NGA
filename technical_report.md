@@ -1,4 +1,4 @@
-# Technical report — `Suva Scout`, `<to fill: team name>`
+# Technical report — Suva Scout, NGA - Need GPUs for Apertus
 
 A deeper write-up than the README: what you built, how it works, and what the
 numbers say.
@@ -103,7 +103,7 @@ Models not used at runtime: `openai/gpt-oss-120b` and DeepSeek V4 Pro (open weig
 
 ## 6. Reproducibility
 
-- **Commit:** `<to fill: submission commit>`.
+- **Commit:** the commit tagged `submission` on `main`.
 - **Hardware:** a laptop with Docker; no GPU. The model runs behind `LLM_BASE_URL`.
 - **Determinism:** every Apertus call at temperature 0; the committed answers under `replay/llm/` reproduce the run without the gateway.
 
