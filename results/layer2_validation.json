@@ -1,8 +1,8 @@
 {
   "what": "layer2_judge certification against the D-074 benchmark (docs/LAYER2.md)",
   "version": "V1.0.0",
-  "git_commit": "14caaba355f2062172bc53f6018774d59d160f79",
-  "git_dirty": true,
+  "git_commit": "15cb5f81a059356759ec38fe15e8900e92d7ab15",
+  "git_dirty": false,
   "expected": {
     "canonical": "layer2-golden-1",
     "step": "layer2_judge",
@@ -36,7 +36,7 @@
   },
   "texts_with_control_tags": 0,
   "scores": {
-    "run_id": "4f2e3283-c4d7-4cbf-ab17-9fa2cee19797",
+    "run_id": "5162a5b1-3111-4a4d-8af4-a7a9a428f2f5",
     "judged_in_run": 634,
     "compared": 634,
     "equal": 634,

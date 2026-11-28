@@ -87,8 +87,10 @@ layer3: ## layer 3: summaries of the top 10 by layer-2 score + pending requests 
 layer3-requests: ## layer 3: the pending summary requests of the UI only (ops.user_request, MODE=replay|live)
 	$(PY) -m src.layer3 requests --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
 
-layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune)
-	$(PY) -m src.layer2 validate --data-root data/derived/finetune/suva-ft-v3 --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json --bench data/derived/finetune/bench_v3/8b_all $(ARGS)
+# Like layer1-validate, the report goes to data/runs/validation/ (git-ignored; writable in the cluster) unless OUT
+# names a file: OUT=results/layer2_validation.json regenerates the committed report, from a clean checkout.
+layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune) [OUT=path]
+	$(PY) -m src.layer2 validate --data-root data/derived/finetune/suva-ft-v3 --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json --bench data/derived/finetune/bench_v3/8b_all --out $(or $(OUT),data/runs/validation/layer2_validation.json) $(ARGS)
 
 layer1-golden: ## certified layer-1 and ingest decisions, in memory, no DB: make layer1-golden PARQUET=path [WRITE=1]
 	$(PY) -m src.layer1 golden --parquet $(PARQUET) $(if $(WRITE),--write)
@@ -96,7 +98,8 @@ layer1-golden: ## certified layer-1 and ingest decisions, in memory, no DB: make
 layer1-verify: ## a layer-1 run's files equal its DB rows, read-only: make layer1-verify RUN=<run_id>
 	$(PY) -m src.layer1 verify --run $(RUN)
 
-# The report goes to tmp/ (git-ignored) unless OUT names a file: a default run never overwrites a committed results file.
+# The report goes to data/runs/validation/ (git-ignored on a workstation, writable in the cluster) unless OUT names a
+# file: a default run never overwrites a committed results file.
 L1V_BASE = $(or $(BASE),layer1_reference)
 L1V_PROFILE = $(or $(PROFILE),default)
 layer1-validate: ## run two profiles, recall, compare; fails on a removal: make layer1-validate BASE=... PROFILE=... [OUT=path]
@@ -134,10 +137,18 @@ load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's la
 	@$(MAKE) --no-print-directory ingest-gold
 	@$(MAKE) --no-print-directory ingest-closure
 
+# The layer-2 branch replays the certified set (the labelled quarters) from the benchmark's answers in a run of kind
+# eval, then certifies it: the gate never depends on an earlier layer-2 run, and like layer1-validate's runs (kind
+# eval too) it never changes the delivered label. It needs a succeeded layer-1 run (make run S2, or make layer1).
+L2_CERT_STORE ?= data/derived/layer2/replay_store
 validate: ## the cluster's release gate: layer 1 on two profiles, recall, compare; layer-2 certification when its data is there
-	@$(MAKE) --no-print-directory layer1-validate
+	@$(MAKE) --no-print-directory layer1-validate OUT=
 	@if [ -d data/derived/finetune/suva-ft-v3 ]; then \
-		$(MAKE) --no-print-directory layer2-validate; \
+		if [ ! -d $(L2_CERT_STORE)/cache ]; then \
+			echo "validate: no benchmark replay store in $(L2_CERT_STORE) (docs/LAYER2.md §3: hard links to data/derived/finetune/bench_v3/llm_store/cache)" >&2; exit 1; \
+		fi; \
+		$(MAKE) --no-print-directory layer2 MODE=replay PROFILE= ARGS="--kind eval --store $(L2_CERT_STORE) --population 2025Q4_decision --population 2026Q1_decision" \
+		&& $(MAKE) --no-print-directory layer2-validate OUT= ARGS=; \
 	else \
 		echo "SKIPPED layer2-validate: no data/derived/finetune/suva-ft-v3 (Suva-derived, D-031; mount it with SUVA_DERIVED_SOURCE)"; \
 	fi

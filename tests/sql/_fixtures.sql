@@ -58,6 +58,12 @@ FROM unnest(ARRAY['segment', 'parse', 'layer1_filter', 'layer2_judge', 'justific
 
 INSERT INTO ops.component_version_model (component_version_id, model_role, model_id)
 SELECT pg_temp.cv('layer2_judge'), 'judge', model_id FROM ops.model WHERE gateway_id = 'fixture-model-large';
+-- the question prompt, declared by the layer-2 version: a judgement's prompt is the one its call sent (DDL-1). Bound
+-- before a profile pins the version: a pinned version's models and prompts are sealed
+INSERT INTO ops.prompt_version (role, v_major, v_minor, v_patch, template_sha256, system_template, user_template, contains_suva_material, status, bump_kind, changelog)
+VALUES ('layer2_judge.question', 1, 0, 0, repeat('8', 64), 'fixture system', 'fixture user', false, 'active', 'initial', 'fixture');
+INSERT INTO ops.component_version_prompt (component_version_id, prompt_role, prompt_version_id)
+SELECT pg_temp.cv('layer2_judge'), 'question', prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question';
 
 INSERT INTO ops.rule (step, rule_code, v_major, v_minor, v_patch, kind, definition, definition_schema_id, reason_code, status, bump_kind, changelog)
 SELECT r.step::ops.pipeline_step, r.code, 1, 0, 0, r.kind::ops.rule_kind, '{}',
@@ -146,11 +152,6 @@ INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_co
   ('00000000-0000-4000-8000-000000000103', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'fired', 'rubric:gegenstand', 'Assicurazione contro gli infortuni', 'Assicurazione contro gli infortuni');
 
 -- layer 2 ---------------------------------------------------------------------
--- the question prompt, declared by the layer-2 version: a judgement's prompt is the one its call sent (DDL-1)
-INSERT INTO ops.prompt_version (role, v_major, v_minor, v_patch, template_sha256, system_template, user_template, contains_suva_material, status, bump_kind, changelog)
-VALUES ('layer2_judge.question', 1, 0, 0, repeat('8', 64), 'fixture system', 'fixture user', false, 'active', 'initial', 'fixture');
-INSERT INTO ops.component_version_prompt (component_version_id, prompt_role, prompt_version_id)
-SELECT pg_temp.cv('layer2_judge'), 'question', prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question';
 
 INSERT INTO ops.llm_call (llm_call_id, run_id, span_id, ruling_id, step, purpose, language, prompt_version_id, cache_key, cache_hit, mode, endpoint,
                           model_role, requested_model, served_model, finish_reason, parsed_ok, attempt, input_tokens, output_tokens, latency_ms, started_at)

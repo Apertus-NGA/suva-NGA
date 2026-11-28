@@ -1,6 +1,6 @@
 # LAYER2: the Apertus relevance judge on the database
 
-> **Status: V1 in `main` since 28 Nov 2026 (PR #45, branch `triage/layer2-db`); DDL-1, DDL-2 and the replay policy from branch `triage/layer2-ddl` (§4, §7).** Decisions D-075 to D-080 in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Traceability, state and gaps: `docs/LAYER2_TRACEABILITY.md`. Owner: the layer-2 owner (`docs/agents/finetune.md`).
+> **Status: V1 in `main` since 28 Nov 2026 (PR #45, branch `triage/layer2-db`); DDL-1, DDL-2 and the replay policy from branch `triage/layer2-ddl` (§4, §7).** Decisions D-075 to D-080 and D-085, all DECIDED, in `docs/DECISIONS.md`. Design and reasons: `docs/LAYER2_IMPLEMENTATION_PLANNING.md`. Audit: `tmp/audits/audit-layer2-classifier-2026-11-28.md` (git-ignored). Traceability, state and gaps: `docs/LAYER2_TRACEABILITY.md`. Owner: the layer-2 owner (`docs/agents/finetune.md`).
 
 ## 1. What it does
 
@@ -36,7 +36,8 @@ Version V1.0.0 is the chain of the D-074 benchmark, byte for byte, judged by Ape
 | Live on Q2 only | `make layer2 MODE=live ARGS="--all --population 2026Q2_union"` |
 | Replay from the benchmark's answers | `make layer2 ARGS="--store data/derived/layer2/replay_store --population 2025Q4_decision --population 2026Q1_decision"` (the store holds hard links to `data/derived/finetune/bench_v3/llm_store/cache`, so the benchmark's call log is never written) |
 | Aggregates of a run for `results/` | `python -m src.layer2 report --run RUN_ID --out results/<file>.json` (no Suva label) |
-| Certify a version | `make layer2-validate` (add `ARGS=--write-expected` only for a version that has no expected file) |
+| Certify a version | `make layer2-validate` (add `ARGS=--write-expected` only for a version that has no expected file). Its report goes to `data/runs/validation/layer2_validation.json` unless `OUT=path` names a file; `OUT=results/layer2_validation.json` regenerates the committed report, from a clean checkout so its `git_dirty` is false |
+| Release gate (`make validate`) | layer 1's validation (two runs of kind `eval`), then, when `data/derived/finetune/suva-ft-v3` is mounted, a replay of the labelled quarters from `data/derived/layer2/replay_store` in a run of kind `eval` and the certification of that run: neither changes the label. It needs a succeeded layer-1 run (`make run` S2 or `make layer1`) |
 | In `make run` | stage S3, after layer 1; skipped with its reason without `DATABASE_URL`, without a succeeded layer-1 run, or in replay without a cache |
 | A run ended `partial` | rerun the same command: answered calls come from the cache, failed ones are called again |
 | A run ended `failed` | read `ops.pipeline_run.error_summary`, the run's warnings in `ops.log_event`, `data/runs/<run_id>/manifest.json`; fix; rerun |
@@ -51,7 +52,7 @@ Database, in one transaction: `ops.span` (`layer2.run`, `layer2.judge` per rulin
 
 Outcomes: `ok` (judged); `failed` with `L2_FAILED_CALL` (gateway, served model rejected) or `L2_FAIL_NO_YESNO_TOKEN` (the answer is kept as evidence); `skipped` with `ING_TEXT_MISSING` (no text, no call). All stay `potentially`, never a negative.
 
-**Replay without a recorded answer** (D-085, refines D-078): in replay mode, a candidate whose request was never answered in the store is **not judged in that run**. No row is written, so an earlier judgement keeps its place in the label. It is listed in `replay_misses.jsonl`, counted in the metric `replay_misses`, reported by the event `layer2.replay.missing`, and the run is `partial`; it is never a failure. A replay where no candidate has an answer fails with a clear message. So `make run` in replay with a partial local cache is green: on 28 Nov, 383 of 935 judged, 552 without a recorded answer, `partial`.
+**Replay without a recorded answer** (D-085, refines D-078): in replay mode, a candidate whose request was never answered in the store is **not judged in that run**. No row is written, so an earlier judgement keeps its place in the label while the ruling's current layer-1 decision is the one it was judged on (an identical layer-1 rerun, as `make run` S2 does, keeps it; a changed decision makes it stale: DDL-2, matched on the decision). It is listed in `replay_misses.jsonl`, counted in the metric `replay_misses`, reported by the event `layer2.replay.missing`, and the run is `partial`; it is never a failure. A replay where no candidate has an answer fails with a clear message. So `make run` in replay with a partial local cache is green: on 28 Nov, 383 of 935 judged, 552 without a recorded answer, `partial`.
 
 Why a ruling scored as it did: `SELECT * FROM triage.v_scope_trace WHERE ruling_id = …` (run, versions, served model, call, latency, tokens, cache flag, P(Ja), input text and its HF snapshot).
 

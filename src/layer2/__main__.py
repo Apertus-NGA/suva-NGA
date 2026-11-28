@@ -3,6 +3,7 @@
 python -m src.layer2 run [--mode replay|live] [--population CODE] [--limit N | --all] [--store PATH]
                          [--kind layer2|eval] [--repetition N] [--layer1-run RUN_ID] [--workers N]
 python -m src.layer2 validate --data-root DIR --manifest FILE [--bench DIR] [--run RUN_ID] [--write-expected]
+                              [--out PATH]   (default results/layer2_validation.json, the committed report)
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     val.add_argument("--bench", type=Path, help="benchmark folder with fold_*/rep000.jsonl (score parity)")
     val.add_argument("--run")
     val.add_argument("--write-expected", action="store_true")
+    val.add_argument("--out", type=Path, help="aggregate report (default results/layer2_validation.json)")
     rep = sub.add_parser("report", help="aggregates of one run (no Suva label) for results/")
     rep.add_argument("--run", required=True)
     rep.add_argument("--out", type=Path)
@@ -85,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
                     run_id=args.run,
                     profile=args.profile,
                     write_expected=args.write_expected,
+                    **({"results_path": args.out} if args.out else {}),
                 )
         except (Layer2RunFailed, ValidationFailed, ConfigError, LookupError) as exc:
             print(f"layer2 {args.cmd}: {exc}", file=sys.stderr)

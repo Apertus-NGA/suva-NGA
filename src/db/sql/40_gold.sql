@@ -42,15 +42,27 @@ CREATE TABLE IF NOT EXISTS gold.expert_review (
   comment               text,
   supersedes_review_id  uuid REFERENCES gold.expert_review(review_id) ON DELETE RESTRICT,
   span_id               uuid REFERENCES ops.span(span_id) ON DELETE RESTRICT,
-  created_at            timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT expert_review_target_chk CHECK (
-    (target_kind = 'scope' AND assessment_id IS NOT NULL AND summary_version_id IS NULL
-       AND verdict IN ('correct', 'incorrect') AND reviewed_label IN ('in_scope', 'out_of_scope'))
-    OR (target_kind = 'summary_version' AND summary_version_id IS NOT NULL AND assessment_id IS NULL
-       AND verdict IN ('validated', 'rejected') AND reviewed_label IS NULL))
+  created_at            timestamptz NOT NULL DEFAULT now()
+  -- expert_review_target_chk: below, not inline (D-093)
 );
+-- CREATE TABLE IF NOT EXISTS keeps the inline constraints of an existing database, so the target check is set here, in
+-- one statement on every deploy (it rescans the reviews; every row valid under the earlier definition is valid under
+-- this one). A scope review: the relative verdict correct | incorrect on in_scope or out_of_scope (V1), or the expert's
+-- own label relevant | not_relevant on any label, potentially included, or withdrawn. A summary review: validated |
+-- rejected, or withdrawn. withdrawn always supersedes the review it takes back (gold.check_expert_review: same target,
+-- never a withdrawal). reviewed_label = the label the expert saw, required on a scope review, absent on a summary review.
+ALTER TABLE gold.expert_review
+  DROP CONSTRAINT IF EXISTS expert_review_target_chk,
+  ADD CONSTRAINT expert_review_target_chk CHECK (
+    (target_kind = 'scope' AND assessment_id IS NOT NULL AND summary_version_id IS NULL AND reviewed_label IS NOT NULL
+       AND (   (verdict IN ('correct', 'incorrect') AND reviewed_label IN ('in_scope', 'out_of_scope'))
+            OR (verdict IN ('relevant', 'not_relevant') AND reviewed_label IN ('in_scope', 'out_of_scope', 'potentially'))
+            OR (verdict = 'withdrawn' AND supersedes_review_id IS NOT NULL)))
+    OR (target_kind = 'summary_version' AND summary_version_id IS NOT NULL AND assessment_id IS NULL AND reviewed_label IS NULL
+       AND (   verdict IN ('validated', 'rejected')
+            OR (verdict = 'withdrawn' AND supersedes_review_id IS NOT NULL))));
 COMMENT ON TABLE gold.expert_review IS
-  'Expert opinions, append-only and apart from the pipeline''s label (D-066). Scope review V1: correct | incorrect, only on in_scope or out_of_scope. Summary review: validated | rejected. payload follows review_schema_id (empty in V1, ready for V2 without DDL change). Inserted only through gold.submit_review(). actor is a pseudonymous handle (G13).';
+  'Expert opinions, append-only and apart from the pipeline''s label (D-066, D-093). Scope review: relevant | not_relevant = the expert''s own label on any pipeline label (potentially included); correct | incorrect = the V1 relative verdict, only on in_scope or out_of_scope. Summary review: validated | rejected. withdrawn (both kinds) supersedes the review it takes back, of the same target and never a withdrawal; the target then has no expert opinion until a new review. reviewed_label = the label the expert saw (copied from the assessment); payload follows review_schema_id (scope_review.payload V1.1.0: what the expert saw, shown_status and shown scores). Inserted only through gold.submit_review(). actor is a pseudonymous handle (G13).';
 CREATE INDEX IF NOT EXISTS expert_review_assessment_ix ON gold.expert_review (assessment_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS expert_review_summary_ix ON gold.expert_review (summary_version_id, created_at DESC);
 

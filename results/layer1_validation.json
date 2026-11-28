@@ -1,12 +1,12 @@
 {
   "runs": [
     {
-      "run_id": "37a5a44b-7c4a-409d-acc5-bc8d801eac4d",
+      "run_id": "43e3de62-e8be-4a71-ac40-b107a154bea6",
       "layer1_filter": "V1.1.0",
       "profile": "default V0.3.0",
-      "started_at": "2026-11-28 10:01:50.022093+00",
-      "git_commit": "f38db1df73610dc61b17e9c220f82663571b9ed1",
-      "git_dirty": true,
+      "started_at": "2026-11-28 11:22:27.177914+00",
+      "git_commit": "15cb5f81a059356759ec38fe15e8900e92d7ab15",
+      "git_dirty": false,
       "totals": {
         "rulings_in": 6055,
         "kept": 935,
@@ -66,12 +66,12 @@
       }
     },
     {
-      "run_id": "5cecd437-7001-47c2-8772-f78cf580f92e",
+      "run_id": "71f2e931-9991-47ec-87c9-72cfb9fa49d5",
       "layer1_filter": "V1.2.0",
       "profile": "layer1_candidate V0.1.0",
-      "started_at": "2026-11-28 10:02:21.160904+00",
-      "git_commit": "f38db1df73610dc61b17e9c220f82663571b9ed1",
-      "git_dirty": true,
+      "started_at": "2026-11-28 11:22:55.44891+00",
+      "git_commit": "15cb5f81a059356759ec38fe15e8900e92d7ab15",
+      "git_dirty": false,
       "totals": {
         "rulings_in": 6055,
         "kept": 944,
@@ -139,7 +139,7 @@
     "passed": true,
     "baseline": {
       "profile": "default",
-      "run_id": "37a5a44b-7c4a-409d-acc5-bc8d801eac4d",
+      "run_id": "43e3de62-e8be-4a71-ac40-b107a154bea6",
       "layer1_filter": "V1.1.0",
       "golden": "matched",
       "rulings": 6055,
@@ -147,7 +147,7 @@
     },
     "candidate": {
       "profile": "layer1_candidate",
-      "run_id": "5cecd437-7001-47c2-8772-f78cf580f92e",
+      "run_id": "71f2e931-9991-47ec-87c9-72cfb9fa49d5",
       "layer1_filter": "V1.2.0",
       "golden": "matched",
       "rulings": 6055,
