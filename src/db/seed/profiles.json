@@ -124,6 +124,79 @@
               0
             ]
           }
+        },
+        {
+          "version": [
+            0,
+            5,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            4,
+            0
+          ],
+          "decision": "D-099",
+          "changelog": "layer2_judge V1.0.0 (the 8B Ja/Nein judge, D-076) forms the label again, because src/layer2 is the only executor of the step and cannot run V2.0.0: under V0.4.0 make pipeline S3 and the cluster pipeline job failed. The Suva Scout scorer (layer2_judge V2.0.0) and its ranking V1.0.0 move unchanged to the profile scout (D-099).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              1,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "code": "scout",
+      "name": "Suva Scout scorer (D-094)",
+      "is_default": false,
+      "description": "The Suva Scout scorer as layer 2 and its promotion as the ranking step (D-094), loaded from a stored scorer run by make bridge or make scorer-load. Not the label shown by the API until the team makes it the default (D-099).",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "decision": "D-099",
+          "changelog": "layer1_filter V1.1.0, layer2_judge V2.0.0 (the Suva Scout scorer) and ranking V1.0.0, as the default profile V0.4.0 pinned them (D-094); moved here by D-099.",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              2,
+              0,
+              0
+            ],
+            "ranking": [
+              1,
+              0,
+              0
+            ]
+          }
         }
       ]
     },
