@@ -12,6 +12,13 @@ These are the inputs of the relevance score that do not need reading comprehensi
 - ``suva_appellant``            Suva brought the appeal
 - ``manifestly_unfounded``      the court dismissed the appeal as manifestly unfounded (Art. 109 BGG)
 - ``proposed_for_publication``  the star of the court's list; "unknown" when the list was not seen
+- ``other_accident_insurer``    an accident or military insurance ruling in which Suva is not a party: another
+                                accident insurer's case, whose case law applies to Suva alike
+- ``core_topics``               how many core accident-insurance topics the text names (causality, notion of
+                                accident, integrity compensation, degree of disability, expert opinion, daily
+                                allowance, relapse, occupational disease); ``core_topic_names`` lists them
+- ``long_ruling``               the text is longer than 25,000 characters (detailed reasoning)
+- ``appeal_upheld``             the operative part upholds the appeal, fully or in part
 
 Each signal carries the place it was read from. Measurements: ``docs/TRIAGE_SIGNALS.md``.
 """
@@ -23,7 +30,7 @@ import re
 from src.schemas import Evidence, Signal
 from src.triage.outer_gate import classify_area, header_subject
 
-VERSION = "structural_signals@1"
+VERSION = "structural_signals@2"
 
 _SUVA = re.compile(
     r"\b(?:Suva|SUVA|CNA|INSAI)\b|Schweizerische[nr]? Unfallversicherungsanstalt|Caisse nationale suisse d'assurance"
@@ -56,6 +63,23 @@ _UNFOUNDED = re.compile(
     r"offensichtlich unbegründet|manifestement (?:mal fondé|infondé)|manifestamente infondat"
     r"|Art\. 109 (?:Abs\. 2|al\. 2|cpv\. 2)"
 )
+# Core accident-insurance topics, by the wording of the three languages. One topic counts once.
+CORE_TOPICS = {
+    "causality": re.compile(r"kausal|causalit", re.I),
+    "notion_of_accident": re.compile(r"unfallbegriff|notion d'accident|nozione d'infortunio", re.I),
+    "integrity_compensation": re.compile(
+        r"integritätsentschädigung|atteinte à l'intégrité|menomazione dell'integrità", re.I
+    ),
+    "degree_of_disability": re.compile(r"invaliditätsgrad|taux d'invalidité|grado d'invalidità", re.I),
+    "expert_opinion": re.compile(r"gutachten|expertise|perizia", re.I),
+    "daily_allowance": re.compile(r"taggeld|indemnités? journalières?|indennità giornalier", re.I),
+    "relapse": re.compile(r"rückfall|rechute|ricaduta", re.I),
+    "occupational_disease": re.compile(r"berufskrankheit|maladies? professionnelles?|malatti[ae] professional", re.I),
+}
+LONG_RULING = 25_000  # characters
+_OPERATIVE = re.compile(r"Demnach erkennt|Demnach verfügt|Demnach beschliesst|Par ces motifs|Per questi motivi")
+_UPHELD = re.compile(r"gutgeheissen|\badmis\b|\baccolt[oi]\b", re.I)
+_OPERATIVE_SPAN = 800
 
 
 def header(full_text: str) -> str:
@@ -123,6 +147,15 @@ def structural_signals(list_area: str | None, starred: bool | None, full_text: s
     if starred is None and list_area and list_area.strip().endswith("*"):
         starred = True
     add("proposed_for_publication", "unknown" if starred is None else bool(starred), "star")
+
+    add("other_accident_insurer", area in ("UV", "MV") and not party, "parties_block")
+    topics = [name for name, pattern in CORE_TOPICS.items() if pattern.search(text)]
+    add("core_topics", len(topics), "full_text")
+    add("core_topic_names", ", ".join(topics), "full_text")
+    add("long_ruling", len(text) > LONG_RULING, "full_text")
+    operative = _OPERATIVE.search(text)
+    upheld = _UPHELD.search(text, operative.start(), operative.start() + _OPERATIVE_SPAN) if operative else None
+    add("appeal_upheld", bool(upheld), "operative_part", upheld.span() if upheld else None)
     return signals
 
 
