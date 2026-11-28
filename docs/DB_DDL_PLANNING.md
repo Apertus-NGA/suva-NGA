@@ -4,6 +4,11 @@
 > Evidence: the read-only audit of 27 Nov (`tmp/audits/audit-data-layer-2026-11-27.md`, git-ignored) and DuckDB queries on the pinned HF file (`bger.parquet`, commit `35b17aa9c3fad71011b72f78f6ab79650ec0cf96`, SHA-256 `d2b2df1d…`). Numbers marked *estimate* are not measured.
 > Reading order: §0, §7 (versions and registry), §9 (scope label), §11 (logs), §12 (expert reviews), §13 (summaries), §17 (open questions).
 
+**Changes in v0.7 (28 Nov, DDL owner, D-091):**
+- Review of the layer-1 traceability DDL (report `tmp/handoff/ddl-report-layer1-traceability-2026-11-28.md`, §5): every point approved, conditions in D-091.
+- Deploy in one transaction; READ COMMITTED pinned on the database (`00_extensions.sql`); schema guard on the catalog structure, reference `expected/db/structure.json` (58 tables, 631 columns, 436 constraints, 121 indexes, 45 ENUMs), checked by CI. Runbook: `docs/RUNBOOK_DB.md` (closes §19.1 phase 6 "RUNBOOK_DB").
+- Still to do from the report's §6: §8.1 (`results/ingest_closure.json` is the counted source of truth for the closure), §11.3 (unused event names), §11.4 (event volume estimate), the `out_of_window` casing, a D-071 to D-082 cross-reference.
+
 **Changes in v0.6 (28 Nov, layer-1 traceability and governance, branch `triage/layer1-traceability`, D-081 to D-083; any existing database needs `make db-reset && make db-deploy`):**
 - **Rule ledger (D-081):** `triage.assessment_reason` holds every enabled rule of the version, with its outcome (new ENUM `rule_outcome`: `fired`, `not_fired`, `not_applicable`, `blocked`), `examined_value` and `detail`. It is certified row by row (`t30_check`) and per assessment at commit (new deferred trigger `t50_ledger`), and sealed once committed. It **replaces** the debug events `layer1.rule.evaluated` and `layer1.rule.fired` of v0.5 (§10.2, §11.3). New view `triage.v_layer1_ledger` (§10.3).
 - **Ingest exclusion ledger (D-081):** new table `corpus.ingest_exclusion`, so 58 tables. `corpus.ruling_source_ref` is keyed per snapshot. `ops.source_snapshot.row_count` counts every row of the file. A row is a ref or an exclusion, never both (trigger `t31_exclusive`, serialised per snapshot by `corpus.lock_source_rows`). New view `corpus.v_ingest_closure` (§8.4).

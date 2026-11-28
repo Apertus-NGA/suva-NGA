@@ -1,7 +1,7 @@
 """Deploy and test the data layer (docs/DB_DDL_PLANNING.md §15, §19). Standard library only: it runs psql.
 
     python -m src.db.deploy deploy            apply src/db/sql/NN_*.sql in order, in one psql session
-    python -m src.db.deploy reset --yes       fresh deploy: drop the six schemas, deploy, record the fingerprint
+    python -m src.db.deploy reset --yes       fresh deploy: drop the six schemas, then deploy
     python -m src.db.deploy test              run tests/sql/*_test.sql, each in a transaction rolled back
 
 Target: DATABASE_URL (or --url) with a local psql, or --compose to run psql inside the compose service `db`
@@ -12,7 +12,6 @@ expert summary versions) unless --discard-authored is given: export it first (do
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import re
 import subprocess
@@ -24,8 +23,6 @@ SQL_DIR = Path(__file__).resolve().parent / "sql"
 TEST_DIR = ROOT / "tests" / "sql"
 SCHEMAS = ("summ", "gold", "triage", "corpus", "audit", "ops")
 INCLUDE = re.compile(r"^\\ir\s+(\S+)\s*$", re.MULTILINE)
-# The schema fingerprint setting of src/db/schema_guard.py (kept here: this module is standard library only).
-SCHEMA_SETTING = "suva.schema_sha256"
 
 
 def sql_files(directory: Path = SQL_DIR) -> list[Path]:
@@ -96,8 +93,10 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     files = sql_files()
     if not files:
         raise SystemExit(f"no SQL file in {SQL_DIR}")
-    res = run_psql(args, script_for(files))
-    print(f"deploy: {len(files)} files applied" if res.returncode == 0 else "deploy: FAILED")
+    # One transaction: with ON_ERROR_STOP, psql stops at the first error before COMMIT, and the server rolls the whole
+    # script back, so a failed deploy never leaves a half-built schema (no file of src/db/sql needs autocommit).
+    res = run_psql(args, "BEGIN;\n" + script_for(files) + "COMMIT;\n")
+    print(f"deploy: {len(files)} files applied" if res.returncode == 0 else "deploy: FAILED, nothing applied")
     return res.returncode
 
 
@@ -118,25 +117,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
     if res.returncode != 0:
         return res.returncode
     print("reset: schemas dropped")
-    status = cmd_deploy(args)
-    if status == 0:
-        status = record_fingerprint(args)
-    return status
-
-
-def record_fingerprint(args: argparse.Namespace) -> int:
-    """After a reset: store the fingerprint of the script just deployed (src/db/schema_guard.py), so the next
-    bootstrap sees the same schema. Without it the database kept the fingerprint of the schema the reset dropped,
-    and the guard refused the next `make cluster-up` again, looping on its own recovery steps."""
-    sha = hashlib.sha256(script_for(sql_files()).encode("utf-8")).hexdigest()  # = schema_guard.shipped()
-    res = run_psql(
-        args,
-        "\\set ON_ERROR_STOP on\n"
-        f"SELECT format('ALTER DATABASE %I SET {SCHEMA_SETTING} = %L', current_database(), '{sha}') \\gexec\n",
-    )
-    if res.returncode == 0:
-        print(f"reset: schema fingerprint recorded ({sha[:12]}…)")
-    return res.returncode
+    return cmd_deploy(args)
 
 
 def cmd_test(args: argparse.Namespace) -> int:

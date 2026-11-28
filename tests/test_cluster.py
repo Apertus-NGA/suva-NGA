@@ -131,7 +131,7 @@ def _service(name: str) -> str:
 
 def test_bootstrap_guards_the_schema_around_the_deploy():
     steps = _recipe("bootstrap")
-    assert [s.split()[-1] for s in steps] == ["CMD=check", "db-deploy", "CMD=record", "db-logins"]
+    assert [s.split()[-1] for s in steps] == ["CMD=check", "db-deploy", "db-logins"]
 
 
 def test_load_ends_with_the_closure_check():

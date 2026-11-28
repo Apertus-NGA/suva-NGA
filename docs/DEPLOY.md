@@ -2,7 +2,7 @@
 
 > **Status: PROPOSED (D-090), Sat 28 Nov 2026.** Owner: platform (the lead, while D-024 is open). Files: `docker-compose.yml`, `Dockerfile`, `.dockerignore`, the `cluster-*` targets of the `Makefile`, `src/db/logins.py`, `src/ingest/fetch.py`, `src/db/schema_guard.py`, `tests/test_cluster.py`, `tests/test_schema_guard.py`, the CI job `cluster`.
 > **Increment 2** (Sat 28 Nov, after the layer-1 traceability merge, PR #44): schema guard on every deploy, ingest closure in `load`, golden certification and self-verification in `make run` S2, release gate `validate`, a `data/derived` slot for replayed layer 2, and CI running the whole chain on the base dataset.
-> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), layer 2 (S3, §10), and the release gate. The next stages run inside it as soon as `make run` calls them: the cluster calls make targets, so a new stage needs no change here. The API and UI service is ready but off (profile `ui`): `make serve` is a stub until the FastAPI app lands, after layer 3 (summaries).
+> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), layer 2 (S3, §10), and the release gate. The next stages run inside it as soon as `make run` calls them: the cluster calls make targets, so a new stage needs no change here. The API service is ready but off (profile `ui`): `make serve` runs the FastAPI app (`docs/API.md`); the UI build stage comes with the UI.
 
 ## 1. What runs where
 
@@ -14,7 +14,7 @@
                       │        │    └─────── load (suva_pipeline: registry, base dataset, labels)    │
                       │        └──────────── pipeline (suva_pipeline: make run SERVE=0)  ──┐         │
                       │  llm (profile sovereign: Apertus on vLLM, GPU, offline) ◀──────────┤         │
-                      │  app (profile ui, suva_api: make serve, after layer 3)             │         │
+                      │  app (profile ui, suva_api: make serve, the API)                   │         │
                       └────────────────────────────────────────────────────────────────────┼─────────┘
                         network egress: fetch (Hugging Face, once), pipeline and app ──────┘──▶ LLM_BASE_URL
 ```
@@ -22,7 +22,7 @@
 | Service | Kind | Login | Network | Does |
 |---|---|---|---|---|
 | `db` | long-running | `suva` (owner) | backend | PostgreSQL 17 with pgvector, image pinned by digest; scram-sha-256; no published port |
-| `migrate` | one-shot | `suva` | backend | `make bootstrap`: schema guard (§7), `src/db/sql` (idempotent), fingerprint recorded, then the passwords of the three logins |
+| `migrate` | one-shot | `suva` | backend | `make bootstrap`: schema guard (the database's structure against `expected/db/structure.json`, §7), `src/db/sql` in one transaction, then the passwords of the three logins |
 | `fetch` | one-shot | none | egress | `make fetch-base`: the pinned HF file, checked by SHA-256; does nothing when the file is already there |
 | `load` | one-shot | `suva_pipeline` | backend | `make load`: versions and rules, base dataset (6,055 rulings), Suva's labels (D-051 fields never read), then the closure check: every row of the file loaded or excluded with its reason, else the job fails (F-04) |
 | `pipeline` | one-shot | `suva_pipeline` | backend, egress | `make run SERVE=0`: S2 runs layer 1, compares its decisions with `expected/layer1/` (golden), runs the blocking recall check, then proves its files equal its database rows. `MODE=replay` by default, `MODE=live` with the three `LLM_*` variables |
@@ -66,7 +66,7 @@ Measured Sat 28 Nov on a laptop (arm64, the `linux/amd64` image emulated, other 
 
 Increment 2, same laptop: the whole chain with the new checks took 93 s on an adopted database and the release gate 101 s; both green (golden matched, recall 82/82 on both profiles, 6,055 records verified, closure OK).
 
-Other commands: `make cluster-config` (checks the compose file with the current `.env`, every profile), `make cluster-build`, `make cluster-backup`, `docker compose --profile ui up -d app` once `make serve` exists.
+Other commands: `make cluster-config` (checks the compose file with the current `.env`, every profile), `make cluster-build`, `make cluster-backup`, `docker compose --profile ui up -d app` (set `SUVA_API_PASSWORD` first).
 
 ## 4. Security
 
@@ -74,7 +74,7 @@ Other commands: `make cluster-config` (checks the compose file with the current 
 - **Logins** (src/db/sql/90_roles.sql): the owner `suva` deploys and backs up; the jobs use `suva_pipeline` (group `suva_g_pipeline`: reads, inserts facts, no DDL); the app will use `suva_api`; `suva_report` is read-only. Passwords are set by `migrate` (`src/db/logins.py`, at least 16 characters, never logged). `python -m src.db.logins --verify suva_pipeline` proves that the login connects and cannot create a table in any schema; CI runs it.
 - **Network:** `backend` is internal, so the database and the local model have no route out and publish no port. Only `fetch`, `pipeline` and `app` reach `egress`. The app binds to `127.0.0.1` by default (`APP_BIND`, `APP_PORT`): expose it through a TLS reverse proxy, never directly.
 - **Containers:** non-root user (uid 10001), read-only root file system, `/tmp` in memory, every capability dropped, `no-new-privileges`, an init process, memory and process limits, logs rotated (5 × 10 MB per container). The image holds no `.git`, no `data/`, no `tmp/`, no docs.
-- **Traceability:** every run records the commit the image was built from (`SUVA_GIT_COMMIT`, a build argument set by `make cluster-build`) and whether the tree was clean. A run in the cluster on 28 Nov recorded `e1bc7c2`. The database records the SHA-256 of the schema it was deployed from (`suva.schema_sha256`, §7); each layer-1 run is certified against `expected/layer1/` and proves that its files equal its rows; `results/ingest_closure.json` accounts for every row of the source file.
+- **Traceability:** every run records the commit the image was built from (`SUVA_GIT_COMMIT`, a build argument set by `make cluster-build`) and whether the tree was clean. A run in the cluster on 28 Nov recorded `e1bc7c2`. The schema guard compares the database's structure with `expected/db/structure.json` before every deploy (§7); each layer-1 run is certified against `expected/layer1/` and proves that its files equal its rows; `results/ingest_closure.json` accounts for every row of the source file.
 
 ## 5. Data and the air-gapped path
 
@@ -96,7 +96,7 @@ docker compose --profile sovereign up -d llm
 
 ## 7. Operations
 
-- **Upgrade:** pull or rebuild the image, `make cluster-up`. `migrate` runs the schema guard first (`src/db/schema_guard.py`): the database stores the SHA-256 of the DDL script it was deployed from. Same fingerprint: the deploy runs again (idempotent). No schema yet: fresh deploy. Another fingerprint: the job stops, because the DDL is fresh-deploy only (no `ALTER`, D-061) and would leave the old tables in place. Then a human backs up (`make cluster-backup`), resets (`docker compose run --rm migrate make db-reset`, which refuses to drop rows written by experts, then deploys the shipped files and records their fingerprint) and runs `make cluster-up` again, whose guard now sees the same fingerprint. A schema deployed before the guard (increment 1) has no fingerprint: the job stops too, unless the operator states once that it equals the shipped files (`docker compose run --rm -e SUVA_SCHEMA_ADOPT=1 migrate`). `make db-schema-guard` shows the stored and the shipped fingerprints.
+- **Upgrade:** pull or rebuild the image, `make cluster-up`. `migrate` runs the schema guard first (`src/db/schema_guard.py`): it reads the database's structure from its catalog (tables, columns, constraints, indexes, ENUMs; `src/db/structure.py`) and compares it with `expected/db/structure.json`, the structure a fresh deploy of the shipped files builds. Same structure: the deploy runs again and replaces functions, views and triggers (a fix such as D32 deploys without a reset). No schema yet: fresh deploy. Another structure: the job stops and prints the differences, because the DDL never alters a table (D-061); a human backs up and resets (`docs/RUNBOOK_DB.md`). The deploy runs in one transaction: a failure changes nothing.
 - **Backup:** `make cluster-backup` writes `suva-<UTC time>.dump` into `backups` (or `BACKUP_TARGET`). Restore into an empty database with `pg_restore --clean --if-exists -d suva <file>` run in the `db` container.
 - **Resources:** `db` 2 CPUs and 2 GB, `load` 6 GB, `pipeline` 4 GB, `migrate` and `fetch` 1 GB, `app` 2 GB; change them in `docker-compose.yml` for a larger host.
 - **Logs:** stdout of every container, rotated; PostgreSQL logs connections and statements slower than 5 s. The pipeline's own spans, events and metrics are in the database (`ops.*`, D-065).
@@ -121,7 +121,7 @@ Region: Switzerland North, for data residency.
 
 ## 9. Limits
 
-- The `app` service waits for `make serve` (FastAPI, after layer 3).
+- The `app` service runs `make serve` (the API, `docs/API.md`); runs launched from it stay off unless `API_RUNS_ENABLED=1`.
 - Layer 2 runs in the cluster (§10); a complete replay needs the 23 reference rulings' answers. Layer 3 and the app: §10.
 - CI (job `cluster`) runs the whole chain on the base dataset, cached between runs, and the release gate; the GPU profile is tested by hand only.
 - `make db-up` (the developer database) now needs `POSTGRES_PASSWORD` in `.env`: `make cluster-env` sets it. A database volume created before this change keeps its old authentication until it is recreated.

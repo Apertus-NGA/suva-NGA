@@ -55,7 +55,7 @@ db-up: ## start the local Postgres (compose service db) and wait until it is hea
 db-deploy: ## apply src/db/sql/NN_*.sql in order (idempotent)
 	$(PY) -m src.db.deploy deploy $(DB_TARGET)
 
-db-reset: ## fresh deploy: drop the six schemas, re-apply src/db/sql, record its fingerprint (refuses if expert rows would be lost)
+db-reset: ## fresh deploy: drop the six schemas, re-apply src/db/sql (refuses if expert rows would be lost)
 	$(PY) -m src.db.deploy reset --yes $(DB_TARGET)
 
 db-test: ## SQL tests in tests/sql, each in a transaction rolled back
@@ -100,15 +100,18 @@ layer1-validate: ## run two profiles, recall, compare; fails on a removal: make 
 
 # --- Cluster (docs/DEPLOY.md). The compose jobs call the first four targets inside the app image; the cluster-*
 # targets wrap docker compose on the host. Never `docker compose down -v` (G12): volumes hold the database.
-.PHONY: db-logins db-schema-guard ingest-closure fetch-base bootstrap load validate cluster-env cluster-config cluster-build cluster-up cluster-down cluster-ps cluster-logs cluster-backup cluster-validate
+.PHONY: db-logins db-schema-guard db-structure ingest-closure fetch-base bootstrap load validate cluster-env cluster-config cluster-build cluster-up cluster-down cluster-ps cluster-logs cluster-backup cluster-validate
 CLUSTER_PROFILES = --profile sovereign --profile ui --profile ops
 CLUSTER_BUILD_ENV = GIT_COMMIT=$$(git rev-parse HEAD 2>/dev/null) GIT_DIRTY=$$(test -z "$$(git status --porcelain 2>/dev/null)" && echo 0 || echo 1)
 
 db-logins: ## set the passwords of the login roles from SUVA_*_PASSWORD (owner, after db-deploy)
 	$(PY) -m src.db.logins
 
-db-schema-guard: ## fingerprint of the deployed schema: stored vs shipped (CMD=check|record|show, owner)
+db-schema-guard: ## the database's structure against expected/db/structure.json (CMD=check|show, owner)
 	$(PY) -m src.db.schema_guard $(or $(CMD),show)
+
+db-structure: ## compare the database's structure with expected/db/structure.json; WRITE=1 rewrites it (after a fresh deploy)
+	$(PY) -m src.db.structure $(if $(WRITE),--write)
 
 ingest-closure: ## every source row loaded or excluded with its reason; exit 1 if a snapshot does not close (F-04)
 	$(PY) -m src.ingest closure
@@ -116,10 +119,9 @@ ingest-closure: ## every source row loaded or excluded with its reason; exit 1 i
 fetch-base: ## download the pinned HF base file into HF_BASE_DIR (default data/hf), checked by SHA-256
 	$(PY) -m src.ingest.fetch --dest $(or $(HF_BASE_DIR),data/hf)
 
-bootstrap: ## the cluster's migrate job: schema guard, schema (idempotent), fingerprint, login passwords (owner)
+bootstrap: ## the cluster's migrate job: schema guard, schema in one transaction, login passwords (owner)
 	@$(MAKE) --no-print-directory db-schema-guard CMD=check
 	@$(MAKE) --no-print-directory db-deploy
-	@$(MAKE) --no-print-directory db-schema-guard CMD=record
 	@$(MAKE) --no-print-directory db-logins
 
 load: ## the cluster's load job: registry, base dataset (PARQUET=...), Suva's labels, closure (pipeline login)

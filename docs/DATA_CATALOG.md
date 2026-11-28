@@ -1,6 +1,7 @@
 # suva-NGA data catalog: layers 1 and 2, layer 3 preview
 
 > **Status: measured snapshot, 28 Nov 2026, 10:40 CET, on `main` @ `14caaba`.** **Amended 28 Nov 10:53 CET** for layer 2's DDL-1, DDL-2 and replay policy (branch `triage/layer2-ddl`); counts unchanged. Owner: `lead`. Readers: whoever builds the UI or the API, human or agent. Out of date after any change to `src/db/sql/`, to the ingest, to layer 1 or layer 2, or when layer 3 or the ranking lands: regenerate it then.
+> **DDL changes after this snapshot, with their effect on an API contract:** `docs/DDL_CHANGES.md` (none in a table, a column or a view's columns as of 28 Nov, PR #51).
 
 An exhaustive, raw list of the data that exists. It makes no recommendation and no design decision.
 
@@ -11,7 +12,7 @@ An exhaustive, raw list of the data that exists. It makes no recommendation and 
 | Layer 2 (Apertus relevance judge) | implemented, filled |
 | Ranking (threshold, top 30, release, export) | schema only, **empty** |
 | Layer 3 (summaries) | schema only, **empty**. **Section 13 is a preview: subject to change.** |
-| HTTP API | none on `main` (`make serve` is a stub) |
+| HTTP API | `src/api/`, `make serve` (`docs/API.md`, D-092), added after this snapshot |
 
 ## 0. How this was produced
 
@@ -94,7 +95,7 @@ UI writes (functions) ──►       gold.expert_review · summ.summary_version
 | `corpus.subject_observation` | table | ingest (HF legal_area) | 4,327 | The matter rubric (Sachgebiet) a source states: the Neuheiten page (authoritative, with the publication star) or HF legal_area (empty for most Q2/2026 rulings). Layer 1 reads neuheiten > hf_legal_area > the head of gegenstand, and records which one it used (D- |
 | `corpus.v_ingest_closure` | view | view | 1 | Every row of a source file accounted for (F-04, G5), per snapshot that has source refs or exclusions: closure_ok = row_count = loaded refs (base + twins) + exclusions. Source refs are kept per snapshot, so a new revision of a file closes on its own, the rows a |
 | `corpus.v_ruling` | view | view | 6,055 | Ruling with its best publication date (Neuheiten > HF poller), the approximation kept apart, quarter_by_publication from exact dates only (D-050), primary text and segmentation. |
-| `gold.expert_review` | table | function gold.submit_review (none yet) | 0 | Expert opinions, append-only and apart from the pipeline's label (D-066). Scope review V1: correct \| incorrect, only on in_scope or out_of_scope. Summary review: validated \| rejected. payload follows review_schema_id (empty in V1, ready for V2 without DDL ch |
+| `gold.expert_review` | table | function gold.submit_review (none yet) | 0 | Expert opinions, append-only and apart from the pipeline's label (D-066, D-093). Scope review: relevant \| not_relevant = the expert's own label on any pipeline label (potentially included); correct \| incorrect = the V1 relative verdict, only on in_scope or out_of_scope. Summary review: validated \| rejected. withdrawn (both kinds) supersedes the review it takes back, of the same target and never a withdrawal; the target then has no expert opinion until a new review. reviewed_label = the label the expert saw (copied from the assessment); payload follows review_schema_id (scope_review.payload V1.1.0: what the expert saw, shown_status and shown scores). Inserted only through gold.submit_review(). actor is a pseudonymous handle (G13).|
 | `gold.label` | table | ingest gold | 115 | Suva's truth: a row of its relevance list or one of its 55 exports. external_title = the cantonal row (Q-28), which has no Federal Court ruling. Append-only. Negatives are a view (closed world, Q-04), never stored. |
 | `gold.suva_summary` | table | no loader at this commit | 0 | Suva's 55 human summaries, parsed (DS5): only docket, dates, Text DE, Text FR and the bger.ch link (D-051). Id = uuid5('suva_summary\|<source_file>'). Append-only. |
 | `gold.v_expert_review_current` | view | view | 0 | The latest non-superseded review per target. |
@@ -536,7 +537,7 @@ The API login `suva_api` reads every schema and writes only through these functi
 | `triage.release_gate_problems(uuid)` | TABLE(problem text, ruling_id uuid) | suva_api, suva_g_pipeline, suva_g_read, suva_g_review, suva_owner, suva_pipeline, suva_report | Why a release may not become current: a target member without a label, or an in-scope ruling without its mandatory summary (§9.2 invariant 4, §13.7). A failed judgement stays potentially and is allowed (it is listed in ranking_entry). |
 
 Constraints that shape these writes (from the DDL):
-- `gold.expert_review` CHECK `expert_review_target_chk`: a scope review has verdict `correct | incorrect` and `reviewed_label IN ('in_scope','out_of_scope')`; a summary review has verdict `validated | rejected` and no label. So a scope review on a `potentially` assessment is refused by the database.
+- `gold.expert_review` CHECK `expert_review_target_chk` (D-093, after this snapshot): a scope review has verdict `relevant | not_relevant` on any label (`potentially` included), `correct | incorrect` on `in_scope` or `out_of_scope`, or `withdrawn` with `supersedes_review_id`; a summary review has verdict `validated | rejected`, or `withdrawn` with `supersedes_review_id`, and no label. Before D-093 a scope review on a `potentially` assessment was refused.
 - `ops.user_request`: `kind` = `add_judgement | summary`; `status` = `pending | accepted | done | failed | rejected`; a request names a docket, a bger.ch link or a ruling id (`user_request_target_chk`).
 - `summ.create_expert_version` creates a new version of an existing summary (it needs one to exist).
 
@@ -618,7 +619,7 @@ Committed aggregates (no Suva label per docket): `results/layer1_validation.json
 | `ops.request_kind` | add_judgement \| summary |
 | `ops.request_status` | pending \| accepted \| done \| failed \| rejected |
 | `ops.review_target` | scope \| summary_version |
-| `ops.review_verdict` | correct \| incorrect \| validated \| rejected |
+| `ops.review_verdict` | correct \| incorrect \| validated \| rejected \| relevant \| not_relevant \| withdrawn (the last three: D-093, after this snapshot) |
 | `ops.rule_kind` | keep \| drop \| flag \| signal \| check |
 | `ops.rule_outcome` | fired \| not_fired \| not_applicable \| blocked |
 | `ops.ruling_origin` | base_dataset \| user_added |
@@ -922,7 +923,7 @@ Ruling with its best publication date (Neuheiten > HF poller), the approximation
 
 ### `gold.expert_review` (table, 0 rows)
 
-Expert opinions, append-only and apart from the pipeline's label (D-066). Scope review V1: correct \| incorrect, only on in_scope or out_of_scope. Summary review: validated \| rejected. payload follows review_schema_id (empty in V1, ready for V2 without DDL change). Inserted only through gold.submit_review(). actor is a pseudonymous handle (G13).
+Expert opinions, append-only and apart from the pipeline's label (D-066, D-093). Scope review: relevant \| not_relevant = the expert's own label on any pipeline label (potentially included); correct \| incorrect = the V1 relative verdict, only on in_scope or out_of_scope. Summary review: validated \| rejected. withdrawn (both kinds) supersedes the review it takes back, of the same target and never a withdrawal; the target then has no expert opinion until a new review. reviewed_label = the label the expert saw (copied from the assessment); payload follows review_schema_id (scope_review.payload V1.1.0: what the expert saw, shown_status and shown scores). Inserted only through gold.submit_review(). actor is a pseudonymous handle (G13).
 
 | Column | Type | Null | Filled | Comment |
 |---|---|---|---:|---|
