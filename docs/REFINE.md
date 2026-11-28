@@ -79,8 +79,9 @@ flowchart TD
 | r1 | first loop | 0.771 | 0.542 | 0.73 | 0.88 | 0.88 | 0.83 | 0.75 | 0.74 |
 | r2 | fixes from r1 (no entailment gate) | 0.739 | 0.292 | 0.68 | 0.79 | 0.92 | 0.67 | 0.70 | 0.67 |
 | r7 | entailment gate, pointers by prefix, anchored rules, glossary in prompts | 0.779 | 0.583 | 0.83 | 1.00 | 0.96 | 0.79 | 0.67 | 0.79 |
+| r8 | no new terms of art in a rewording, optional pointer in context | 0.788 | 0.625 | 0.83 | 1.00 | 0.91 | 0.83 | 0.67 | 0.79 |
 
-Source: `results/refine_eval_iterate_r1.json`, `…_r2.json`, `…_r7.json`. Judge numbers are provisional.
+Source: `results/refine_eval_iterate_r1.json`, `…_r2.json`, `…_r7.json`, `…_r8.json`. Judge numbers are provisional.
 
 ## 5. Measurement
 
@@ -99,6 +100,36 @@ uv run python -m eval.refine_eval show   --set iterate --name r1  # every edit, 
 
 Results: section 6, filled from `results/` only.
 
-## 6. Results
+## 6. Results (holdout, run h2, code a5a8288)
 
-(pending)
+16 rulings, 32 fiches, run once. Each fiche was judged before and after refine, in two judge repetitions. Refine changed 19 of the 32 fiches, with a median of 9.5 calls per fiche.
+
+| | Mean | Usable | F1 | F2 | F3 | C1 | T1 | T2 | T3 | T4 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| before, rep 0 | 0.755 | 0.469 | 0.75 | 0.94 | 0.91 | 0.91 | 0.75 | 0.75 | 0.63 | 0.88 |
+| after, rep 0 | 0.759 | 0.438 | 0.81 | 0.84 | 1.00 | 0.91 | 0.72 | 0.88 | 0.61 | 0.81 |
+| before, rep 1 | 0.755 | 0.406 | 0.72 | 0.81 | 0.94 | 0.94 | 0.77 | 0.75 | 0.69 | 0.88 |
+| after, rep 1 | 0.751 | 0.281 | 0.81 | 0.69 | 0.97 | 0.90 | 0.72 | 0.88 | 0.67 | 0.84 |
+
+Code checks failing: 20 before, 15 after. Source: `results/refine_eval_holdout_h2.json`, `…_h2_rep1.json`.
+
+**Verdict: R-B2 (+0.10 usable) is not met, so refine stays off by default.** The gains seen on the iterate set
+(+0.04 usable) do not carry over. T2 (+0.13) and F1 (+0.06 to +0.09) improve in both repetitions; F2 and T1 fall.
+
+**Noise.** Judging the same "before" texts twice moves the usable share by 0.06 and F2 by 0.13. A difference of
+three fiches out of 32 is within the judge's own variation.
+
+**Where the F2 losses come from.** Three fiches lost F2 in both repetitions. Reading the judge's reasons, refine
+caused none of them:
+- 8C_145/2025 fr: the faulted words ("l'instruction est complète") are in the draft, and refine did not change them.
+- 8C_154/2025 de: the faulted sentence ("Die Integritätsentschädigung wird bestätigt.") is in the draft. It is a real
+  error of the draft that refine did not catch.
+- 8C_399/2025 de: the judge faults "Art. 21 Abs. 5 ATSG" as a wrong citation of "Art. 21 al. 5 LPGA". This is a
+  judge error: ATSG and LPGA are the German and French names of the same act.
+
+This reading was done on the holdout. Any change made from it has to be measured on a fresh set.
+
+**Next.**
+1. Validate the judge (`docs/JUDGE.md` §5); add the DE/FR act-name pairs to its F2 instructions.
+2. Add a step that checks the court's decision on each claim against the operative part, since 8C_154 kept a reversed outcome.
+3. Have a lawyer review the kept patches, using the trace shown in the UI.
