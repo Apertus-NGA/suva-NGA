@@ -205,10 +205,13 @@ def run_layer3_stage(mode: str) -> int:
 
     from src.db.pg import connect
     from src.layer3.run import DEFAULT_LIMIT, Layer3RunFailed, run_layer3
-    from src.llm.client import DEFAULT_STORE
+    from src.llm.client import DEFAULT_STORE, SHIPPED_STORE
 
-    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir():
-        print(f"SKIPPED run S6 summarise: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)}")
+    if mode == "replay" and not (DEFAULT_STORE / "cache").is_dir() and not (SHIPPED_STORE / "cache").is_dir():
+        print(
+            f"SKIPPED run S6 summarise: replay mode and no cache in {DEFAULT_STORE.relative_to(REPO_ROOT)} "
+            f"or {SHIPPED_STORE.relative_to(REPO_ROOT)}"
+        )
         return 0
     if mode == "live":
         try:

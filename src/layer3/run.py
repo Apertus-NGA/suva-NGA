@@ -44,7 +44,7 @@ from src.layer3.models import SegmentConfig, SummariseConfig, VerifyConfig, engi
 from src.layer3.presets import active_preset
 from src.layer3.render import FicheRejected, plan_text, quality_status
 from src.layer3.store import PRESET, Context, Work, cache_key, canonical_messages, load, messages_sha256, rule_ids
-from src.llm.client import DEFAULT_STORE, ReplayMiss
+from src.llm.client import DEFAULT_STORE, SHIPPED_STORE, ReplayMiss
 from src.llm.served_model import canonical
 from src.summarize.engine_types import EngineResult, RulingSource
 
@@ -487,7 +487,9 @@ def run_layer3(
 
             with client_lock:  # one client for the run (its limiter caps the concurrency, G2)
                 if not client_box:
-                    client_box.append(LLMClient(LLMConfig.from_env(mode), store_dir=store))  # type: ignore[arg-type]
+                    # answers from the store, then the shipped store read-only; logs go to the store (D-106)
+                    shipped = SHIPPED_STORE if store == DEFAULT_STORE else None
+                    client_box.append(LLMClient(LLMConfig.from_env(mode), store_dir=store, shipped_dir=shipped))  # type: ignore[arg-type]
                 return client_box[0]
 
         available = {"mode": mode, "store": store, "store_dir": store, "client": make_client}
