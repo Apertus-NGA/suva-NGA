@@ -431,15 +431,30 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
     from src.summarize.refine.steps.context import ContextStep
 
     short = "Das Bundesgericht bestätigte die Leistungseinstellung.\n\nDie Beschwerde wird abgewiesen."
-    answer = {"a_label": "facts", "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
-              "c_text": "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter; die Suva stellte ihre Leistungen per 30. Juni 2023 ein."}
-    recheck = {"items": [{"a_sentence": "s1", "b_label": "facts", "c_opening": "Der Versicherte stürzte am 7. Mai 2023", "d_verdict": "same"}]}
+    answer = {
+        "a_label": "facts",
+        "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
+        "c_text": "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter; die Suva stellte ihre Leistungen per 30. Juni 2023 ein.",
+    }
+    recheck = {
+        "items": [
+            {
+                "a_sentence": "s1",
+                "b_label": "facts",
+                "c_opening": "Der Versicherte stürzte am 7. Mai 2023",
+                "d_verdict": "same",
+            }
+        ]
+    }
     fake = Fake(**{"context@1": [answer], "facts@5__recheck": [recheck]})
     result = refine(short, ctx_for(fake), [ContextStep()])
     assert result.text.startswith("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter")
     assert result.trace[0].status == "corrected" and result.trace[0].findings[0]["evidence"] == "facts"
-    invented = {"a_label": "facts", "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
-                "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe."}
+    invented = {
+        "a_label": "facts",
+        "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
+        "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe.",
+    }
     refused = refine(short, ctx_for(Fake(**{"context@1": [invented]})), [ContextStep()])
     assert "number 2021 not in the ruling" in refused.trace[0].findings[0]["why_not"]
 
@@ -448,16 +463,47 @@ def test_facts_deletes_only_an_invented_sentence_and_only_when_a_second_reading_
     detect = {"items": [{"a_sentence": "s3", "b_label": "none", "c_opening": "", "d_verdict": "not_in_ruling"}]}
     repair = {"a_label": "E.2.1", "b_opening": "", "c_action": "delete", "d_sentence": ""}
     agree = {"items": [{"a_sentence": "s3", "b_label": "none", "c_opening": "", "d_verdict": "not_in_ruling"}]}
-    disagree = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "Die Leistungspflicht des Unfallversicherers setzt", "d_verdict": "same"}]}
-    kept = refine(DRAFT, ctx_for(Fake(**{"facts@5__detect": [detect], "facts@5__repair": [repair], "facts@5__confirm": [disagree]})), [Facts()])
+    disagree = {
+        "items": [
+            {
+                "a_sentence": "s3",
+                "b_label": "E.2.1",
+                "c_opening": "Die Leistungspflicht des Unfallversicherers setzt",
+                "d_verdict": "same",
+            }
+        ]
+    }
+    kept = refine(
+        DRAFT,
+        ctx_for(Fake(**{"facts@5__detect": [detect], "facts@5__repair": [repair], "facts@5__confirm": [disagree]})),
+        [Facts()],
+    )
     assert "ohne Kausalzusammenhang" in kept.text and "second reading" in kept.trace[0].findings[0]["why_not"]
-    gone = refine(DRAFT, ctx_for(Fake(**{"facts@5__detect": [detect], "facts@5__repair": [repair], "facts@5__confirm": [agree]})), [Facts()])
+    gone = refine(
+        DRAFT,
+        ctx_for(Fake(**{"facts@5__detect": [detect], "facts@5__repair": [repair], "facts@5__confirm": [agree]})),
+        [Facts()],
+    )
     assert "ohne Kausalzusammenhang" not in gone.text
 
 
 def test_facts_never_offers_delete_for_a_sentence_that_only_overstates():
-    detect = {"items": [{"a_sentence": "s3", "b_label": "E.2.1", "c_opening": "Die Leistungspflicht des Unfallversicherers setzt", "d_verdict": "stronger_or_broader"}]}
-    fake = Fake(**{"facts@5__detect": [detect], "facts@5__repair": [{"a_label": "E.2.1", "b_opening": "x", "c_action": "delete", "d_sentence": ""}]})
+    detect = {
+        "items": [
+            {
+                "a_sentence": "s3",
+                "b_label": "E.2.1",
+                "c_opening": "Die Leistungspflicht des Unfallversicherers setzt",
+                "d_verdict": "stronger_or_broader",
+            }
+        ]
+    }
+    fake = Fake(
+        **{
+            "facts@5__detect": [detect],
+            "facts@5__repair": [{"a_label": "E.2.1", "b_opening": "x", "c_action": "delete", "d_sentence": ""}],
+        }
+    )
     result = refine(DRAFT, ctx_for(fake), [Facts()])
     assert result.trace[0].status == "needs_review"  # 'delete' is not an allowed answer here: the answer is invalid
     assert '["rewrite"]' in fake.sent[1][1][-1]["content"]
@@ -466,12 +512,16 @@ def test_facts_never_offers_delete_for_a_sentence_that_only_overstates():
 def test_a_bad_item_of_a_list_is_dropped_and_the_rest_of_the_answer_stands():
     shape = obj({"items": {"type": "array", "items": obj({"a_sentence": enum(["s1", "s2"])})}})
     answer = json.dumps({"items": [{"a_sentence": "s9"}, {"a_sentence": "s2"}]})
-    assert Model(lambda *a: answer).ask([{"role": "user", "content": "x"}], "t", shape, "v") == {"items": [{"a_sentence": "s2"}]}
+    assert Model(lambda *a: answer).ask([{"role": "user", "content": "x"}], "t", shape, "v") == {
+        "items": [{"a_sentence": "s2"}]
+    }
 
 
 def test_form_writes_the_outcome_as_its_own_last_sentence_when_the_draft_buries_it():
-    buried = ("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter, und das Bundesgericht hat die Beschwerde "
-              "abgewiesen, weil der natürliche Kausalzusammenhang am 30. Juni 2023 dahingefallen war.")
+    buried = (
+        "Der Versicherte stürzte am 7. Mai 2023 von einer Leiter, und das Bundesgericht hat die Beschwerde "
+        "abgewiesen, weil der natürliche Kausalzusammenhang am 30. Juni 2023 dahingefallen war."
+    )
     result = refine(buried, ctx_for(Fake()), [Form()])
     assert result.text.endswith("dahingefallen war. Die Beschwerde wird abgewiesen.")
     assert Draft.from_text(result.text).sentences[-1].locked
