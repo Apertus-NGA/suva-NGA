@@ -17,7 +17,7 @@ from src.summarize.refine import evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, array, enum, obj
 from src.summarize.refine.step import Candidate, Context, Skip, Step
-from src.summarize.refine.steps.common import NAME, guarded, polish, with_reference, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, guarded, polish, repeats, with_reference, written_sentence_problems
 
 VERSION = "holding@3"
 NONE = "none"
@@ -124,7 +124,7 @@ class Holding(Step):
         def check(before: Draft, after: Draft) -> list[str]:
             if not written:
                 return ["nothing written"]
-            problems = written_sentence_problems(text, "", ctx, max_words=60 * len(written))
+            problems = written_sentence_problems(text, "", ctx, max_words=60 * len(written)) + repeats(text, before)
             if problems:
                 return problems
             # A targeted question per added rule about the sentence written for it (run r4: searching the whole

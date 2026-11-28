@@ -473,7 +473,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
             }
         ]
     }
-    fake = Fake(**{"context@3": [answer], "facts@5__recheck": [recheck]})
+    fake = Fake(**{"context@4": [answer], "facts@5__recheck": [recheck]})
     result = refine(short, ctx_for(fake), [ContextStep()])
     assert result.text.startswith("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter")
     assert result.trace[0].status == "corrected" and result.trace[0].findings[0]["evidence"] == "facts"
@@ -482,7 +482,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
         "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
         "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe.",
     }
-    refused = refine(short, ctx_for(Fake(**{"context@3": [invented]})), [ContextStep()])
+    refused = refine(short, ctx_for(Fake(**{"context@4": [invented]})), [ContextStep()])
     assert "number 2021 not in the ruling" in refused.trace[0].findings[0]["why_not"]
 
 
@@ -588,3 +588,16 @@ def test_a_lower_courts_decision_is_a_fact_not_the_outcome():
     assert checks.restates_outcome("Le recours est rejeté.")
     assert not checks.restates_outcome("Das kantonale Gericht hiess die Beschwerde des Versicherten gut.")
     assert not checks.restates_outcome("La cour cantonale a admis le recours de l'assuré.")
+
+
+def test_an_insert_that_repeats_a_sentence_of_the_draft_is_refused():
+    from src.summarize.refine.steps.context import ContextStep
+
+    short = "Am 7. Mai 2023 stürzte A.________ von einer Leiter.\n\nDie Beschwerde wird abgewiesen."
+    answer = {
+        "a_label": "facts",
+        "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
+        "c_text": "Am 7. Mai 2023 stürzte der Versicherte von einer Leiter.",
+    }
+    result = refine(short, ctx_for(Fake(**{"context@4": [answer]})), [ContextStep()])
+    assert "repeats s1" in result.trace[0].findings[0]["why_not"]

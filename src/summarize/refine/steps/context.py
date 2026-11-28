@@ -13,11 +13,11 @@ from src.summarize.refine import checks, evidence
 from src.summarize.refine.draft import Draft, Patch
 from src.summarize.refine.model import STRING, enum, obj
 from src.summarize.refine.step import Candidate, Context, Step
-from src.summarize.refine.steps.common import NAME, guarded, polish, written_sentence_problems
+from src.summarize.refine.steps.common import NAME, guarded, polish, repeats, written_sentence_problems
 from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
 from src.summarize.refine.steps.facts import judge_sentences
 
-VERSION = "context@3"
+VERSION = "context@4"
 
 TASK = (
     "Task: the {lang} summary below of the ruling above is too short and lacks the facts a lawyer needs to "
@@ -49,7 +49,7 @@ class ContextStep(Step):
         def check(before: Draft, after: Draft) -> list[str]:
             # The pointer is evidence when code finds it; the gate is the facts check below (a sentence that sums up
             # two facts rarely has one ruling sentence it opens with: run r4 lost 8 of 13 additions to that).
-            problems = written_sentence_problems(text, "", ctx, max_words=90)
+            problems = written_sentence_problems(text, "", ctx, max_words=90) + repeats(text, before)
             if "____" in text:
                 problems.append("placeholder")
             if problems:

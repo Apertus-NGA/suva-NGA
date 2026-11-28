@@ -58,6 +58,26 @@ def written_sentence_problems(new: str, old: str, ctx, max_words: int = MAX_SENT
     return problems
 
 
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"\w{4,}", text.lower())}
+
+
+def repeats(new: str, draft: Draft, threshold: float = 0.6) -> list[str]:
+    """Sentences of `new` that say what a sentence of the draft already says: most of their words are shared (a
+    near-duplicate; run r5 re-inserted a draft's first sentence with its placeholder filled in)."""
+    from src.summarize.refine.draft import split_sentences
+
+    found = []
+    for sentence in split_sentences(new):
+        mine = _words(sentence)
+        for old in draft.sentences:
+            theirs = _words(old.text)
+            if mine and theirs and len(mine & theirs) / min(len(mine), len(theirs)) >= threshold:
+                found.append(f"repeats {old.id}: {old.text[:60]!r}")
+                break
+    return found
+
+
 def guarded(check):
     """Wrap a verify function that may call the model: a failed call refuses the patch, it never crashes the run."""
 
