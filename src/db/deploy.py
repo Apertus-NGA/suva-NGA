@@ -93,8 +93,10 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     files = sql_files()
     if not files:
         raise SystemExit(f"no SQL file in {SQL_DIR}")
-    res = run_psql(args, script_for(files))
-    print(f"deploy: {len(files)} files applied" if res.returncode == 0 else "deploy: FAILED")
+    # One transaction: with ON_ERROR_STOP, psql stops at the first error before COMMIT, and the server rolls the whole
+    # script back, so a failed deploy never leaves a half-built schema (no file of src/db/sql needs autocommit).
+    res = run_psql(args, "BEGIN;\n" + script_for(files) + "COMMIT;\n")
+    print(f"deploy: {len(files)} files applied" if res.returncode == 0 else "deploy: FAILED, nothing applied")
     return res.returncode
 
 

@@ -21,6 +21,10 @@ COMMENT ON ROLE suva_owner IS 'Owns every object of the data layer. Never logs i
 
 DO $$ BEGIN
   EXECUTE format('GRANT CREATE, CONNECT, TEMPORARY ON DATABASE %I TO suva_owner', current_database());
+  -- READ COMMITTED for every new session, whatever the server default (a managed server may set another one):
+  -- the source-row lock (corpus.lock_source_rows, D21) and the idempotent events (src.db.runs.events, N1) wait for a
+  -- lock, then read what the other transaction committed; under REPEATABLE READ their snapshot would predate the wait.
+  EXECUTE format('ALTER DATABASE %I SET default_transaction_isolation = %L', current_database(), 'read committed');
 END $$;
 
 SET ROLE suva_owner;
