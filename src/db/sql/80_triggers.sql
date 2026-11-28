@@ -4,7 +4,8 @@
 -- Description: Triggers that enforce what a CHECK or a foreign key cannot: deterministic uuid5 ids,
 --              append-only facts (with the columns allowed to change), cross-table validation (a step
 --              version pinned by the run's profile, citations from the same segmentation, scorer
---              comparability, review/target consistency, each ledger row against its rule version, a
+--              comparability, review/target consistency, each ledger row against its rule version, a layer-2
+--              judgement against its own call (DDL-1), a
 --              source row either loaded or excluded, serialised per snapshot across sessions, an exclusion's
 --              reason and file kind), version numbering,
 --              the rule set of a used or pinned step version sealed, the German + French pair of every summary
@@ -621,6 +622,41 @@ CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.llm_judgement
   FOR EACH ROW EXECUTE FUNCTION triage.check_detail_step('layer2_judge');
 CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.justification
   FOR EACH ROW EXECUTE FUNCTION triage.check_detail_step('justification');
+
+-- Layer 2 (DDL-1, D-079; docs/LAYER2.md): a judgement points to its own call. The call has the assessment's run and
+-- ruling and the step layer2_judge; the judgement's prompt is the one the call sent and one its step version declares;
+-- the requested model is the call's, the served model the call's model field or, without it, its header. Fires after
+-- t30_check, which has already checked that the assessment is a layer2_judge one.
+CREATE OR REPLACE FUNCTION triage.check_llm_judgement() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+DECLARE
+  a triage.assessment%ROWTYPE;
+  c ops.llm_call%ROWTYPE;
+BEGIN
+  SELECT * INTO a FROM triage.assessment WHERE assessment_id = NEW.assessment_id;
+  SELECT * INTO c FROM ops.llm_call WHERE llm_call_id = NEW.llm_call_id;
+  IF c.run_id IS DISTINCT FROM a.run_id OR c.ruling_id IS DISTINCT FROM a.ruling_id OR c.step <> 'layer2_judge' THEN
+    RAISE EXCEPTION 'llm_judgement %: call % is not a layer2_judge call of the same run and ruling', NEW.assessment_id, NEW.llm_call_id;
+  END IF;
+  IF c.prompt_version_id IS DISTINCT FROM NEW.prompt_version_id THEN
+    RAISE EXCEPTION 'llm_judgement %: prompt version % is not the one call % sent (%)',
+      NEW.assessment_id, NEW.prompt_version_id, NEW.llm_call_id, coalesce(c.prompt_version_id::text, 'none');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM ops.component_version_prompt cvp
+                 WHERE cvp.component_version_id = a.component_version_id AND cvp.prompt_version_id = NEW.prompt_version_id) THEN
+    RAISE EXCEPTION 'llm_judgement %: prompt version % is not a prompt of the assessment''s step version', NEW.assessment_id, NEW.prompt_version_id;
+  END IF;
+  IF NEW.requested_model IS DISTINCT FROM c.requested_model THEN
+    RAISE EXCEPTION 'llm_judgement %: requested model % is not the call''s (%)', NEW.assessment_id, NEW.requested_model, c.requested_model;
+  END IF;
+  IF NEW.served_model IS DISTINCT FROM coalesce(c.served_model, c.served_model_header) THEN
+    RAISE EXCEPTION 'llm_judgement %: served model % is not the call''s (%)',
+      NEW.assessment_id, coalesce(NEW.served_model, 'none'), coalesce(c.served_model, c.served_model_header, 'none');
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE OR REPLACE TRIGGER t31_call BEFORE INSERT ON triage.llm_judgement
+  FOR EACH ROW EXECUTE FUNCTION triage.check_llm_judgement();
 
 CREATE OR REPLACE FUNCTION triage.check_evidence() RETURNS trigger
   LANGUAGE plpgsql AS $$
