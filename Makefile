@@ -93,7 +93,7 @@ layer1-verify: ## a layer-1 run's files equal its DB rows, read-only: make layer
 L1V_BASE = $(or $(BASE),layer1_reference)
 L1V_PROFILE = $(or $(PROFILE),default)
 layer1-validate: ## run two profiles, recall, compare; fails on a removal: make layer1-validate BASE=... PROFILE=... [OUT=path]
-	$(PY) -m src.layer1 validate --baseline-profile $(L1V_BASE) --profile $(L1V_PROFILE) --out $(or $(OUT),tmp/layer1_validation_$(L1V_BASE)_$(L1V_PROFILE).json)
+	$(PY) -m src.layer1 validate --baseline-profile $(L1V_BASE) --profile $(L1V_PROFILE) --out $(or $(OUT),data/runs/validation/layer1_validation_$(L1V_BASE)_$(L1V_PROFILE).json)
 
 # --- Cluster (docs/DEPLOY.md). The compose jobs call the first four targets inside the app image; the cluster-*
 # targets wrap docker compose on the host. Never `docker compose down -v` (G12): volumes hold the database.
