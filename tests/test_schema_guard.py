@@ -15,7 +15,8 @@ CURRENT = "a" * 64
 
 def test_decide_covers_every_state():
     assert guard.decide(present=False, recorded=None, current=CURRENT, adopt=False) == "fresh"
-    assert guard.decide(present=False, recorded="b" * 64, current=CURRENT, adopt=False) == "fresh"  # after a reset
+    # schemas dropped by hand, nothing deployed yet (a reset deploys and records: test_guard_on_a_real_database)
+    assert guard.decide(present=False, recorded="b" * 64, current=CURRENT, adopt=False) == "fresh"
     assert guard.decide(present=True, recorded=CURRENT, current=CURRENT, adopt=False) == "same"
     assert guard.decide(present=True, recorded=None, current=CURRENT, adopt=True) == "adopt"
     with pytest.raises(SystemExit, match="no recorded fingerprint"):
@@ -61,6 +62,13 @@ def test_guard_on_a_real_database(monkeypatch):
             conn.execute(f"ALTER DATABASE \"{name}\" SET {guard.SETTING} = '{'c' * 64}'")
         with pytest.raises(SystemExit, match="deployed from schema cccccccccccc"):
             guard.check()
+        # the documented recovery: reset (drop, deploy, record), then the next bootstrap passes. Red before: the reset
+        # kept the old fingerprint and the guard refused again, with the same steps
+        reset = argparse.Namespace(yes=True, discard_authored=False, compose=False, url=url)
+        assert deploy.cmd_reset(reset) == 0
+        assert guard.check() == "same"
+        with guard._connect(url) as conn:
+            assert guard.stored(conn) == guard.shipped()
     finally:
         with psycopg.connect(base, autocommit=True) as admin:
             admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')

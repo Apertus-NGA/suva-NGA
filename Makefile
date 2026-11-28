@@ -55,7 +55,7 @@ db-up: ## start the local Postgres (compose service db) and wait until it is hea
 db-deploy: ## apply src/db/sql/NN_*.sql in order (idempotent)
 	$(PY) -m src.db.deploy deploy $(DB_TARGET)
 
-db-reset: ## fresh deploy: drop the six schemas, re-apply src/db/sql (refuses if expert rows would be lost)
+db-reset: ## fresh deploy: drop the six schemas, re-apply src/db/sql, record its fingerprint (refuses if expert rows would be lost)
 	$(PY) -m src.db.deploy reset --yes $(DB_TARGET)
 
 db-test: ## SQL tests in tests/sql, each in a transaction rolled back

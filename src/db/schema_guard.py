@@ -11,7 +11,8 @@ database setting (`suva.schema_sha256`: no table, no DDL change) and compares it
 
   no schema yet                    fresh: deploy, then record
   same fingerprint                 deploy again (idempotent)
-  other fingerprint                refused: back up, then reset (a human runs it; reset refuses to lose expert rows)
+  other fingerprint                refused: back up, then reset (a human runs it; reset refuses to lose expert rows,
+                                   and records the shipped fingerprint once it has deployed, so the next check is same)
   schema without fingerprint       refused, unless SUVA_SCHEMA_ADOPT=1: the operator states that the schema equals
                                    the shipped files (a database deployed before the guard existed)
 """
@@ -22,10 +23,10 @@ import argparse
 import os
 import sys
 
-from src.db.deploy import SCHEMAS, script_for, sql_files
+from src.db.deploy import SCHEMA_SETTING, SCHEMAS, script_for, sql_files
 from src.db.pg import sha256_text
 
-SETTING = "suva.schema_sha256"
+SETTING = SCHEMA_SETTING  # recorded here after a deploy, and by `src.db.deploy reset` after a fresh deploy
 RESET_STEPS = (
     "back up first (make cluster-backup), then reset the schemas (docker compose run --rm migrate make db-reset: "
     "it refuses if expert rows would be lost), then make cluster-up (docs/DEPLOY.md §7)"
