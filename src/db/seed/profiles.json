@@ -87,6 +87,43 @@
               0
             ]
           }
+        },
+        {
+          "version": [
+            0,
+            4,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            3,
+            0
+          ],
+          "decision": "D-094",
+          "changelog": "layer2_judge V2.0.0 (the Suva Scout scorer) replaces the 8B judge, and ranking V1.0.0 (its promotion) is added, after layer1_filter V1.1.0 (D-094).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              2,
+              0,
+              0
+            ],
+            "ranking": [
+              1,
+              0,
+              0
+            ]
+          }
         }
       ]
     },

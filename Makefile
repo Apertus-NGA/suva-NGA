@@ -76,6 +76,13 @@ layer1: ## run layer 1 on the default profile (PROFILE=..., POPULATION=...): fil
 layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 	$(PY) -m src.layer1 recall --profile $(or $(PROFILE),default)
 
+.PHONY: scorer-export scorer-load
+scorer-export: ## write a stored Suva Scout scorer run to data/derived/scorer/run.json: make scorer-export FROM=postgresql://...
+	$(PY) -m src.scorer export --from-url $(FROM)
+
+scorer-load: ## load that run as layer 2 (the scorer) and ranking (its promotion) on the default profile (D-094)
+	$(PY) -m src.scorer load $(if $(FILE),--file $(FILE))
+
 .PHONY: layer2 layer2-validate
 layer2: ## layer 2 on layer 1's candidates (MODE=replay|live; ARGS="--limit N|--all --population CODE --store DIR")
 	$(PY) -m src.layer2 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)

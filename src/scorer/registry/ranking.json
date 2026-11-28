@@ -1,0 +1,35 @@
+{
+  "step": "ranking",
+  "doc": "docs/DECISIONS.md D-094; src/scorer/load.py. The scorer run's promotion as the ranking step (D-094).",
+  "config_schema": {
+    "schema_code": "ranking.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial (D-094)."
+  },
+  "rules": [],
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "Promotion of the Suva Scout scorer run",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "cut": "stored_promotion",
+        "scorer": "scorer@2",
+        "reference_threshold": 0.4680961658280962
+      },
+      "rules": [],
+      "decision": "D-094",
+      "validation": null,
+      "changelog": "Initial (D-094): a ruling the scorer's run promoted is in_scope. A kept ruling it did not promote gets no ranking assessment and stays potentially with its score."
+    }
+  ]
+}
