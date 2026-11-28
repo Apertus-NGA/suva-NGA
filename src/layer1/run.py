@@ -344,7 +344,13 @@ def run_layer1(
     population: str | None = None,
     runs_dir: Path = RUNS_DIR,
     actor: str = "pipeline",
+    kind: str = "layer1",
 ) -> dict:
+    """Decide every ruling (or one population) with the profile's pinned version. `kind`: `layer1` for a pipeline
+    run, whose decisions form the label and feed layer 2; `eval` for a measurement (`validate`), which never does:
+    triage.v_scope_pipeline skips eval runs and layer 2 takes its candidates from `layer1` runs only."""
+    if kind not in ("layer1", "eval"):
+        raise ValueError("kind must be layer1 (a pipeline run) or eval (a measurement, never the label)")
     with conn.cursor() as cur:
         pvid, profile_label = profile_version(cur, profile)
         cvid = pinned_version(cur, pvid, STEP)
@@ -355,7 +361,7 @@ def run_layer1(
     run = begin_run(
         conn,
         profile_version_id=pvid,
-        kind="layer1",
+        kind=kind,
         step=STEP,
         operation="layer1.run",
         component_version_id=cvid,

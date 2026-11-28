@@ -445,3 +445,37 @@ def test_replay_with_a_partial_cache_judges_what_it_has_and_counts_the_rest(db):
     assert label == [("layer2_judge", True)]  # the earlier judgement keeps its place: a miss writes no row
     with pytest.raises(Layer2RunFailed, match="none of the 3 candidates"):
         run(url, tmp, client(tmp / "store_empty", Gateway(), mode="replay"), mode="replay")
+
+
+def test_a_validation_or_an_identical_layer1_rerun_keeps_the_layer2_label(db):
+    """Integration review, 28 Nov: the release gate's `validate` and `make run` S2 both run layer 1 again. The
+    validation's runs are measurements (kind eval): they never form the label and are never layer 2's source. A new
+    pipeline run that decides every ruling the same way keeps each judgement in the label (DDL-2 matches the layer-1
+    decision, not the assessment id). Red before: one validation dropped every layer2_judge row from the label."""
+    from src.layer1.recall import validate
+    from src.layer1.run import run_layer1
+    from src.layer2.run import layer1_source
+
+    url, tmp = db
+    q = """SELECT r.docket, p.step::text, p.assessment_id::text FROM triage.v_scope_pipeline p
+           JOIN corpus.ruling r USING (ruling_id) ORDER BY 1"""
+    before = rows(url, q)
+    assert sum(step == "layer2_judge" for _, step, _ in before) == 3  # the earlier tests judged the 3 candidates
+    with pipeline(url) as conn:
+        report = validate(conn, "default", "default", runs_dir=tmp / "runs", actor="test")
+    assert report["validation"]["passed"]
+    measured = [r["run_id"] for r in report["runs"]]
+    kinds = rows(url, "SELECT DISTINCT kind::text FROM ops.pipeline_run WHERE run_id = ANY(%s::uuid[])", measured)
+    assert kinds == [("eval",)]
+    assert rows(url, q) == before  # the gate leaves the label as it found it
+    with pipeline(url) as conn:
+        rerun = run_layer1(conn, runs_dir=tmp / "runs", actor="test")
+        with conn.cursor() as cur:
+            pvid = cur.execute(
+                "SELECT profile_version_id::text FROM ops.pipeline_run WHERE run_id = %s", (rerun["run_id"],)
+            ).fetchone()[0]
+            assert layer1_source(cur, pvid) == rerun["run_id"] not in measured
+    after = rows(url, q)
+    judged = [r for r in before if r[1] == "layer2_judge"]
+    assert [r for r in after if r[1] == "layer2_judge"] == judged  # same decisions: their judgements stay the label
+    assert [(d, s) for d, s, _ in after] == [(d, s) for d, s, _ in before]  # the drop now shows the rerun's decision

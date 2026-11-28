@@ -51,7 +51,9 @@ CODE_PATHS = ("src/layer2/engine.py", "src/layer2/models.py", "src/layer2/run.py
 PURPOSE = "relevance_judgement"
 RUNS_DIR = ROOT / "data" / "runs"
 # Replay mode, no recorded answer: the candidate is not judged in this run (no row, so an earlier judgement keeps its
-# place in the label), listed in replay_misses.jsonl and counted; never a failure (D-085, docs/LAYER2.md §4).
+# place in the label while the ruling's current layer-1 decision is the one it was judged on: an identical layer-1
+# rerun keeps it, a changed decision does not; DDL-2), listed in replay_misses.jsonl and counted; never a failure
+# (D-085, docs/LAYER2.md §4).
 REPLAY_MISS = "L2_REPLAY_MISS"
 BREAKER_CONSECUTIVE = 5  # live call failures in a row that stop a run: the gateway is down, not one ruling
 PROGRESS_EVERY_S = 10.0

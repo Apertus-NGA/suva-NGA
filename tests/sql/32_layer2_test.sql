@@ -1,5 +1,6 @@
 -- Layer 2 (docs/LAYER2.md): a judgement points to its own call (DDL-1), and the label reads only usable runs, along
--- the lineage of each ruling's current layer-1 decision (DDL-2). Synthetic ruling 8C_900/2026, no personal data.
+-- the lineage of each ruling's current layer-1 decision (DDL-2), matched on the decision so that an identical layer-1
+-- rerun keeps the judgements (integration review, 28 Nov). Synthetic ruling 8C_900/2026, no personal data.
 BEGIN;
 \ir _fixtures.sql
 
@@ -85,6 +86,8 @@ SELECT r.id::uuid, (SELECT profile_version_id FROM ops.pipeline_profile_version 
 FROM (VALUES ('00000000-0000-4000-8000-000000000b0a', 'layer1', 'succeeded'),
              ('00000000-0000-4000-8000-000000000b0b', 'layer1', 'succeeded'),
              ('00000000-0000-4000-8000-000000000b09', 'layer1', 'succeeded'),
+             ('00000000-0000-4000-8000-000000000b08', 'layer1', 'succeeded'),
+             ('00000000-0000-4000-8000-000000000b07', 'layer1', 'succeeded'),
              ('00000000-0000-4000-8000-000000000b10', 'layer2', 'succeeded'),
              ('00000000-0000-4000-8000-000000000b0f', 'layer2', 'failed'),
              ('00000000-0000-4000-8000-000000000b0c', 'layer2', 'aborted'),
@@ -136,6 +139,23 @@ SELECT pg_temp.a('00000000-0000-4000-8000-000000000c03', '00000000-0000-4000-800
 SELECT pg_temp.a('00000000-0000-4000-8000-000000000c17', '00000000-0000-4000-8000-000000000b10', 'layer2_judge',
                  '00000000-0000-4000-8000-000000000c03', 'potentially', 55, 10);
 DO $$ BEGIN ASSERT pg_temp.label() = 'layer2_judge:c17', format('judged on the new current decision: %s', pg_temp.label()); END $$;
+
+-- the lineage follows the layer-1 decision, not the assessment id: a rerun of layer 1 that decides the ruling the same
+-- way (same version, input fingerprint, scope, reason code, outcome; make run S2) keeps the judgement in the label
+SELECT pg_temp.a('00000000-0000-4000-8000-000000000c04', '00000000-0000-4000-8000-000000000b08', 'layer1_filter', NULL, 'potentially', NULL, 11);
+DO $$ BEGIN ASSERT pg_temp.label() = 'layer2_judge:c17', format('an identical layer-1 rerun keeps the judgement: %s', pg_temp.label()); END $$;
+
+-- a layer-1 measurement (an eval run: make layer1-validate) never becomes the current decision, even a different one
+SELECT pg_temp.a('00000000-0000-4000-8000-000000000c05', '00000000-0000-4000-8000-000000000b0e', 'layer1_filter', NULL, 'out_of_scope', 0, 12);
+DO $$ BEGIN ASSERT pg_temp.label() = 'layer2_judge:c17', format('a layer-1 eval run never changes the label: %s', pg_temp.label()); END $$;
+
+-- the same scope and reason on another input (the text changed: another fingerprint) is another decision: stale
+INSERT INTO triage.assessment (assessment_id, run_id, ruling_id, step, component_version_id, span_id, input_fingerprint,
+                               in_suva_scope, outcome, reason_code, mode, started_at, created_at)
+VALUES ('00000000-0000-4000-8000-000000000c06', '00000000-0000-4000-8000-000000000b07', pg_temp.rid('8C_900/2026'), 'layer1_filter',
+        pg_temp.cv('layer1_filter'), pg_temp.span('layer1_filter', '8C_900/2026', '00000000-0000-4000-8000-000000000b07'),
+        repeat('1', 64), 'potentially', 'ok', 'L1_KEEP_RUBRIC', 'REPLAY', now(), now() + make_interval(secs => 13));
+DO $$ BEGIN ASSERT pg_temp.label() = 'layer1_filter:c06', format('another input is another decision: %s', pg_temp.label()); END $$;
 
 -- the fixture's rulings keep their labels (furthest step of the finished fixture run)
 DO $$ BEGIN

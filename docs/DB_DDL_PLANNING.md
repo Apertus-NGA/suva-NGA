@@ -538,7 +538,7 @@ Invariants:
 
 ### 9.3 Views (never a column)
 
-- **`triage.v_scope_pipeline`**: for each ruling, the assessment of the furthest step in the current release of the `default` profile. This is **the label** (OQ-7). Outside a release, only runs that finished `succeeded` or `partial` count (not `eval`), and an assessment counts only if its `upstream_assessment_id` chain reaches the ruling's current layer-1 decision (DDL-2 of `docs/LAYER2_IMPLEMENTATION_PLANNING.md`, 28 Nov; `tests/sql/32_layer2_test.sql`).
+- **`triage.v_scope_pipeline`**: for each ruling, the assessment of the furthest step in the current release of the `default` profile. This is **the label** (OQ-7). Outside a release, only runs that finished `succeeded` or `partial` count (not `eval`), and an assessment counts only if its `upstream_assessment_id` chain reaches the ruling's current layer-1 decision (DDL-2 of `docs/LAYER2_IMPLEMENTATION_PLANNING.md`, 28 Nov; `tests/sql/32_layer2_test.sql`). The decision is matched by content (`layer1_filter` version, input fingerprint, scope, reason code, outcome) and its layer-1 root must come from a usable run of the default profile: an identical rerun of layer 1 (`make run` S2) keeps the later steps, and the runs of `make layer1-validate` are of kind `eval`, so the release gate never moves the label (integration review, 28 Nov).
 - **`triage.v_scope_current`**: the above, plus the latest expert scope review (§12.2): `pipeline_label`, `expert_verdict` (`correct` \| `incorrect` \| NULL), `expert_implied_label` (the pipeline label, flipped when the verdict is `incorrect`), `reviewed_at`. What each consumer reads is settled in §12.3.
 
 ---
