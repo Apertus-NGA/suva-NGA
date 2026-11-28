@@ -1,0 +1,52 @@
+{
+  "what": "layer2_judge certification against the D-074 benchmark (docs/LAYER2.md)",
+  "version": "V1.0.0",
+  "git_commit": "e1bc7c295d11825e85a9dfdaff2bbf0d05eb6a37",
+  "git_dirty": true,
+  "expected": {
+    "canonical": "layer2-golden-1",
+    "step": "layer2_judge",
+    "version": "V1.0.0",
+    "prompt": "layer2_judge.question V1.0.0",
+    "prompt_template_sha256": "66a315583668de5a1f7be574228ee90078c9fcc61683c9b4e333e1e7d4e1a907",
+    "config_sha256": "4c74c89870add34984f8e75d034170b3b45172d17e06ade6463084af1dee2c75",
+    "dataset": {
+      "name": "suva-ft-v3",
+      "ids_digest": "69f8e4b0c7714898d8df0765138f0dbe687e83705d1d793c531c3f80d23785b6",
+      "rulings": 3936
+    },
+    "messages": {
+      "in_db": 3936,
+      "missing_in_db": 0,
+      "equal": 3936,
+      "different": 0,
+      "digest": "70cf677e061595620a2876d2e38f890146ba43e4a116c3131ed103ddb613e4c4"
+    },
+    "scores": {
+      "layer1_filter": "V1.1.0",
+      "compared": 634,
+      "equal": 634,
+      "max_abs_diff": 0.0,
+      "scores_digest": "36db7b534f802d47a1db2ddd1c439743db417b4f29b87347fce633ea15a70bc8"
+    }
+  },
+  "truncation": {
+    "head12000_tail2000": 1683,
+    "none": 2253
+  },
+  "texts_with_control_tags": 0,
+  "scores": {
+    "run_id": "8fc08fc1-f05d-4a18-a55b-aca8630103ad",
+    "judged_in_run": 634,
+    "compared": 634,
+    "equal": 634,
+    "max_abs_diff": 0.0,
+    "scores_digest": "36db7b534f802d47a1db2ddd1c439743db417b4f29b87347fce633ea15a70bc8",
+    "distinct_p_yes": 597,
+    "distinct_score_0_100": 90,
+    "tied_at_100": 123,
+    "tied_at_0": 277,
+    "distinct_score_raw": 634
+  },
+  "metrics_source": "results/finetune_benchmark_v3.json (by identity when both parities hold)"
+}

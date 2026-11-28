@@ -12,6 +12,7 @@ import json
 import sys
 from pathlib import Path
 
+from src.db.llm_registry import bind_resources, load_models
 from src.db.pg import ROOT, connect
 from src.db.registry import load_profiles, load_step_registry, pinned_version, profile_version
 from src.ingest import judgements
@@ -19,6 +20,7 @@ from src.ingest.gold import load_gold
 from src.ingest.hf_base import load_base
 from src.ingest.models import IngestConfig
 from src.layer1.models import Layer1Config, RuleDefinition
+from src.layer2.models import Layer2Config
 
 REGISTRIES = (
     ("src/ingest/registry/ingest.json", IngestConfig, None, ("src/ingest/hf_base.py", "src/ingest/models.py")),
@@ -28,14 +30,22 @@ REGISTRIES = (
         RuleDefinition,
         ("src/layer1/engine.py", "src/layer1/models.py"),
     ),
+    (
+        "src/layer2/registry/layer2_judge.json",
+        Layer2Config,
+        None,
+        ("src/layer2/engine.py", "src/layer2/models.py"),
+    ),
 )
 
 
 def load_registries(conn) -> list[str]:
-    loaded = []
+    models = load_models(conn)  # first: step versions bind models by id (layer2_judge)
+    loaded = [f"MODELS.md: {', '.join(sorted(models))}"]
     for path, config_model, rule_model, code in REGISTRIES:
         versions = load_step_registry(conn, ROOT / path, config_model, rule_model, code)
         loaded += [f"{path}: " + ", ".join("V{}.{}.{}".format(*v) for v in versions)]
+        bind_resources(conn, ROOT / path)  # models and prompts a version declares (layer2_judge), next to it
     loaded += load_profiles(conn, ROOT / "src" / "db" / "seed" / "profiles.json")
     return loaded
 

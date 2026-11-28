@@ -92,6 +92,7 @@ Files of the official template are marked `[T]`: never renamed or moved (D-039);
     src/triage/      net, Apertus judgement, score and threshold (design OPEN, D-021)
     src/summarise/   DE and FR summaries
     src/verify/      reference and number verifier (canonical ids, D-037)
+    src/layer2/      layer 2 on the database: the Apertus relevance judge, every call traced (D-075 to D-080)
     src/llm/         the single Apertus client (limiter, cache, replay, JSON cascade) and the gateway probe
     src/api/ src/ui/ FastAPI and the legal-expert UI
     eval/            gold manifests, runners, graders

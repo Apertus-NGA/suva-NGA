@@ -75,3 +75,10 @@ layer1: ## run layer 1 on the default profile (PROFILE=..., POPULATION=...): fil
 
 layer1-recall: ## blocking recall of the latest layer-1 run on Suva's labels
 	$(PY) -m src.layer1 recall --profile $(or $(PROFILE),default)
+
+.PHONY: layer2 layer2-validate
+layer2: ## layer 2 on layer 1's candidates (MODE=replay|live; ARGS="--limit N|--all --population CODE --store DIR")
+	$(PY) -m src.layer2 run --mode $(MODE) --profile $(or $(PROFILE),default) $(ARGS)
+
+layer2-validate: ## certify the pinned layer2_judge version against the D-074 benchmark (needs data/derived/finetune)
+	$(PY) -m src.layer2 validate --data-root data/derived/finetune/suva-ft-v3 --manifest experiments/finetune/manifests/suva-ft-v3/MANIFEST_suva_ft_v3.json --bench data/derived/finetune/bench_v3/8b_all $(ARGS)

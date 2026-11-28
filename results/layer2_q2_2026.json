@@ -1,0 +1,111 @@
+{
+  "status": "succeeded",
+  "mode": "LIVE",
+  "kind": "layer2",
+  "git_commit": "e1bc7c295d11825e85a9dfdaff2bbf0d05eb6a37",
+  "started_at": "2026-11-28 06:58:35.606794+00",
+  "finished_at": "2026-11-28 06:59:11.287916+00",
+  "resolved_models": {
+    "judge": "apertus-v1-5-8b"
+  },
+  "model_override": false,
+  "run_id": "8650bb32-3619-49c4-962c-bfb567668c99",
+  "params": {
+    "limit": null,
+    "store": "data/derived/llm",
+    "profile": "default",
+    "version": "V1.0.0",
+    "layer1_run": "546d66a8-4098-42e7-a607-7a8d3db732d9",
+    "population": [
+      "2026Q2_union"
+    ],
+    "repetition": 0,
+    "client_size": "small",
+    "profile_version": "V0.3.0",
+    "max_failed_share": 0.02
+  },
+  "metrics": {
+    "cache_hits": 3.0,
+    "failed": 0.0,
+    "judged": 383.0,
+    "latency_p50_ms": 378.0,
+    "latency_p95_ms": 528.0,
+    "live_calls": 380.0,
+    "llm_attempts": 383.0,
+    "llm_errors": 0.0,
+    "model_override": 0.0,
+    "neutralised": 0.0,
+    "rulings_in": 383.0,
+    "skipped": 0.0,
+    "tokens_in": 1206304.0,
+    "truncated": 190.0
+  },
+  "by_language": {
+    "de": 247,
+    "fr": 126,
+    "it": 10
+  },
+  "by_court": {
+    "8C": {
+      "n": 168,
+      "mean_p_yes": 0.547
+    },
+    "9C": {
+      "n": 100,
+      "mean_p_yes": 0.361
+    },
+    "4A": {
+      "n": 68,
+      "mean_p_yes": 0.139
+    },
+    "4D": {
+      "n": 12,
+      "mean_p_yes": 0.0
+    },
+    "6B": {
+      "n": 9,
+      "mean_p_yes": 0.118
+    },
+    "2C": {
+      "n": 7,
+      "mean_p_yes": 0.009
+    },
+    "9F": {
+      "n": 5,
+      "mean_p_yes": 0.226
+    },
+    "8F": {
+      "n": 5,
+      "mean_p_yes": 0.4
+    },
+    "5A": {
+      "n": 3,
+      "mean_p_yes": 0.0
+    },
+    "4F": {
+      "n": 3,
+      "mean_p_yes": 0.0
+    },
+    "7B": {
+      "n": 2,
+      "mean_p_yes": 0.0
+    },
+    "9G": {
+      "n": 1,
+      "mean_p_yes": 0.014
+    }
+  },
+  "p_yes_bands": {
+    "0.001<=p<0.1": 57,
+    "0.1<=p<0.5": 15,
+    "0.5<=p<0.9": 11,
+    "p<0.001": 170,
+    "p>=0.9": 130
+  },
+  "ties": {
+    "distinct_score_raw": 383,
+    "distinct_score_0_100": 81,
+    "at_100": 88,
+    "at_0": 133
+  }
+}

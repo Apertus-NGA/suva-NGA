@@ -1,0 +1,63 @@
+{
+  "step": "layer2_judge",
+  "doc": "docs/LAYER2.md; docs/LAYER2_IMPLEMENTATION_PLANNING.md §6, §7. A version is immutable: any change to the configuration, the prompt or the model is a new version (D-064).",
+  "config_schema": {
+    "schema_code": "layer2_judge.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: client prompt string (cache key), question language, Ja/Nein answer tokens, top log-probabilities, one token at T=0, the head/tail text cut, the control-tag neutraliser, score_raw = logit, score_0_100 = 100 x p_yes, the failure share above which a run fails."
+  },
+  "rules": [],
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "Apertus 8B zero-shot Ja/Nein, the D-074 chain",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "client_prompt_version": "suva-ft-v3/zero-shot-ja-nein",
+        "question_language": "de",
+        "answer_tokens": {
+          "yes": [
+            "ja",
+            "j"
+          ],
+          "no": [
+            "nein",
+            "nei",
+            "ne"
+          ]
+        },
+        "top_logprobs": 20,
+        "max_tokens": 1,
+        "temperature": 0,
+        "text_cap": {
+          "max_chars": 14000,
+          "head": 12000,
+          "marker": "\n[…]\n"
+        },
+        "neutralise_control_tags": true,
+        "score_raw": "logit",
+        "score_mapping": "p_yes_x100",
+        "max_failed_share": 0.02
+      },
+      "rules": [],
+      "models": {
+        "judge": "apertus-v1-5-8b"
+      },
+      "prompts": {
+        "question": "prompts/layer2_judge/question.V1.0.0.json"
+      },
+      "decision": "D-076",
+      "validation": "expected/layer2/V1.0.0.json",
+      "changelog": "Initial (D-075, D-076): the scoring chain of the D-074 benchmark, byte for byte (prompt, 14,000-character cut, one token, top 20, Ja/Nein sets, P(Ja)/(P(Ja)+P(Nein))), judged by Apertus v1.5 8B, the model at least as good as the 70B on every primary metric where a difference is resolvable. Adds a control-tag neutraliser (G4) that is identity on texts without such tags."
+    }
+  ]
+}
