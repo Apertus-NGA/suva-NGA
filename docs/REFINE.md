@@ -122,14 +122,15 @@ three fiches out of 32 is within the judge's own variation.
 **Where the F2 losses come from.** Three fiches lost F2 in both repetitions. Reading the judge's reasons, refine
 caused none of them:
 - 8C_145/2025 fr: the faulted words ("l'instruction est complète") are in the draft, and refine did not change them.
-- 8C_154/2025 de: the faulted sentence ("Die Integritätsentschädigung wird bestätigt.") is in the draft. It is a real
-  error of the draft that refine did not catch.
+- 8C_154/2025 de: the faulted sentence ("Die Integritätsentschädigung wird bestätigt.") is in the draft, and it is
+  correct. The court rejected the appeal on the integrity compensation (E.7), so Suva's 10 % stands. The judge read
+  "appeal rejected on this point" as "compensation refused".
 - 8C_399/2025 de: the judge faults "Art. 21 Abs. 5 ATSG" as a wrong citation of "Art. 21 al. 5 LPGA". This is a
   judge error: ATSG and LPGA are the German and French names of the same act.
 
-This reading was done on the holdout. Any change made from it has to be measured on a fresh set.
+So the three F2 losses are all judge errors. This reading was done on the holdout. Any change made from it has to be measured on a fresh set.
 
 **Next.**
 1. Validate the judge (`docs/JUDGE.md` §5); add the DE/FR act-name pairs to its F2 instructions.
-2. Add a step that checks the court's decision on each claim against the operative part, since 8C_154 kept a reversed outcome.
+2. Teach the judge the difference between the appeal being rejected on a point and the benefit being refused (8C_154).
 3. Have a lawyer review the kept patches, using the trace shown in the UI.
