@@ -24,6 +24,7 @@ Needs `DATABASE_URL` (a database built by `make db-deploy` and loaded). Settings
 | `PIPELINE_DATABASE_URL` | `DATABASE_URL` | the pipeline login those runs use (never the API's own) |
 | `API_LAYER2_STORE`, `API_LAYER2_POPULATIONS` | none | `--store`, `--population` of the launched layer 2 |
 | `API_AI_RELEVANT_MIN_SCORE` | unset | a threshold on `score_0_100` that makes `ai_relevant`; unset while D-021 is open |
+| `API_UI_DIST` | `src/web/dist` | the built React UI (`npm run build` in `src/web`), served at `/` when the directory holds an `index.html`; mounted after every route, so `/api/*` keeps priority; nothing is mounted without a build |
 
 ## 2. Conventions
 
@@ -61,7 +62,7 @@ The first matching line wins. The label itself is `triage.v_scope_pipeline`'s (b
 | `GET /api/rulings` | `q`, `decided_from`, `decided_to`, `published_from`, `published_to`, `court`*, `area`*, `core`, `language`*, `status`*, `score_min`, `score_max`, `has_summary`, `inbox`, `sort` (`score` \| `decision_date` \| `publication_date` \| `docket` \| `status`), `order`, `limit`, `offset` (* repeatable) | `{total, items: [RulingRow]}` |
 | `GET /api/facets` | the same filters | `{total, decided_min, decided_max, published_min, published_max, courts, areas, languages, statuses}`, each list `[{value, n}]` counted under every filter but its own |
 | `GET /api/rulings/{id}` | | `{ruling: RulingRow, text, text_id, text_source, relevance, summaries: {de, fr}, summary_request, reference}` |
-| `POST /api/rulings/{id}/relevance` | `{action: mark_relevant \| mark_not_relevant \| reopen, comment?, token?}` | the new `RulingRow`; 409 when not assessed, nothing to reopen, or `token` is stale |
+| `POST /api/rulings/{id}/relevance` | `{action: mark_relevant \| confirm_relevant \| mark_not_relevant \| reopen, comment?, token?}` (`confirm_relevant` is an alias of `mark_relevant`, stored as `mark_relevant`) | the new `RulingRow`; 409 when not assessed, nothing to reopen, or `token` is stale |
 | `POST /api/rulings/{id}/summaries` | | 202, the request `{request_id, kind, status, ...}` (stays `pending`: no request runner yet) |
 | `PUT /api/rulings/{id}/summaries/{de\|fr}` | `{body, title_line?, parent_version_id?}` | the summaries; 409 while the ruling has no summary or `parent_version_id` is stale |
 | `POST /api/rulings/{id}/summaries/{lang}/validate` | `{comment?}` | the summaries (one review covers the DE + FR version) |
@@ -70,13 +71,15 @@ The first matching line wins. The label itself is `triage.v_scope_pipeline`'s (b
 | `POST /api/requests` | `{docket?, bger_url?}` | 202, the "add another judgement" request (D-015), `pending` |
 | `GET /api/requests/{id}` | | `{request_id, kind, status (pending \| accepted \| done \| failed \| rejected), status_detail, ...}` |
 | `GET /api/learning` | | `{decisions, transitions: [{before, after, n}], summaries_generated, summaries_edited, summaries_validated, edits_per_language}` |
-| `GET /api/scoring` | | the default profile's steps, layer 1's rules (DE/FR labels), layer 2's judge; `rules: []` |
+| `GET /api/scoring` | | the default profile's steps, layer 1's rules (DE/FR labels), layer 2's judge; `rules` and `intercept` (below) |
 | `GET /api/runs` | | `{enabled, running, current, last, recent}`: the job the API started and the latest `ops.pipeline_run` rows (with `replay_misses`) |
 | `POST /api/runs` | `{mode?, limit?, all?, population?}` | 202 and the job; 403 unless `API_RUNS_ENABLED=1`, 409 while a job runs, 422 for a live run without `limit` or `all` |
 
-**RulingRow**: `id, docket, decision_date, publication_date, publication_date_approx, publication_quality, quarter_by_decision, quarter_by_publication, court, language, area, subject, bger_url, status, pipeline_label, step, score (0-100), score_raw (the logit: orders ties), score_source, reason_code, reason_label_de, reason_label_fr, explanation_de, outcome, mode, is_new, has_summary, summary_validated, decision_token, expert {verdict, label, at, stale}`.
+**RulingRow**: `id, docket, decision_date, publication_date, publication_date_approx, publication_quality, quarter_by_decision, quarter_by_publication, court, language, area, subject, bger_url, status, pipeline_label, step, score (0-100), score_raw (the logit: orders ties), score_source, reason_code, reason_label_de, reason_label_fr, explanation_de, outcome, mode, is_new, has_summary, summary_validated, decision_token, expert {verdict, label, at, stale}`. Added (28 Nov): `rubric` (the matter head the `area` code is read from: Neuheiten rubric, else HF legal area, else the start of the subject, cut at the first bracket, comma or semicolon), `star` (the Neuheiten star of the best publication observation, `null` when none), `has_reference` (a Suva summary in `gold.suva_summary` is linked to the ruling).
 
-**relevance** (the "why" card): `state` (`scored` \| `assessed` \| `not_assessed`), `label`, `step`, `score`, `score_raw`, `reason_code` and its labels, `explanation_de`, `mode`, `run {run_id, kind, status, mode, started_at, finished_at, profile, component}`, `trace` (one hop per step of the label's lineage), `text_id`, `layer1` (the fired rules: `rule, label_de, label_fr, effect, outcome, decisive, field, examined_value, text_id, matched_text, char_start, char_end, detail`), `layer2` (`model, requested_model, prompt_version, p_yes, logprob_yes, logprob_no, yes_no_in_top, top_logprobs, text_chars_total, text_chars_sent, truncation, input_tokens, llm_call_id, outcome`), `rules: []`.
+**relevance** (the "why" card): `state` (`scored` \| `assessed` \| `not_assessed`), `label`, `step`, `score`, `score_raw`, `reason_code` and its labels, `explanation_de`, `mode`, `run {run_id, kind, status, mode, started_at, finished_at, profile, component}`, `trace` (one hop per step of the label's lineage), `text_id`, `layer1` (the fired rules: `rule, label_de, label_fr, effect, outcome, decisive, field, examined_value, text_id, matched_text, char_start, char_end, detail`), `layer2` (`model, requested_model, prompt_version, p_yes, logprob_yes, logprob_no, yes_no_in_top, top_logprobs, text_chars_total, text_chars_sent, truncation, input_tokens, llm_call_id, outcome`), `rules`, `readings`, `read_by_apertus`. When the current layer-2 assessment was written by the scorer (`src/scorer/load.py`, profile `scout`), `rules` lists its `signal` reasons in the scorer's order: `[{rule, feature, source (apertus \| code), direction (+1 \| -1), applies, value, effect}]`, `readings` the Apertus readings behind the consensus rule `[{reading, level}]`, and `read_by_apertus` is true when the Apertus rule applies. Otherwise (the 8B judge) `rules: []`, `readings: []`, and `read_by_apertus` says whether a layer-2 judgement exists. A not-assessed ruling answers `{state: not_assessed, reason, reason_code: NOT_ASSESSED}`.
+
+**scoring.rules**: when the default profile's `layer2_judge` config holds `rule_weights` (the scorer), `[{rule, feature, source, direction, weight, effect: 0, share: null}]` in the scorer's input order, and `intercept`; otherwise `rules: []` and `intercept: null`.
 
 **Summary** (per language, preset `suva_house` only, `null` until layer 3 writes `summ.*`; `has_summary` and `summary_validated` on a row read the same preset): `summary_version_id, summary_id, preset, version, origin, quality_status, mode, validated, validated_at, title_line, body, sentences [{claim_id, ordinal, paragraph, section, text, status, sources: []}]`.
 
@@ -98,5 +101,5 @@ curl -s -X POST localhost:8000/api/requests -H 'Content-Type: application/json' 
 | expert decision on a not-assessed ruling | a ruling-level review target (D-093, open part) |
 | refresh (`/api/updates`), inbox content | incremental ingest with `created_by_run_id`, a refresh run that links its child runs |
 | processing of requests | a request runner (`ops.user_request`: pending → accepted → done or failed) |
-| UI served by the API, CORS for a separate dev server | the UI owner's choice (open) |
+| CORS for a separate dev server; client-side routes other than `/` (`html=True` serves `index.html` for `/` only) | the UI owner's choice (open) |
 | folders and exports, revision by reason, Suva's reference summaries | their tables and a `gold.suva_summary` loader |

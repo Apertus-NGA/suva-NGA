@@ -1,4 +1,13 @@
-// Types and calls for the backend API (src/suva_app/main.py).
+// Types and calls for the backend API. By default Suva Scout (src/suva_app/main.py); built with VITE_BACKEND=api,
+// src/api (the six-schema data layer, docs/API.md) through the adapters of sixApi.ts. The types are the UI's.
+
+import { ApiError, failure } from "./http";
+import * as six from "./sixApi";
+
+export { ApiError };
+
+/** True when the UI was built against src/api. */
+export const SIX_BACKEND = import.meta.env.VITE_BACKEND === "api";
 
 export type Label = "relevant" | "not_relevant" | "unknown";
 export type Topic = "UV" | "MV" | "IV";
@@ -6,7 +15,7 @@ export type Status = "not_assessed" | "potentially_relevant" | "ai_relevant" | "
 export type RelevanceAction = "confirm_relevant" | "mark_not_relevant" | "reopen";
 
 export type Ruling = {
-  id: number;
+  id: string; // Scout's numeric id as text, or src/api's UUID
   docket: string;
   decision_date: string;
   publication_date: string | null;
@@ -52,29 +61,6 @@ export type Facets = {
   statuses: FacetValue[];
 };
 
-/** A failed call: the HTTP status and, when the server gave one, its `{detail}` text. */
-export class ApiError extends Error {
-  status: number;
-  detail: string | null;
-  constructor(status: number, detail: string | null) {
-    super(detail ?? String(status));
-    this.status = status;
-    this.detail = detail;
-  }
-}
-
-async function failure(response: Response): Promise<ApiError> {
-  let detail: string | null = null;
-  try {
-    const body: unknown = await response.json();
-    const value = body && typeof body === "object" ? (body as { detail?: unknown }).detail : null;
-    if (typeof value === "string") detail = value;
-  } catch {
-    // no JSON body: the status alone is reported
-  }
-  return new ApiError(response.status, detail);
-}
-
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, { signal, headers: { Accept: "application/json" } });
   if (!response.ok) throw await failure(response);
@@ -112,10 +98,12 @@ export type UpdatesStatus = {
   ingested_rulings: number;
 };
 
-export const fetchUpdates = (signal?: AbortSignal) => get<UpdatesStatus>("/api/updates", signal);
+export const fetchUpdates = (signal?: AbortSignal): Promise<UpdatesStatus> =>
+  SIX_BACKEND ? six.fetchUpdates() : get<UpdatesStatus>("/api/updates", signal);
 
 /** Start an update: a range of publication dates, or nothing for "since the last update". */
 export async function startUpdate(range?: { published_from: string; published_to: string }): Promise<UpdatesStatus> {
+  if (SIX_BACKEND) return six.startUpdate();
   const response = await fetch("/api/updates", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -140,7 +128,8 @@ export type Learning = {
 };
 
 /** Record an expert decision on a ruling's relevance. Confirming creates a gold label. */
-export async function decideRelevance(rulingId: number, action: RelevanceAction): Promise<void> {
+export async function decideRelevance(rulingId: string, action: RelevanceAction): Promise<void> {
+  if (SIX_BACKEND) return six.decideRelevance(rulingId, action);
   const response = await fetch(`/api/rulings/${rulingId}/relevance`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -149,19 +138,26 @@ export async function decideRelevance(rulingId: number, action: RelevanceAction)
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 }
 
-export const fetchLearning = (signal?: AbortSignal) => get<Learning>("/api/learning", signal);
+export const fetchLearning = (signal?: AbortSignal): Promise<Learning> =>
+  SIX_BACKEND ? six.fetchLearning(signal) : get<Learning>("/api/learning", signal);
 
-export const fetchFacets = (signal?: AbortSignal) => get<Facets>("/api/facets", signal);
+export const fetchFacets = (signal?: AbortSignal): Promise<Facets> =>
+  SIX_BACKEND ? six.fetchFacets(signal) : get<Facets>("/api/facets", signal);
 
-export const fetchRulings = (query: URLSearchParams, signal?: AbortSignal) =>
-  get<RulingPage>(`/api/rulings?${query.toString()}`, signal);
+/** Scout's numeric ids become text, so the UI handles one id type for both backends. */
+const withTextId = (ruling: Ruling): Ruling => ({ ...ruling, id: String(ruling.id) });
+
+export const fetchRulings = (query: URLSearchParams, signal?: AbortSignal): Promise<RulingPage> =>
+  SIX_BACKEND
+    ? six.fetchRulings(query, signal)
+    : get<RulingPage>(`/api/rulings?${query.toString()}`, signal).then((page) => ({ ...page, items: page.items.map(withTextId) }));
 
 // --- the ruling page and the summary workspace ---------------------------------------------------------------
 
 export type SummaryLanguage = "de" | "fr";
 
 export type Summary = {
-  id: number;
+  id: number | string; // Scout: a number; src/api: the summary_version_id
   version: number;
   origin: "model" | "expert";
   body: string;
@@ -237,7 +233,8 @@ export type Scoring = {
   suspected: number;
 };
 
-export const fetchScoring = (signal?: AbortSignal) => get<Scoring>("/api/scoring", signal);
+export const fetchScoring = (signal?: AbortSignal): Promise<Scoring> =>
+  SIX_BACKEND ? six.fetchScoring(signal) : get<Scoring>("/api/scoring", signal);
 
 export type RulingDetail = {
   ruling: Ruling;
@@ -260,15 +257,25 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
   return response.json() as Promise<T>;
 }
 
-const summaries = (id: number) => `/api/rulings/${id}/summaries`;
+const summaries = (id: string) => `/api/rulings/${id}/summaries`;
+const withTextRulingId = (detail: RulingDetail): RulingDetail => ({ ...detail, ruling: withTextId(detail.ruling) });
+const scout = <T extends RulingDetail>(call: Promise<T>): Promise<RulingDetail> => call.then(withTextRulingId);
 
-export const fetchRuling = (id: number, signal?: AbortSignal) => get<RulingDetail>(`/api/rulings/${id}/workspace`, signal);
-export const generateSummaries = (id: number) => send<RulingDetail>("POST", summaries(id));
-export const saveSummary = (id: number, language: SummaryLanguage, body: string, confirm: boolean) =>
-  send<RulingDetail>("PUT", `${summaries(id)}/${language}`, { body, confirm });
-export const confirmSummary = (id: number, language: SummaryLanguage) =>
-  send<RulingDetail>("POST", `${summaries(id)}/${language}/confirm`);
-export const unconfirmSummary = (id: number, language: SummaryLanguage) =>
-  send<RulingDetail>("POST", `${summaries(id)}/${language}/unconfirm`);
-export const reviseSummary = (id: number, language: SummaryLanguage, reason: string, note: string) =>
-  send<RulingDetail>("POST", `${summaries(id)}/${language}/revise`, { reason, note: note || null });
+export const fetchRuling = (id: string, signal?: AbortSignal): Promise<RulingDetail> =>
+  SIX_BACKEND ? six.fetchRuling(id, signal) : scout(get<RulingDetail>(`/api/rulings/${id}/workspace`, signal));
+export const generateSummaries = (id: string): Promise<RulingDetail> =>
+  SIX_BACKEND ? six.generateSummaries(id) : scout(send<RulingDetail>("POST", summaries(id)));
+export const saveSummary = (id: string, language: SummaryLanguage, body: string, confirm: boolean): Promise<RulingDetail> =>
+  SIX_BACKEND
+    ? six.saveSummary(id, language, body, confirm)
+    : scout(send<RulingDetail>("PUT", `${summaries(id)}/${language}`, { body, confirm }));
+export const confirmSummary = (id: string, language: SummaryLanguage): Promise<RulingDetail> =>
+  SIX_BACKEND ? six.confirmSummary(id, language) : scout(send<RulingDetail>("POST", `${summaries(id)}/${language}/confirm`));
+export const unconfirmSummary = (id: string, language: SummaryLanguage): Promise<RulingDetail> =>
+  SIX_BACKEND
+    ? six.unconfirmSummary(id, language)
+    : scout(send<RulingDetail>("POST", `${summaries(id)}/${language}/unconfirm`));
+export const reviseSummary = (id: string, language: SummaryLanguage, reason: string, note: string): Promise<RulingDetail> =>
+  SIX_BACKEND
+    ? six.reviseSummary()
+    : scout(send<RulingDetail>("POST", `${summaries(id)}/${language}/revise`, { reason, note: note || null }));

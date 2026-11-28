@@ -12,7 +12,7 @@ import { SCROLL_KEY } from "./ScoringPage";
 import { Button, SummaryCard, Working } from "./SummaryCard";
 import { cn } from "./ui/cn";
 
-type Props = { rulingId: number; onBack: () => void; onChanged: () => void; onShowScoring: () => void };
+type Props = { rulingId: string; onBack: () => void; onChanged: () => void; onShowScoring: () => void };
 
 const LANGUAGES: SummaryLanguage[] = ["de", "fr"];
 /** A summary sentence: the one whose sources are marked in the ruling text. */
