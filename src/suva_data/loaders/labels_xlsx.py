@@ -196,7 +196,8 @@ def write_labels(conn, result: LabelsResult, label_set: str = config.LABEL_SET_X
             )
         if quarter_mismatch:
             problems.append(
-                f"quarter differs from the decision-date quarter for {len(quarter_mismatch)} label(s): {quarter_mismatch}"
+                f"quarter differs from the decision-date quarter for {len(quarter_mismatch)} label(s): "
+                f"{quarter_mismatch}"
             )
         if changed:
             problems.append(

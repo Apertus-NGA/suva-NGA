@@ -318,7 +318,8 @@ def quality_report(
         L.append(
             f"- bger.ch lists present: {list_coverage.get('first_list_date')} to {list_coverage.get('last_list_date')} "
             f"({list_coverage.get('lists')} lists). Weekdays without a list for the window plus look-ahead: "
-            f"**{len(list_coverage.get('window_missing_weekdays', []))}**. Rulings published on those days have no star and no tier-1 publication date."
+            f"**{len(list_coverage.get('window_missing_weekdays', []))}**. "
+            "Rulings published on those days have no star and no tier-1 publication date."
         )
     for row, title, reason in labels_dropped:
         L.append(f"- xlsx row {row} dropped ({reason}): {title}")

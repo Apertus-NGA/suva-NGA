@@ -204,7 +204,8 @@ def reconcile(
                             source,
                             source,
                             recs[0].source_key,
-                            f"{extra.source_key} ({'same text' if same_text else 'no text' if not extra.text else 'DIFFERENT text'})",
+                            f"{extra.source_key} "
+                            f"({'same text' if same_text else 'no text' if not extra.text else 'DIFFERENT text'})",
                         )
                     )
                     if extra.text and recs[0].text and not same_text:

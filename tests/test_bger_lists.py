@@ -323,7 +323,8 @@ def test_fetch_skips_weekends_and_days_already_in_snapshot(snapshot, site, no_ne
     assert no_network == [2.0] * 5  # a delay between requests, none before the first
     assert {r.get_header("User-agent") for r in fake.requests} == {config.USER_AGENT}
     assert all(
-        r.full_url == bger_lists.URL.format(d=date(2025, 12, int(d[6:]))) for r, d in zip(fake.requests, fake.days())
+        r.full_url == bger_lists.URL.format(d=date(2025, 12, int(d[6:])))
+        for r, d in zip(fake.requests, fake.days(), strict=True)
     )
     # second run: nothing left to do, no request
     assert adapter.fetch(WEEK) == [] and len(fake.requests) == 6

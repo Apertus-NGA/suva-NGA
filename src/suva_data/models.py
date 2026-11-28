@@ -44,7 +44,9 @@ class SourceAdapter(Protocol):
     name: str
 
     def fetch(self, window: Window, extra_dockets: frozenset[str] = frozenset()) -> list[str]:
-        """Download what is missing into SNAPSHOT_DIR/<name>/ (idempotent, resumable). Returns relative paths written."""
+        """Download what is missing into SNAPSHOT_DIR/<name>/ (idempotent, resumable).
+
+        Returns relative paths written."""
         ...
 
     def parse(self, window: Window, extra_dockets: frozenset[str] = frozenset()) -> Iterator[SourceRecord]:

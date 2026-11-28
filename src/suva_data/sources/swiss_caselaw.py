@@ -202,7 +202,9 @@ class SwissCaselawAdapter:
             keys = source.read_row_group(i, columns=KEY_COLUMNS)
             scanned += keys.num_rows
             wanted = []
-            for docket, decided in zip(keys["docket_number"].to_pylist(), keys["decision_date"].to_pylist()):
+            for docket, decided in zip(
+                keys["docket_number"].to_pylist(), keys["decision_date"].to_pylist(), strict=True
+            ):
                 in_window = window.contains(_iso_date(decided))
                 is_extra = not in_window and bool(extra_dockets) and normalise_docket(docket) in extra_dockets
                 by_window += in_window

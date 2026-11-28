@@ -241,8 +241,8 @@ def facets(conn) -> dict:
 
         def counted(column: str, order: str = "n DESC, value") -> list[dict]:
             return cur.execute(
-                _BASE
-                + f"SELECT {column} AS value, count(*) AS n FROM list WHERE {column} IS NOT NULL GROUP BY 1 ORDER BY {order}"
+                _BASE + f"SELECT {column} AS value, count(*) AS n FROM list WHERE {column} IS NOT NULL "
+                f"GROUP BY 1 ORDER BY {order}"
             ).fetchall()
 
         ranges = cur.execute(

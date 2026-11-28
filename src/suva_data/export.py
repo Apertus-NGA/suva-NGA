@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 
 from . import config
 
-S, D, B, I = pa.string(), pa.date32(), pa.bool_(), pa.int32()
+S, D, B, I = pa.string(), pa.date32(), pa.bool_(), pa.int32()  # noqa: E741 (one-letter type aliases for the schemas below)
 
 
 def _j(value):
@@ -206,9 +206,9 @@ def export_tables(conn, out_dir: Path | None = None) -> dict[str, dict]:
                         break
                     if convert:
                         batch = [convert(r) for r in batch]
-                    cols = list(zip(*batch))
+                    cols = list(zip(*batch, strict=True))
                     writer.write_table(
-                        pa.table([pa.array(c, type=f.type) for c, f in zip(cols, schema)], schema=schema)
+                        pa.table([pa.array(c, type=f.type) for c, f in zip(cols, schema, strict=True)], schema=schema)
                     )
                     rows += len(batch)
                 if rows == 0:

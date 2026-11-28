@@ -52,6 +52,7 @@ def ruling(conn, docket="8C_72/2025", date="2025-12-11"):
                     "id",
                 ],
                 row,
+                strict=True,
             )
         )
         if row
@@ -258,7 +259,7 @@ def test_invalid_values_are_skipped_and_logged(db_conn):
     )
     r = ruling(db_conn)
     assert r["language"] == "fr" and r["publication_date"] == "2026-01-14"
-    assert {(k, f, l) for k, f, _, l in conflicts(db_conn, "invalid_value")} == {
+    assert {(k, f, loser) for k, f, _, loser in conflicts(db_conn, "invalid_value")} == {
         ("invalid_value", "publication_date", config.BGER_LIST),
         ("invalid_value", "language", config.ENTSCHEIDSUCHE),
     }

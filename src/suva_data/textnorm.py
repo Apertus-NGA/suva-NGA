@@ -12,7 +12,8 @@ TRUNCATION_LENGTHS = frozenset({99992, 100000})
 _ERROR_MARKERS = ("Dokument nicht gefunden", "in elektronischer Form nicht verfügbar", "Incapsula incident")
 # A real ruling ends with the court / president / clerk signature block.
 _SIGNATURE_RE = re.compile(
-    r"Bundesgericht|Tribunal f[ée]d[ée]ral|Tribunale federale|Gerichtsschreiber|Greffi[eè]r|Cancellier|Pr[äée]sident|Presidente",
+    r"Bundesgericht|Tribunal f[ée]d[ée]ral|Tribunale federale|Gerichtsschreiber|Greffi[eè]r|Cancellier"
+    r"|Pr[äée]sident|Presidente",
     re.I,
 )
 

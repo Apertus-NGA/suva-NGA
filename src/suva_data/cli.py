@@ -61,7 +61,8 @@ def cmd_fetch(args) -> int:
     for a in adapters():
         if a.name == config.BGER_LIST and not args.include_bger:
             print(
-                f"{a.name}: skipped (bger.ch refuses non-browser clients; the archived pages in the snapshot are used). Pass --include-bger to try."
+                f"{a.name}: skipped (bger.ch refuses non-browser clients; "
+                "the archived pages in the snapshot are used). Pass --include-bger to try."
             )
             continue
         try:
@@ -260,10 +261,12 @@ def cmd_ingest(args) -> int:
     by_status = {k: sum(1 for d in days if d["status"] == k) for k in sorted({d["status"] for d in days})}
     print(f"  bger.ch lists: {bger['status']} ({bger['records']} entries for the range)")
     print(
-        f"  Hugging Face daily files: {report.daily['status']} {by_status}, {report.daily['records']} rulings in the range"
+        f"  Hugging Face daily files: {report.daily['status']} {by_status}, "
+        f"{report.daily['records']} rulings in the range"
     )
     print(
-        f"  mirror (entscheidsuche.ch): {mirror['status']}, asked for {mirror['asked']} rulings, found {mirror['found']}"
+        f"  mirror (entscheidsuche.ch): {mirror['status']}, asked for {mirror['asked']} rulings, "
+        f"found {mirror['found']}"
     )
     print(
         f"  added {len(report.new_rulings)} new rulings; {report.known_rulings} were already held and left as they were"

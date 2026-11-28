@@ -35,17 +35,24 @@ TITLE_LANGUAGE_PREFIXES = (("BGer-Urteil", "de"), ("Arrêt du", "fr"), ("Sentenz
 # Month names without accents, lower case (titles are compared the same way).
 MONTHS = {
     **dict(
-        zip("januar februar marz april mai juni juli august september oktober november dezember".split(), range(1, 13))
+        zip(
+            "januar februar marz april mai juni juli august september oktober november dezember".split(),
+            range(1, 13),
+            strict=True,
+        )
     ),
     **dict(
         zip(
-            "janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre".split(), range(1, 13)
+            "janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre".split(),
+            range(1, 13),
+            strict=True,
         )
     ),
     **dict(
         zip(
             "gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre".split(),
             range(1, 13),
+            strict=True,
         )
     ),
 }
@@ -252,7 +259,8 @@ def write_gold_summaries(conn, summaries: list[GoldSummary]) -> dict[str, int]:
     with conn.transaction():
         resolved, missing, ambiguous = resolve_dockets(conn, files_by_docket)
         date_mismatch = [
-            f"{s.docket}: title {s.decision_date_from_title}, ruling {resolved[s.docket][1].isoformat()} ({s.source_file})"
+            f"{s.docket}: title {s.decision_date_from_title}, "
+            f"ruling {resolved[s.docket][1].isoformat()} ({s.source_file})"
             for s in summaries
             if s.docket in resolved
             and s.decision_date_from_title is not None
@@ -292,7 +300,8 @@ def write_gold_summaries(conn, summaries: list[GoldSummary]) -> dict[str, int]:
             )
         if date_mismatch:
             problems.append(
-                f"the date in the title is not the ruling's decision date for {len(date_mismatch)} summary(ies): {date_mismatch}"
+                f"the date in the title is not the ruling's decision date for {len(date_mismatch)} summary(ies): "
+                f"{date_mismatch}"
             )
         if changed:
             problems.append(

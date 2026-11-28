@@ -5,8 +5,8 @@ The court digits, the proceedings letters and the kept subjects are in
 keeps a ruling when its digit, its letter and its Neuheiten subject are in
 that set. The subject is matched by name (``src/areas.py``), in German, French
 or Italian. It is read from the Neuheiten rubric, and when that is empty from
-the start of the ruling's subject line. The text decision keeps it when the text names Suva, CNA, INSAI or an accident or
-military insurance term, and also when the text names the insurance-contract
+the start of the ruling's subject line. The text decision keeps it when the text names Suva, CNA, INSAI or an
+accident or military insurance term, and also when the text names the insurance-contract
 act (VVG, LCA) or private daily-allowance insurance (Taggeldversicherung).
 The bare word Taggeld does not: it is the unemployment benefit. Those
 contract terms do not keep unemployment, old-age, tax, supplementary
