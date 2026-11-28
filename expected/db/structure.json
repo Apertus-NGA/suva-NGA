@@ -1,5 +1,5 @@
 {
- "sha256": "409ccbf14913a0f6df1d77e185e315880de52924acb525d118183f69fc67c980",
+ "sha256": "a5c9270d7dd560f2981b75bb9336eb728f3de8da27c8bb6bc85c29d1ba4d9b40",
  "counts": {
   "column": 631,
   "constraint": 436,
@@ -736,7 +736,7 @@
   "constraint\tgold.expert_review.expert_review_span_id_fkey\tFOREIGN KEY (span_id) REFERENCES ops.span(span_id) ON DELETE RESTRICT",
   "constraint\tgold.expert_review.expert_review_summary_version_fk\tFOREIGN KEY (summary_version_id) REFERENCES summ.summary_version(summary_version_id) ON DELETE RESTRICT",
   "constraint\tgold.expert_review.expert_review_supersedes_review_id_fkey\tFOREIGN KEY (supersedes_review_id) REFERENCES gold.expert_review(review_id) ON DELETE RESTRICT",
-  "constraint\tgold.expert_review.expert_review_target_chk\tCHECK ((((target_kind = 'scope'::ops.review_target) AND (assessment_id IS NOT NULL) AND (summary_version_id IS NULL) AND (verdict = ANY (ARRAY['correct'::ops.review_verdict, 'incorrect'::ops.review_verdict])) AND (reviewed_label = ANY (ARRAY['in_scope'::ops.in_suva_scope, 'out_of_scope'::ops.in_suva_scope]))) OR ((target_kind = 'summary_version'::ops.review_target) AND (summary_version_id IS NOT NULL) AND (assessment_id IS NULL) AND (verdict = ANY (ARRAY['validated'::ops.review_verdict, 'rejected'::ops.review_verdict])) AND (reviewed_label IS NULL))))",
+  "constraint\tgold.expert_review.expert_review_target_chk\tCHECK ((((target_kind = 'scope'::ops.review_target) AND (assessment_id IS NOT NULL) AND (summary_version_id IS NULL) AND (reviewed_label IS NOT NULL) AND (((verdict = ANY (ARRAY['correct'::ops.review_verdict, 'incorrect'::ops.review_verdict])) AND (reviewed_label = ANY (ARRAY['in_scope'::ops.in_suva_scope, 'out_of_scope'::ops.in_suva_scope]))) OR ((verdict = ANY (ARRAY['relevant'::ops.review_verdict, 'not_relevant'::ops.review_verdict])) AND (reviewed_label = ANY (ARRAY['in_scope'::ops.in_suva_scope, 'out_of_scope'::ops.in_suva_scope, 'potentially'::ops.in_suva_scope]))) OR ((verdict = 'withdrawn'::ops.review_verdict) AND (supersedes_review_id IS NOT NULL)))) OR ((target_kind = 'summary_version'::ops.review_target) AND (summary_version_id IS NOT NULL) AND (assessment_id IS NULL) AND (reviewed_label IS NULL) AND ((verdict = ANY (ARRAY['validated'::ops.review_verdict, 'rejected'::ops.review_verdict])) OR ((verdict = 'withdrawn'::ops.review_verdict) AND (supersedes_review_id IS NOT NULL))))))",
   "constraint\tgold.label.label_created_by_run_id_fkey\tFOREIGN KEY (created_by_run_id) REFERENCES ops.pipeline_run(run_id) ON DELETE RESTRICT",
   "constraint\tgold.label.label_list_quarter_chk\tCHECK (((source <> 'suva_relevance_list'::ops.label_source) OR (quarter_label IS NOT NULL)))",
   "constraint\tgold.label.label_pkey\tPRIMARY KEY (label_id)",
@@ -1100,7 +1100,7 @@
   "enum\tops.request_kind\tadd_judgement,summary",
   "enum\tops.request_status\tpending,accepted,done,failed,rejected",
   "enum\tops.review_target\tscope,summary_version",
-  "enum\tops.review_verdict\tcorrect,incorrect,validated,rejected",
+  "enum\tops.review_verdict\tcorrect,incorrect,validated,rejected,relevant,not_relevant,withdrawn",
   "enum\tops.rule_kind\tkeep,drop,flag,signal,check",
   "enum\tops.rule_outcome\tfired,not_fired,not_applicable,blocked",
   "enum\tops.ruling_origin\tbase_dataset,user_added",

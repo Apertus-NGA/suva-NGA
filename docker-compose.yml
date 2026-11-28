@@ -236,8 +236,9 @@ services:
               capabilities: [gpu]
     logging: *logging
 
-  # The API and the UI (profile ui), as the API login. `make serve` is still a stub: the FastAPI app lands with
-  # the UI, after layer 3 (summaries). Bound to localhost; put a TLS reverse proxy in front (docs/DEPLOY.md §4).
+  # The API (profile ui), as the API login (docs/API.md). Launching pipeline runs from it stays off unless
+  # API_RUNS_ENABLED=1 and PIPELINE_DATABASE_URL names the pipeline login. Bound to localhost; put a TLS reverse proxy
+  # in front (docs/DEPLOY.md §4).
   app:
     <<: *app
     profiles: ["ui"]
@@ -251,6 +252,8 @@ services:
       # The API login is least-privileged by its memberships (suva_g_read, suva_g_review): keep them, never SET ROLE
       # to the pipeline group (src/db/pg.py), which suva_api is not granted.
       DB_PIPELINE_ROLE: ""
+      # inside the container: every interface (the port is published on APP_BIND only, localhost by default)
+      API_HOST: 0.0.0.0
       MODE: ${MODE:-replay}
       LLM_NAME: ${LLM_NAME:-}
       LLM_NAME_SMALL: ${LLM_NAME_SMALL:-}
