@@ -17,7 +17,7 @@ MODEL_ID = re.compile(
     r"|pplx-embed[A-Za-z0-9._-]*"
     r"|bge-m3[A-Za-z0-9._-]*"
     r"|(?:gpt|claude|gemini|llama|mistral|qwen)-[A-Za-z0-9._-]+"
-    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
+    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge(?![a-z])|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
     r")",
     re.I,
 )
@@ -58,3 +58,13 @@ def test_check_goes_red_on_an_unlisted_model(tmp_path):
     f = tmp_path / "x.py"
     f.write_text('JUDGE = "apertus-v1-5-70b"\nEMB = "intfloat/multilingual-e5-large"\nX = "gpt-4o"\n')
     assert unregistered([f], registered_ids()) == ["x.py: intfloat/multilingual-e5-large", "x.py: gpt-4o"]
+
+
+def test_bger_paths_are_not_model_ids_but_bge_models_are(tmp_path):
+    """`bger` (Bundesgericht) in a data path or dataset name is not the `bge` embedding family."""
+    f = tmp_path / "x.py"
+    f.write_text(
+        'A = "data/bger.parquet"\nB = "suva-nga/bger-rulings"\nC = "docs/CH_BGer"\n'
+        'D = "BAAI/bge-reranker-v2"\nE = "BAAI/bge_small"\n'
+    )
+    assert unregistered([f], registered_ids()) == ["x.py: BAAI/bge-reranker-v2", "x.py: BAAI/bge_small"]
