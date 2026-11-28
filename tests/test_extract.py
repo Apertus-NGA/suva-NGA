@@ -310,3 +310,14 @@ def test_a_bracketed_placeholder_is_refused_and_the_outcome_keeps_so_far_as_admi
     assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", source).endswith(
         "Die Beschwerde wird abgewiesen, soweit darauf einzutreten ist.")
     assert write.with_admissibility("Text. Die Beschwerde wird abgewiesen.", "de", RULING).endswith("abgewiesen.")
+
+
+def test_trim_leaves_out_facts_then_application_and_keeps_the_answer_and_what_code_added():
+    long = " ".join(["Wort"] * 100) + "."
+    sentences = [write.Written(f"S{n}", label, role, "x", long, "written") for n, (label, role) in enumerate(
+        [("facts", "fact"), ("E.3", "rule"), ("E.4", "application"), ("E.5", "application"), ("E.5", "holding"),
+         ("E.6", "condition")], 1)]  # fmt: skip
+    choice = choose.Choice("p", (), 0, {}, {"E.3": 0.9, "E.4": 0.2, "E.5": 0.8, "E.6": 0.5}, ["S6 added for income_comparison:deduction"])
+    kept, notes = write.trim(sentences, choice, "de")  # limit 303 words: three sentences of 101 words fit
+    assert [w.source_id for w in kept] == ["S2", "S5", "S6"]
+    assert [n.split()[0] for n in notes] == ["S1", "S3", "S4"]  # fact, then the lower-read application first

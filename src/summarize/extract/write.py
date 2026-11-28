@@ -29,6 +29,9 @@ from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, 
 from src.summarize.refine.steps.common import CALQUES, NAME, new_terms, polish
 
 VERSION = "write@2"
+TRIM_VERSION = "trim@1"
+TRIM_SHARE = 0.9  # of the upper end of Suva's band (checks.LENGTH_BAND)
+_KEEP_ORDER = {"fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
 FLOW_VERSION = "flow@1"
 
 SYSTEM = (
@@ -276,13 +279,33 @@ def with_admissibility(text: str, language: str, source: str) -> str:
     return text
 
 
+def trim(written: list[Written], choice: Choice, language: str) -> tuple[list[Written], list[str]]:
+    """Leave out sentences until the fiche fits Suva's band: facts first, then application, conditions, rules,
+    each from the lowest-read consideration first. A sentence a rule of code added (profiles.py) and the court's
+    answer stay. Run x4 (28 Nov): 6 of 24 fiches over the band, median 276 words."""
+    limit = int(checks.LENGTH_BAND[language][1] * TRIM_SHARE)
+    added = {note.split()[0] for note in (choice.notes or []) if " added for " in note}
+    scores = choice.scores or {}
+    kept = [w for w in written if w.text]
+    notes = []
+    while sum(len(w.text.split()) for w in kept) > limit:
+        removable = [w for w in kept if w.source_id not in added and w.role != "holding"]
+        if len(kept) <= 3 or not removable:
+            break
+        out = min(removable, key=lambda w: (_KEEP_ORDER.get(w.role, 1), scores.get(w.label, 0.0), -len(w.text)))
+        kept.remove(out)
+        out.status = "trimmed"
+        notes.append(f"{out.source_id} left out for length ({out.role}, {out.label})")
+    return kept, notes
+
+
 def write_fiche(choice: Choice, language: str, ruling: dict, model: Model) -> Fiche:
     """The finished fiche in `language` from the chosen sentences. `ruling`: text, language, category, starred."""
     start = model.calls
     written = [write_sentence(c, role, language, ruling, model) for c, role in choice.chosen]
-    texts = [w.text for w in written if w.text]
-    texts, flow_log = flow(texts, language, ruling, model)
+    kept, trimmed = trim(written, choice, language)
+    texts, flow_log = flow([w.text for w in kept], language, ruling, model)
     body = " ".join(t if t.endswith((".", "!", "?")) else t + "." for t in texts)
     text, notes = finish.finish(language, body, ruling["text"], ruling.get("starred"))
     text = with_admissibility(text, language, ruling["text"])
-    return Fiche(text, written, flow_log, model.calls - start, notes)
+    return Fiche(text, written, flow_log, model.calls - start, notes + trimmed)
