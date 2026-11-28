@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "layer1-log-1",
+  "title": "Layer 1 filter log",
+  "description": "One run of the candidate gate. A filter takes a population of assets in and writes a smaller population out. This document is the audit record of that run: who produced it, which file went in, what each action did, and the outcome of every asset. Counts are integers. A share is a count over a declared total, never a rounded rate. Every action carries checks that must be true before the run is trusted.",
+  "type": "object",
+  "required": ["schema_version", "phase", "phase_kind", "run", "population", "actions", "quality", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "layer1-log-1"},
+    "phase": {"enum": ["layer1", "layer1_recall"]},
+    "phase_kind": {
+      "description": "filter: the whole cache. recall_check: the same filter on the known positives.",
+      "enum": ["filter", "recall_check"]
+    },
+    "run": {
+      "type": "object",
+      "required": ["run_id", "phase", "started_at", "finished_at", "selection", "batch_size", "code", "input", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {"type": "string", "description": "New id on every write. The log table key."},
+        "phase": {"enum": ["layer1", "layer1_recall"]},
+        "started_at": {"type": "string", "description": "UTC timestamp, ISO-8601."},
+        "finished_at": {"type": "string"},
+        "selection": {
+          "description": "all, a row limit, or known_positives.",
+          "oneOf": [{"type": "string"}, {"type": "integer"}]
+        },
+        "batch_size": {"type": "integer"},
+        "code": {"const": "src/courts.py"},
+        "input": {
+          "type": "object",
+          "required": ["path", "format", "bytes", "sha256", "rows_read"],
+          "additionalProperties": false,
+          "properties": {
+            "path": {"type": "string"},
+            "format": {"const": "parquet"},
+            "bytes": {"type": "integer"},
+            "sha256": {"type": "string", "description": "Checksum of the input file, so a later run can be tied to the same snapshot."},
+            "rows_read": {"type": "integer"}
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": ["log"],
+          "additionalProperties": false,
+          "properties": {
+            "log": {"type": "string", "description": "JSON log. A later database stores this document; this run does not write a parquet."}
+          }
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "description": "The filter as one number: assets in, assets kept, assets dropped. assets_in = assets_out + assets_dropped.",
+      "required": ["unit", "assets_in", "assets_out", "assets_dropped", "keep", "drop"],
+      "additionalProperties": false,
+      "properties": {
+        "unit": {"const": "ruling"},
+        "assets_in": {"type": "integer"},
+        "assets_out": {"type": "integer"},
+        "assets_dropped": {"type": "integer"},
+        "keep": {"$ref": "#/$defs/share"},
+        "drop": {"$ref": "#/$defs/share"}
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"$ref": "#/$defs/subject_action"},
+        {"$ref": "#/$defs/text_action"},
+        {"$ref": "#/$defs/disposition_action"}
+      ]
+    },
+    "quality": {
+      "type": "object",
+      "required": ["all_checks_passed", "checks", "distinct_asset_ids", "duplicate_asset_ids"],
+      "properties": {
+        "all_checks_passed": {"type": "boolean", "description": "False means the run must not be treated as a measured filter."},
+        "checks": {
+          "type": "object",
+          "required": ["asset_rows_equal_assets_in", "kept_assets_equal_assets_out", "every_action_check_passed"],
+          "additionalProperties": false,
+          "properties": {
+            "asset_rows_equal_assets_in": {"type": "boolean"},
+            "kept_assets_equal_assets_out": {"type": "boolean"},
+            "every_action_check_passed": {"type": "boolean"}
+          }
+        },
+        "distinct_asset_ids": {"type": "integer"},
+        "duplicate_asset_ids": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["asset_id", "rows"],
+            "additionalProperties": false,
+            "properties": {
+              "asset_id": {"type": "string"},
+              "rows": {"type": "integer", "minimum": 2}
+            }
+          }
+        },
+        "by_cohort": {
+          "description": "Present on a recall_check. One total per labelled cohort.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cohort", "assets_in", "assets_out", "assets_dropped"],
+            "additionalProperties": false,
+            "properties": {
+              "cohort": {"enum": ["suva_list", "q3_summary"]},
+              "assets_in": {"type": "integer"},
+              "assets_out": {"type": "integer"},
+              "assets_dropped": {"type": "integer"}
+            }
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "One row per input asset. This is the line table. actions is the step table. Join them on run_id.",
+      "items": {"$ref": "#/$defs/asset"}
+    }
+  },
+  "$defs": {
+    "share": {
+      "type": "object",
+      "required": ["count", "of"],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer"},
+        "of": {"type": "integer", "description": "The population the count is divided by. Zero when that population is empty."}
+      }
+    },
+    "reason_map": {
+      "type": "object",
+      "additionalProperties": {"type": "integer"}
+    },
+    "subject_action": {
+      "type": "object",
+      "description": "Action 1. Court, letter and rubric, applied to every asset.",
+      "required": ["sequence", "action_id", "kind", "applies_to", "rule", "assets_in", "assets_out", "assets_dropped", "keep", "drop", "passed_by_reason", "dropped_by_reason", "passed_by_criterion", "dropped_by_criterion", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {"const": 1},
+        "action_id": {"const": "layer1.subject"},
+        "kind": {"const": "filter"},
+        "applies_to": {"const": "all_assets"},
+        "rule": {
+          "type": "object",
+          "required": ["keeps_when", "drops_when"],
+          "additionalProperties": false,
+          "properties": {
+            "keeps_when": {"type": "array", "items": {"enum": ["kept_subject", "subject_missing"]}},
+            "drops_when": {"type": "array", "items": {"enum": ["wrong_court", "wrong_letter", "subject_out"]}}
+          }
+        },
+        "assets_in": {"type": "integer"},
+        "assets_out": {"type": "integer"},
+        "assets_dropped": {"type": "integer"},
+        "keep": {"$ref": "#/$defs/share"},
+        "drop": {"$ref": "#/$defs/share"},
+        "passed_by_reason": {"$ref": "#/$defs/reason_map"},
+        "dropped_by_reason": {"$ref": "#/$defs/reason_map"},
+        "passed_by_criterion": {"$ref": "#/$defs/reason_map"},
+        "dropped_by_criterion": {"$ref": "#/$defs/reason_map"},
+        "checks": {
+          "type": "object",
+          "required": ["in_equals_out_plus_dropped", "passed_reasons_sum_to_out", "dropped_reasons_sum_to_dropped", "passed_criteria_sum_to_out", "dropped_criteria_sum_to_dropped", "every_criterion_present"],
+          "additionalProperties": false,
+          "properties": {
+            "in_equals_out_plus_dropped": {"type": "boolean"},
+            "passed_reasons_sum_to_out": {"type": "boolean"},
+            "dropped_reasons_sum_to_dropped": {"type": "boolean"},
+            "passed_criteria_sum_to_out": {"type": "boolean"},
+            "dropped_criteria_sum_to_dropped": {"type": "boolean"},
+            "every_criterion_present": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "text_action": {
+      "type": "object",
+      "description": "Action 2. The rescue. Its filter population is only the assets action 1 dropped. It is still evaluated on every asset; those already kept are counted in outside_scope.",
+      "required": ["sequence", "action_id", "kind", "applies_to", "parent_action", "rule", "assets_in_scope", "assets_out", "assets_dropped", "keep", "drop", "passed_by_reason", "dropped_by_reason", "passed_by_criterion", "dropped_by_criterion", "outside_scope", "outside_scope_by_reason", "outside_scope_by_criterion", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {"const": 2},
+        "action_id": {"const": "layer1.text"},
+        "kind": {"const": "filter"},
+        "applies_to": {"const": "assets_failed_by_layer1.subject"},
+        "parent_action": {"const": "layer1.subject"},
+        "rule": {
+          "type": "object",
+          "required": ["keeps_when", "drops_when"],
+          "additionalProperties": false,
+          "properties": {
+            "keeps_when": {"type": "array", "items": {"enum": ["kept_text", "kept_contract"]}},
+            "drops_when": {"type": "array", "items": {"enum": ["text_clear", "text_absent"]}}
+          }
+        },
+        "assets_in_scope": {"type": "integer"},
+        "assets_out": {"type": "integer"},
+        "assets_dropped": {"type": "integer"},
+        "keep": {"$ref": "#/$defs/share"},
+        "drop": {"$ref": "#/$defs/share"},
+        "passed_by_reason": {"$ref": "#/$defs/reason_map"},
+        "dropped_by_reason": {"$ref": "#/$defs/reason_map"},
+        "passed_by_criterion": {"$ref": "#/$defs/reason_map"},
+        "dropped_by_criterion": {"$ref": "#/$defs/reason_map"},
+        "outside_scope": {"type": "integer"},
+        "outside_scope_by_reason": {"$ref": "#/$defs/reason_map"},
+        "outside_scope_by_criterion": {"$ref": "#/$defs/reason_map"},
+        "checks": {
+          "type": "object",
+          "required": ["scope_equals_subject_failures", "passed_reasons_sum_to_out", "dropped_reasons_sum_to_dropped", "outside_scope_sums_to_subject_passes", "passed_criteria_sum_to_out", "dropped_criteria_sum_to_dropped", "outside_scope_criteria_sum", "every_criterion_present", "evaluated_on_every_asset"],
+          "additionalProperties": false,
+          "properties": {
+            "scope_equals_subject_failures": {"type": "boolean"},
+            "passed_reasons_sum_to_out": {"type": "boolean"},
+            "dropped_reasons_sum_to_dropped": {"type": "boolean"},
+            "outside_scope_sums_to_subject_passes": {"type": "boolean"},
+            "passed_criteria_sum_to_out": {"type": "boolean"},
+            "dropped_criteria_sum_to_dropped": {"type": "boolean"},
+            "outside_scope_criteria_sum": {"type": "boolean"},
+            "every_criterion_present": {"type": "boolean"},
+            "evaluated_on_every_asset": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "disposition_action": {
+      "type": "object",
+      "description": "Action 3. Combines the two filters. An asset is kept when either action passed.",
+      "required": ["sequence", "action_id", "kind", "applies_to", "rule", "assets_in", "assets_out", "assets_dropped", "keep", "drop", "passed_by_path", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {"const": 3},
+        "action_id": {"const": "layer1.disposition"},
+        "kind": {"const": "combine"},
+        "applies_to": {"const": "all_assets"},
+        "rule": {"const": "kept when layer1.subject passed or layer1.text passed"},
+        "assets_in": {"type": "integer"},
+        "assets_out": {"type": "integer"},
+        "assets_dropped": {"type": "integer"},
+        "keep": {"$ref": "#/$defs/share"},
+        "drop": {"$ref": "#/$defs/share"},
+        "passed_by_path": {"$ref": "#/$defs/reason_map"},
+        "checks": {
+          "type": "object",
+          "required": ["in_equals_out_plus_dropped", "out_equals_subject_passes_plus_text_rescues", "dropped_equals_text_failures", "paths_sum_to_out"],
+          "additionalProperties": false,
+          "properties": {
+            "in_equals_out_plus_dropped": {"type": "boolean"},
+            "out_equals_subject_passes_plus_text_rescues": {"type": "boolean"},
+            "dropped_equals_text_failures": {"type": "boolean"},
+            "paths_sum_to_out": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "required": ["asset_id", "disposition", "deciding_action", "path", "actions"],
+      "properties": {
+        "asset_id": {"type": "string", "description": "Docket. Not unique: two decisions can share one docket."},
+        "disposition": {"enum": ["kept", "dropped"]},
+        "deciding_action": {
+          "description": "The first action that kept the asset. Null when it was dropped.",
+          "oneOf": [{"enum": ["layer1.subject", "layer1.text"]}, {"type": "null"}]
+        },
+        "path": {"enum": ["subject_only", "both", "text_only", "dropped"]},
+        "cohort": {"enum": ["suva_list", "q3_summary"]},
+        "quarter": {"type": "string"},
+        "rubric": {"type": "string"},
+        "actions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["action_id", "outcome", "reason", "criterion"],
+            "properties": {
+              "action_id": {"enum": ["layer1.subject", "layer1.text"]},
+              "outcome": {"enum": ["pass", "fail"]},
+              "reason": {"type": "string"},
+              "criterion": {"type": "string", "minLength": 1, "description": "The value that matched: rubric, court digit, letter, term, closed-rubric stem, or a named rule (blank_rubric, empty_text, no_keep_term, missing_from_cache)."},
+              "blocked_term": {"type": ["string", "null"], "description": "A contract term that matched and was refused because the rubric is closed. Null otherwise."},
+              "in_rescue_scope": {"type": "boolean", "description": "True when action 1 failed, so this asset is inside the text filter's population."}
+            }
+          }
+        }
+      }
+    }
+  }
+}
