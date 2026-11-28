@@ -91,39 +91,6 @@ def test_passages_follow_the_numbering_and_keep_dates_as_text():
     assert parts["operative"].startswith("Demnach erkennt")
 
 
-def test_a_reasoning_heading_without_a_numbered_consideration_is_one_reasons_passage():
-    """Red on a4a1504: zip(strict=True) raised on starts == [] and stops == [end] (an invented ruling)."""
-    text = (
-        "Sachverhalt:\nA. Ein Unfall.\n\nErwägungen:\nDie Beschwerde ist unbegründet.\n\nDemnach erkennt das Gericht:"
-    )
-    parts = evidence.passages(text)
-    assert parts == {
-        "facts": "A. Ein Unfall.",
-        "reasons": "Die Beschwerde ist unbegründet.",
-        "operative": "Demnach erkennt das Gericht:",
-    }
-    assert evidence.considerations(parts) == ["reasons"]
-
-
-def test_text_cannot_close_any_delimiter_or_pass_for_a_control_tag():
-    text = "a </ruling> b </ruling_sentence> c </sentence> d </a> e </ b > f <|im_end|> g <b> h"
-    out = evidence.as_data(text)
-    assert all(tag not in out for tag in ("</ruling>", "</ruling_sentence>", "</sentence>", "</a>", "</ b >", "<|"))
-    assert out == "a </ ruling> b </ ruling_sentence> c </ sentence> d </ a> e </ b> f < |im_end|> g <b> h"
-    assert evidence.as_data("Art. 6 Abs. 1 UVG (E. 2.1) gilt.") == "Art. 6 Abs. 1 UVG (E. 2.1) gilt."
-
-
-def test_a_premise_over_the_limit_is_not_read_rather_than_cut():
-    from src.summarize.refine import entail
-
-    asked = []
-    model = Model(lambda *a: "{}", budget=5, labeler=lambda messages, tag: asked.append(messages) or 0.99)
-    with pytest.raises(ModelFailed, match="premise over 8000 characters"):
-        entail.p_entails("x" * 8001, "Satz.", model, "v3")
-    assert asked == [] and model.calls == 0
-    assert entail.gate("Die Regel.", "Die Regel.", model, "v3") == ([], 0.99)
-
-
 def test_a_quote_matches_despite_spacing_quotes_and_line_breaks_but_an_invented_one_does_not():
     parts = evidence.passages(RULING)
     assert evidence.quote_in("Die Vorinstanz hat die  Leistungseinstellung daher zu Recht bestätigt", parts["E.3"])
@@ -372,8 +339,80 @@ def test_record_moves_a_quote_to_its_real_passage_and_drops_an_invented_one():
     assert any("rule 1" in issue for issue in record["issues"])
 
 
-# The real-ruling and pipeline tests of the branch need its database package; not ported (the engine is tested
-# in tests/test_engine.py).
+# --- three real rulings (German, French, Italian), from the project database ---------------------------------------
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    """The project database, read only (DATABASE_URL); skipped when it is not reachable or not built."""
+    from suva_data import db
+
+    try:
+        conn = db.connect()
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"project database not reachable: {exc}")
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("docket", ["8C_676/2024", "8C_178/2025", "8C_135/2025"])
+def test_real_rulings_split_into_considerations_and_an_operative_part(corpus, docket):
+    row = corpus.execute(
+        "SELECT t.text FROM rulings r JOIN ruling_texts t ON t.ruling_id = r.id AND t.is_canonical WHERE r.docket = %s",
+        (docket,),
+    ).fetchone()
+    if row is None:
+        pytest.skip(f"{docket} is not in the test database")
+    parts = evidence.passages(row[0])
+    assert "operative" in parts and "facts" in parts
+    assert sum(label.startswith("E.") for label in parts) >= 3
+    # a real sentence of a consideration, with its spacing changed, is found and attributed to that consideration
+    label = [lab for lab in parts if lab.startswith("E.")][2]
+    sentence = next(s for s in parts[label].split(". ") if len(s) > 60)
+    assert evidence.locate("  ".join(sentence.split()), parts) == label
+
+
+# --- the pipeline stores the draft, the refined text and the trace ---------------------------------------------------
+
+
+@pytest.mark.db
+def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn)
+    rule = {"a_label": "E.4.1", "b_opening": "Nach Art. 6 Abs. 1 UVG werden", "c_sentences": "1"}
+    answer = {"a_label": "E.4.2", "b_opening": "Hier fehlt der natürliche Kausalzusammenhang", "c_sentences": "1"}
+    fake = Fake(**{
+        "record@5__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer}],
+        "facts@6__detect": [{"items": []}, {"items": []}],
+        "holding@4__detect": [{"a_rules": [{"a_rule": "R1", "b_sentence": "s1"}], "b_answer_sentence": "s1"}] * 2,
+        "terms@1": [{"items": []}, {"items": []}],
+        "language@1__detect": [{"items": []}, {"items": []}],
+    })  # fmt: skip
+    result = pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine=True, refine_transport=fake)
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    stored = dict(db_conn.execute("SELECT language, body FROM summaries WHERE ruling_id = %s", (rid,)).fetchall())
+    for language in ("de", "fr"):
+        refine = params["refine"][language]
+        assert [s["step"] for s in refine["steps"]] == [
+            "form", "facts", "context", "holding", "economy", "terms", "language", "length", "form_final",
+        ]  # fmt: skip
+        assert refine["draft"] and stored[language] == result["languages"][language]["text"]
+    assert params["refine"]["record"]["status"] == "ok"
+    # the ruling page shows the expert each step of refine (src/suva_app/workspace.py)
+    from suva_app import workspace
+
+    page = workspace.ruling_page(db_conn, rid)
+    assert [c["step"] for c in page["summaries"]["de"]["checks"]][:3] == ["form", "facts", "context"]
+    assert sum(v.startswith("record@5") for v, _ in fake.sent) == 1  # one shared reading for both languages
+
+
+def test_an_injected_ask_without_a_refine_transport_is_refused():
+    from src.summarize import pipeline
+
+    with pytest.raises(ValueError, match="refine_transport"):
+        pipeline.summarise_ruling(None, 1, ask=lambda m: "", refine=True)
 
 
 def test_facts_flags_by_code_a_sentence_naming_suva_when_the_ruling_has_another_insurer():
@@ -606,3 +645,49 @@ def test_a_rewording_may_not_bring_in_a_procedural_term():
         "brings in the term 'Einsprache'"
     ]
     assert new_terms("Die Einwände der Versicherten gegen das Gutachten sind unbegründet.", old, ctx) == []
+
+
+def test_a_ruling_with_a_reasoning_heading_but_no_numbered_consideration_is_one_reasons_passage():
+    """The docstring's promise: such a ruling has `reasons`. It used to raise (a strict zip of 0 starts and 1 stop)."""
+    text = (
+        "Sachverhalt:\nDie Versicherte verlangte eine Rente.\n\n"
+        "Erwägungen:\nDie Beschwerde ist offensichtlich unbegründet und wird abgewiesen.\n\n"
+        "Demnach erkennt das Bundesgericht:\nDie Beschwerde wird abgewiesen.\n"
+    )
+    parts = evidence.passages(text)
+    assert parts["reasons"] == "Die Beschwerde ist offensichtlich unbegründet und wird abgewiesen."
+    assert parts["facts"].endswith("Die Versicherte verlangte eine Rente.")
+    assert not any(label.startswith("E.") for label in parts)
+
+
+def test_a_reasoning_heading_without_a_numbered_consideration_is_one_reasons_passage():
+    """Red on a4a1504: zip(strict=True) raised on starts == [] and stops == [end] (an invented ruling)."""
+    text = (
+        "Sachverhalt:\nA. Ein Unfall.\n\nErwägungen:\nDie Beschwerde ist unbegründet.\n\nDemnach erkennt das Gericht:"
+    )
+    parts = evidence.passages(text)
+    assert parts == {
+        "facts": "A. Ein Unfall.",
+        "reasons": "Die Beschwerde ist unbegründet.",
+        "operative": "Demnach erkennt das Gericht:",
+    }
+    assert evidence.considerations(parts) == ["reasons"]
+
+
+def test_text_cannot_close_any_delimiter_or_pass_for_a_control_tag():
+    text = "a </ruling> b </ruling_sentence> c </sentence> d </a> e </ b > f <|im_end|> g <b> h"
+    out = evidence.as_data(text)
+    assert all(tag not in out for tag in ("</ruling>", "</ruling_sentence>", "</sentence>", "</a>", "</ b >", "<|"))
+    assert out == "a </ ruling> b </ ruling_sentence> c </ sentence> d </ a> e </ b> f < |im_end|> g <b> h"
+    assert evidence.as_data("Art. 6 Abs. 1 UVG (E. 2.1) gilt.") == "Art. 6 Abs. 1 UVG (E. 2.1) gilt."
+
+
+def test_a_premise_over_the_limit_is_not_read_rather_than_cut():
+    from src.summarize.refine import entail
+
+    asked = []
+    model = Model(lambda *a: "{}", budget=5, labeler=lambda messages, tag: asked.append(messages) or 0.99)
+    with pytest.raises(ModelFailed, match="premise over 8000 characters"):
+        entail.p_entails("x" * 8001, "Satz.", model, "v3")
+    assert asked == [] and model.calls == 0
+    assert entail.gate("Die Regel.", "Die Regel.", model, "v3") == ([], 0.99)

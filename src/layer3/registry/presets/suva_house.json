@@ -33,8 +33,8 @@
         },
         "title_matter": "ruling_language_only"
       },
-      "decision": "D-094",
-      "changelog": "Initial (D-094): anchor 5, style by the ruling's language (Q-30), written by the v3 engine; title line rendered by code from docket and decision date (DB plan §13.1), the matter appended only in the ruling's language."
+      "decision": "D-095",
+      "changelog": "Initial (D-095): anchor 5, style by the ruling's language (Q-30), written by the v3 engine; title line rendered by code from docket and decision date (DB plan §13.1), the matter appended only in the ruling's language."
     }
   ]
 }

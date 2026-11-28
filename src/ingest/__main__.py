@@ -28,6 +28,7 @@ from src.layer1.models import Layer1Config, RuleDefinition
 from src.layer2.models import Layer2Config
 from src.layer3.models import SegmentConfig, SummariseConfig, VerifyConfig, VerifyRuleDefinition, engine_code_paths
 from src.layer3.presets import load_presets
+from src.scorer.models import RankingConfig, ScorerConfig, SignalRule
 
 REGISTRIES = (
     ("src/ingest/registry/ingest.json", IngestConfig, None, ("src/ingest/hf_base.py", "src/ingest/models.py")),
@@ -43,6 +44,13 @@ REGISTRIES = (
         None,
         ("src/layer2/engine.py", "src/layer2/models.py"),
     ),
+    (
+        "src/scorer/registry/layer2_scorer.json",
+        ScorerConfig,
+        SignalRule,
+        ("src/scorer/load.py", "src/scorer/models.py"),
+    ),
+    ("src/scorer/registry/ranking.json", RankingConfig, None, ("src/scorer/load.py", "src/scorer/models.py")),
     ("src/layer3/registry/segment.json", SegmentConfig, None, ("src/layer3/models.py", "src/layer3/segment.py")),
     (
         "src/layer3/registry/summarise.json",

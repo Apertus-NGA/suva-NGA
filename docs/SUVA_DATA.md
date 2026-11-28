@@ -86,7 +86,7 @@ The deck's sample (about 300 words) is longer than most of the set (Q-08).
 - **Must-hit subset:** defined once in `docs/GLOSSARY.md` (the template's "all judgements that have been summarised by a human should also be correctly identified", Q-20): the summarised rulings of a labelled quarter, 22 in Q4/2025 and 10 in Q1/2026. The 23 Q3/2025 exports are a population check (T30): the crawl checks that every ruling with an export is in its populations (`docs/agents/crawl.md`).
 - **Style pool for summaries:** 55 independent summaries, not 110 (each pair is one text in two languages). For the internal hold-out, split by time and stratify by style: the internal test set is the 10 Q1/2026 exports plus the 13 German-language Q4/2025 exports (23 rulings, both styles); examples and development use the 23 Q3/2025 exports and the 9 French-language Q4/2025 exports; never put a ruling in both the prompt and the test; report the results per style. (Q1/2026 alone holds one German-language export, too few for the majority case.) Do not use a text with a meaning-changing translation error as a target in that language; prefer the ruling-language side.
 - **Never filter** on the `8C_` prefix, on the docket year, or on the word "Suva" in the text (G5).
-- **Personal data:** the author section, staff codes and intranet links are dropped at ingestion and never reproduced (D-051).
+- **Personal data:** the author section, staff codes and intranet links are never reproduced in any file we write, prompt, log, UI or report; the data layer's database may keep the author field, a style key derived from it and the workbook's hyperlink target as data (D-051 as amended).
 
 ## 6. Questions this data raises
 

@@ -139,7 +139,7 @@ services:
   # data/derived (SUVA_DERIVED_SOURCE, Suva-derived: never in the image or in git, D-031).
   pipeline:
     <<: *app
-    command: ["make", "run", "SERVE=0"]
+    command: ["make", "pipeline", "SERVE=0"]
     environment:
       <<: *pipeline-db
       MODE: ${MODE:-replay}
@@ -243,7 +243,7 @@ services:
     <<: *app
     profiles: ["ui"]
     restart: unless-stopped
-    command: ["make", "serve"]
+    command: ["make", "api"]
     environment:
       DATABASE_URL: postgresql://db:5432/suva
       PGUSER: suva_api
@@ -335,6 +335,7 @@ networks:
   backend:
     internal: true
   egress: {}
+
 
 volumes:
   pgdata:

@@ -29,9 +29,9 @@
         "becomes_primary": false
       },
       "rules": [],
-      "decision": "D-094",
+      "decision": "D-095",
       "validation": null,
-      "changelog": "Initial (D-094): numbered consideration headings after the reasoning heading and before the operative part, a number kept only when it continues the numbering (2.1 -> 2.2, 2.1.1 or 3). status ok when considerations are found, failed with none. Draft (V0.x): not measured against structure.parquet."
+      "changelog": "Initial (D-095): numbered consideration headings after the reasoning heading and before the operative part, a number kept only when it continues the numbering (2.1 -> 2.2, 2.1.1 or 3). status ok when considerations are found, failed with none. Draft (V0.x): not measured against structure.parquet."
     }
   ]
 }

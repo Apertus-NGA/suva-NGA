@@ -1,0 +1,351 @@
+{
+  "step": "layer2_judge",
+  "doc": "docs/DECISIONS.md D-094; src/scorer/load.py. The Suva Scout scorer as layer 2 (D-094). A version is immutable: a refit is a new version (D-064).",
+  "config_schema": {
+    "schema_code": "layer2_scorer.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial (D-094): the fitted sign-constrained scorer."
+  },
+  "rule_schema": {
+    "schema_code": "layer2_scorer.rule",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial (D-094): one scorer rule, its source and its fixed direction."
+  },
+  "rules": [
+    {
+      "rule_code": "SC_AREA_UVMV",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "area_uvmv",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "The matter is accident or military insurance.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_AREA_IV",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "area_iv",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "The matter is disability insurance.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_APPEAL_BY_INSTITUTION",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "appeal_by_institution",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "The appeal was lodged by an insurer or an authority.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_FIVE_JUDGES",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "five_judges",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "The bench has five judges.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_PUBLICATION",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "publication",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "The ruling is proposed for the official reporter.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_MANIFESTLY_UNFOUNDED",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "manifestly_unfounded",
+        "source": "code",
+        "direction": -1
+      },
+      "description": "The appeal was dismissed as manifestly unfounded.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_SUVA_PARTY",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "suva_party",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "Suva is a party.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_SINGLE_JUDGE",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "single_judge",
+        "source": "code",
+        "direction": -1
+      },
+      "description": "A single judge decided.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_CONSENSUS",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "consensus",
+        "source": "apertus",
+        "direction": 1
+      },
+      "description": "Consensus of six Apertus 70B readings (first-token log-probabilities, standardised, averaged).",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_CORE_TOPICS",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "core_topics",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "Number of core accident-insurance topics named in the text.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_LONG_ACCIDENT",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "long_accident",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "A long ruling in accident or military insurance.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    },
+    {
+      "rule_code": "SC_OTHER_ACCIDENT_INSURER",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "feature": "other_accident_insurer",
+        "source": "code",
+        "direction": 1
+      },
+      "description": "Another accident insurer is a party.",
+      "changelog": "Initial (D-094): rule of scorer@2."
+    }
+  ],
+  "versions": [
+    {
+      "version": [
+        2,
+        0,
+        0
+      ],
+      "name": "Suva Scout scorer: twelve sign-constrained rules, one fed by six Apertus 70B readings",
+      "bump_kind": "major",
+      "previous": [
+        1,
+        0,
+        0
+      ],
+      "config": {
+        "scorer": "scorer@2",
+        "pipeline": "triage_pipeline@2",
+        "readings": "readings@1",
+        "features": [
+          "area_uvmv",
+          "area_iv",
+          "appeal_by_institution",
+          "five_judges",
+          "publication",
+          "manifestly_unfounded",
+          "suva_party",
+          "single_judge",
+          "consensus",
+          "core_topics",
+          "long_accident",
+          "other_accident_insurer"
+        ],
+        "intercept": -4.003912512440981,
+        "rule_weights": {
+          "area_uvmv": {
+            "sign": 1,
+            "weight": 1.2698783583183186,
+            "mean": 0.14860681114551083,
+            "scale": 0.35570047346984845
+          },
+          "area_iv": {
+            "sign": 1,
+            "weight": 2.269530792487538,
+            "mean": 0.3126934984520124,
+            "scale": 0.46359063243108667
+          },
+          "appeal_by_institution": {
+            "sign": 1,
+            "weight": 0.3568313634581376,
+            "mean": 0.08978328173374613,
+            "scale": 0.28587102695947364
+          },
+          "five_judges": {
+            "sign": 1,
+            "weight": 0.3543551001858384,
+            "mean": 0.05727554179566564,
+            "scale": 0.23236835866287553
+          },
+          "publication": {
+            "sign": 1,
+            "weight": 0.058955373112163895,
+            "mean": 0.02476780185758514,
+            "scale": 0.15541672319518354
+          },
+          "manifestly_unfounded": {
+            "sign": -1,
+            "weight": -0.27256115769199996,
+            "mean": 0.07430340557275542,
+            "scale": 0.26226400723897747
+          },
+          "suva_party": {
+            "sign": 1,
+            "weight": 1.0661172460975805,
+            "mean": 0.10371517027863777,
+            "scale": 0.3048906914497588
+          },
+          "single_judge": {
+            "sign": -1,
+            "weight": -2.240381303781198,
+            "mean": 0.3637770897832817,
+            "scale": 0.4810855627973981
+          },
+          "consensus": {
+            "sign": 1,
+            "weight": 0.3245099474396112,
+            "mean": -0.02869136573305605,
+            "scale": 0.3253002126549388
+          },
+          "core_topics": {
+            "sign": 1,
+            "weight": 0.24441781019763903,
+            "mean": 0.9535603715170279,
+            "scale": 1.3194231378272516
+          },
+          "long_accident": {
+            "sign": 1,
+            "weight": 0.3409384941136847,
+            "mean": 0.010835913312693499,
+            "scale": 0.10353017094245263
+          },
+          "other_accident_insurer": {
+            "sign": 1,
+            "weight": 0.5703659416066524,
+            "mean": 0.04953560371517028,
+            "scale": 0.2169834732871246
+          }
+        },
+        "apertus_rules": [
+          "consensus"
+        ],
+        "score_raw": "logit",
+        "score_mapping": "probability_x100"
+      },
+      "rules": [
+        "SC_AREA_UVMV",
+        "SC_AREA_IV",
+        "SC_APPEAL_BY_INSTITUTION",
+        "SC_FIVE_JUDGES",
+        "SC_PUBLICATION",
+        "SC_MANIFESTLY_UNFOUNDED",
+        "SC_SUVA_PARTY",
+        "SC_SINGLE_JUDGE",
+        "SC_CONSENSUS",
+        "SC_CORE_TOPICS",
+        "SC_LONG_ACCIDENT",
+        "SC_OTHER_ACCIDENT_INSURER"
+      ],
+      "models": {
+        "judge": "apertus-v1-5-70b"
+      },
+      "decision": "D-094",
+      "validation": null,
+      "changelog": "Major (D-094): replaces the 8B Ja/Nein judge by the Suva Scout scorer. The score is a sign-constrained logistic regression over eleven facts read by code and one consensus of six Apertus 70B readings; each rule moves the score in one fixed direction only. Weights fitted on the kept rulings of the two listed quarters. Loaded from a stored run of the scorer (src/scorer), not recomputed."
+    }
+  ]
+}

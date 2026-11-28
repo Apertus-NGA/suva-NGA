@@ -3,15 +3,23 @@
 The court digits, the proceedings letters and the kept subjects are in
 ``docs/DATA.md`` §5. ``decide`` stores two decisions. The subject decision
 keeps a ruling when its digit, its letter and its Neuheiten subject are in
-that set, and also when the subject is missing on an allowed court. The text
-decision keeps it when the text names Suva, CNA, INSAI or an accident or
-military insurance term, and also when the text names the insurance-contract
+that set. The subject is matched by name (``src/areas.py``), in German, French
+or Italian. It is read from the Neuheiten rubric, and when that is empty from
+the start of the ruling's subject line. The text decision keeps it when the text names Suva, CNA, INSAI or an
+accident or military insurance term, and also when the text names the insurance-contract
 act (VVG, LCA) or private daily-allowance insurance (Taggeldversicherung).
 The bare word Taggeld does not: it is the unemployment benefit. Those
 contract terms do not keep unemployment, old-age, tax, supplementary
 benefits, loss-of-earnings, social assistance or family allowances.
 Either decision is enough. A trailing asterisk on the subject (proposed for
-the official reporter) is ignored. The measured counts are in ``docs/LAYER1.md``.
+the official reporter) is ignored.
+
+Code drops a ruling on its subject only when the Neuheiten rubric names a
+matter outside the set. When the rubric is empty and the subject line names no
+kept matter (``subject_unknown``), or there is no subject line
+(``subject_missing``), code does not decide: ``layer1_record`` asks Apertus to
+read the matter (``src/area_judge.py``). Without an answer the ruling is kept.
+The measured counts are in ``docs/LAYER1.md``.
 """
 
 from __future__ import annotations
@@ -20,42 +28,20 @@ import re
 from dataclasses import dataclass
 from datetime import UTC
 
+try:  # imported as ``src.courts`` by the tests, as ``courts`` by the scripts launched from src/
+    from .areas import area_code, first_segment
+except ImportError:
+    from areas import area_code, first_segment
+
 LETTERS = {
     "8": frozenset("CDFG"),
     "9": frozenset("CDFG"),
     "4": frozenset("ADFG"),
 }
 
-# News-page subject, lower case, without the reporter asterisk.
-SOCIAL = frozenset(
-    {
-        "unfallversicherung",
-        "assurance-accidents",
-        "assicurazione contro gli infortuni",
-        "invalidenversicherung",
-        "assurance-invalidité",
-        "assicurazione per l'invalidità",
-        "krankenversicherung",
-        "assurance-maladie",
-        "assicurazione malattie",
-        "berufliche vorsorge",
-        "prévoyance professionnelle",
-        "previdenza professionale",
-        "previdenza professionnale",
-        "militärversicherung",
-        "assurance militaire",
-        "assicurazione militare",
-    }
-)
-CONTRACT = frozenset(
-    {
-        "vertragsrecht",
-        "droit des contrats",
-        "diritto contrattuale",
-        "haftpflichtrecht",
-        "assurance responsabilité civile",
-    }
-)
+# Matters kept per court, as codes of ``src/areas.py`` (the names in three languages are there).
+SOCIAL = frozenset({"UV", "MV", "IV", "KV", "BV"})
+CONTRACT = frozenset({"CONTRACT", "LIABILITY"})
 AREAS = {
     "8": SOCIAL,
     "9": SOCIAL,
@@ -66,12 +52,13 @@ AREAS = {
 _TEXT_TERMS = re.compile(
     r"\b(?:"
     r"suva|cna|insai|uvg|laa|lainf|mvg|"
-    r"unfallversicherung|militärversicherung|"
-    r"assurance-accidents|assurance militaire|"
-    r"assicurazione contro gli infortuni|assicurazione militare"
+    r"unfallversicherung(?:sgesetz|en)?|unfallversicherers?|unfallversicherern|militärversicherung|"
+    r"assurance-accidents?|assureurs?-accidents?|assurance militaire|"
+    r"assicurazione (?:contro gli )?infortuni|assicuratore infortuni|assicurazione militare"
     r")\b"
 )
-_SUBJECT_KEEPS = frozenset({"kept_subject", "subject_missing"})
+_SUBJECT_UNREAD = frozenset({"subject_missing", "subject_unknown"})  # code could not read the matter
+_SUBJECT_KEEPS = frozenset({"kept_subject"}) | _SUBJECT_UNREAD
 _TEXT_KEEPS = frozenset({"kept_text", "kept_contract"})
 
 # Private daily-allowance insurance and the Insurance Contract Act.
@@ -115,6 +102,11 @@ class Gate:
     text_criterion: str
     text_blocked_term: str | None = None
 
+    @property
+    def needs_apertus(self) -> bool:
+        """Code could not read the matter and the text decision did not keep the ruling."""
+        return self.subject in _SUBJECT_UNREAD and self.text not in _TEXT_KEEPS
+
 
 def court_of(docket: str) -> str:
     """Prefix before the underscore, for example ``8C``."""
@@ -133,14 +125,11 @@ def rubric_from_title(title: object) -> str | None:
     """Matter at the start of ``title``, the column just before ``legal_area``.
 
     When Hugging Face leaves ``legal_area`` empty it still writes
-    ``Invalidenversicherung,`` or ``Assurance-accidents (lien de causalité),``
-    in ``title``. The following column, ``regeste``, is empty on those rows.
+    ``Invalidenversicherung,``, ``Assurance-accidents (lien de causalité),`` or
+    ``Invalidenversicherung, Invalidenrente`` in ``title``. The matter ends at the first
+    bracket, comma or semicolon. The following column, ``regeste``, is empty on those rows.
     """
-    if not isinstance(title, str):
-        return None
-    head = title.strip().split("(", 1)[0]
-    head = head.strip().rstrip(",;").strip()
-    return head or None
+    return first_segment(title)
 
 
 def area_for_gate(area: object, title: object = None) -> object:
@@ -155,7 +144,7 @@ def _hit(pattern: re.Pattern[str], value: str) -> str | None:
     return found.group(0) if found else None
 
 
-def _subject_decision(docket: str, area: object) -> tuple[str, str]:
+def _subject_decision(docket: str, area: object, title: object = None) -> tuple[str, str]:
     head = court_of(docket)
     if len(head) != 2:
         return "wrong_court", head or "empty_prefix"
@@ -165,12 +154,17 @@ def _subject_decision(docket: str, area: object) -> tuple[str, str]:
         return "wrong_court", division
     if letter not in LETTERS[division]:
         return "wrong_letter", letter
-    if _missing(area):
+    if not _missing(area):
+        rubric = _subject(area)
+        return ("kept_subject" if area_code(area) in allowed else "subject_out"), rubric
+    matter = rubric_from_title(title)
+    if matter is None:
         return "subject_missing", "blank_rubric"
-    rubric = _subject(area)
-    if rubric in allowed:
-        return "kept_subject", rubric
-    return "subject_out", rubric
+    # A title often names the dispute ("contrat de travail", "Rechtsverweigerung"), not the matter:
+    # when it names no kept matter, nothing was read.
+    if area_code(matter) in allowed:
+        return "kept_subject", _subject(matter)
+    return "subject_unknown", _subject(matter)
 
 
 def _text_decision(text: object, area: object = None) -> tuple[str, str, str | None]:
@@ -189,17 +183,20 @@ def _text_decision(text: object, area: object = None) -> tuple[str, str, str | N
     return "text_clear", "no_keep_term", None
 
 
-def decide(docket: str, area: object = None, text: object = None) -> Gate:
-    """Keep when the subject decision or the text decision says so."""
-    subject, subject_criterion = _subject_decision(docket, area)
-    text_reason, text_criterion, blocked = _text_decision(text, area)
+def decide(docket: str, area: object = None, text: object = None, title: object = None) -> Gate:
+    """Keep when the subject decision or the text decision says so.
+
+    ``area`` is the Neuheiten rubric. ``title`` is the ruling's subject line, read only when ``area`` is empty.
+    """
+    subject, subject_criterion = _subject_decision(docket, area, title)
+    text_reason, text_criterion, blocked = _text_decision(text, area_for_gate(area, title))
     kept = subject in _SUBJECT_KEEPS or text_reason in _TEXT_KEEPS
     return Gate(kept, subject, text_reason, subject_criterion, text_criterion, blocked)
 
 
-def passes(docket: str, area: object = None, text: object = None) -> bool:
+def passes(docket: str, area: object = None, text: object = None, title: object = None) -> bool:
     """True when ``decide`` keeps the ruling."""
-    return decide(docket, area, text).kept
+    return decide(docket, area, text, title).kept
 
 
 def _path(subject: str, text: str) -> str:
@@ -216,7 +213,7 @@ def _path(subject: str, text: str) -> str:
 
 def gate_record(docket: str, area: object = None, title: object = None, text: object = None) -> dict[str, object]:
     """One layer-1 row. ``text`` is the text decision, not the ruling."""
-    gate = decide(docket, area_for_gate(area, title), text)
+    gate = decide(docket, area, text, title)
     return {
         "docket": docket,
         "subject": gate.subject,
@@ -229,6 +226,42 @@ def gate_record(docket: str, area: object = None, title: object = None, text: ob
         "path": _path(gate.subject, gate.text),
         "kept": gate.kept,
     }
+
+
+LAYER1_COLUMNS = ["docket", "subject", "text", "apertus", "matter", "in_scope_probability", "kept"]
+
+
+def layer1_record(
+    docket: str, area: object = None, title: object = None, text: object = None, judge: object = None
+) -> dict[str, object]:
+    """One layer-1 row with the Apertus reading where code could not read the matter.
+
+    ``judge(ruling_text, kept_matters)`` returns ``apertus``, ``matter``, ``in_scope_probability`` and
+    ``kept`` (``src/area_judge.gate_judge``). It is called only when ``decide`` says ``needs_apertus``.
+    No judge (``pending``) or a failed call (``failed``) keeps the ruling: a missing answer is not a no.
+    """
+    gate = decide(docket, area, text, title)
+    row: dict[str, object] = {
+        "docket": docket,
+        "subject": gate.subject,
+        "text": gate.text,
+        "apertus": "not_asked",
+        "matter": None,
+        "in_scope_probability": None,
+        "kept": gate.kept,
+    }
+    if not gate.needs_apertus:
+        return row
+    if judge is None:
+        row["apertus"] = "pending"
+        return row
+    try:
+        answer = judge(text, AREAS[court_of(docket)[0]])  # type: ignore[operator]
+    except Exception:  # noqa: BLE001  any failure of the reading keeps the ruling
+        row["apertus"] = "failed"
+        return row
+    row.update({key: answer[key] for key in ("apertus", "matter", "in_scope_probability", "kept")})
+    return row
 
 
 def _tally(rows: list[dict], key: str) -> dict[str, int]:

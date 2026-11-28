@@ -52,9 +52,9 @@
         "repair": "apertus-v1-5-70b",
         "judge": "apertus-v1-5-70b"
       },
-      "decision": "D-094",
+      "decision": "D-095",
       "validation": null,
-      "changelog": "Initial (D-094): record (propositions by sentence id, copied and checked by code), write per language from the ruling (never translated, D-014), verify per sentence, outcome added by code; v2 per language when v3 fails. Every call the large Apertus model; the labelling calls (record, verify, entail) are bound to the judge role, the only reading role of ops.model_role."
+      "changelog": "Initial (D-095): record (propositions by sentence id, copied and checked by code), write per language from the ruling (never translated, D-014), verify per sentence, outcome added by code; v2 per language when v3 fails. Every call the large Apertus model; the labelling calls (record, verify, entail) are bound to the judge role, the only reading role of ops.model_role."
     }
   ]
 }

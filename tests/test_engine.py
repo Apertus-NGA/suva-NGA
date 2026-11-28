@@ -181,7 +181,7 @@ def test_v3_writes_both_languages_from_one_shared_record_and_verifies_every_sent
         assert fiche.body.endswith(outcome) and fiche.body.count(outcome) == 1
         written = [s for s in fiche.sentences if s.status != "code"]
         assert [s.text for s in written] == [t for t, _ in FICHE[language]]
-        flat = " ".join(fiche.body.split())  # every kept sentence reads as the body says it (claims, D-097)
+        flat = " ".join(fiche.body.split())  # every kept sentence reads as the body says it (claims, D-098)
         assert all(" ".join(s.text.split()) in flat for s in fiche.sentences if s.status != "removed")
         assert [s.ordinal for s in fiche.sentences] == [1, 2, 3, 4, 5, 6]
         assert all(s.entailment == pytest.approx(0.97, abs=0.01) for s in written)

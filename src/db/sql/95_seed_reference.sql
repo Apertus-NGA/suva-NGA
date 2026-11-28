@@ -42,6 +42,20 @@ INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
   ('JUS_EVIDENCE_IN_SET',        'triage', 'Zitierte Erwägungen stammen aus dem Urteil', 'Les considérants cités proviennent de l''arrêt'),
   ('RANK_BELOW_THRESHOLD',       'triage', 'Relevanzwert unter der Schwelle', 'Score de pertinence sous le seuil'),
   ('RANK_AT_OR_ABOVE_THRESHOLD', 'triage', 'Relevanzwert auf oder über der Schwelle', 'Score de pertinence au seuil ou au-dessus'),
+  -- the Suva Scout scorer as layer 2 and its promotion as the ranking step (src/scorer, D-094)
+  ('SC_AREA_UVMV', 'triage', 'Unfall- oder Militärversicherung', 'Assurance-accidents ou assurance militaire'),
+  ('SC_AREA_IV', 'triage', 'Invalidenversicherung', 'Assurance-invalidité'),
+  ('SC_APPEAL_BY_INSTITUTION', 'triage', 'Beschwerde eines Versicherers oder einer Behörde', 'Recours d''un assureur ou d''une autorité'),
+  ('SC_FIVE_JUDGES', 'triage', 'Fünferbesetzung', 'Composition à cinq juges'),
+  ('SC_PUBLICATION', 'triage', 'zur Publikation vorgesehen', 'Destiné à la publication'),
+  ('SC_MANIFESTLY_UNFOUNDED', 'triage', 'als offensichtlich unbegründet erledigt', 'Liquidé comme manifestement infondé'),
+  ('SC_SUVA_PARTY', 'triage', 'Suva ist Partei', 'La Suva est partie'),
+  ('SC_SINGLE_JUDGE', 'triage', 'Einzelrichterentscheid', 'Décision du juge unique'),
+  ('SC_CONSENSUS', 'triage', 'Apertus-Lesungen: rechtliche Aussage über den Einzelfall hinaus', 'Lectures d''Apertus : énoncé juridique au-delà du cas d''espèce'),
+  ('SC_CORE_TOPICS', 'triage', 'Kernthemen der Unfallversicherung im Text', 'Thèmes centraux de l''assurance-accidents dans le texte'),
+  ('SC_LONG_ACCIDENT', 'triage', 'ausführliches Urteil in der Unfall- oder Militärversicherung', 'Arrêt détaillé en assurance-accidents ou en assurance militaire'),
+  ('SC_OTHER_ACCIDENT_INSURER', 'triage', 'anderer Unfallversicherer ist Partei', 'Un autre assureur-accidents est partie'),
+  ('RANK_PROMOTED_BY_SCORER',    'triage', 'Vom Bewertungsmodell als vermutlich relevant eingestuft', 'Classé comme probablement pertinent par le modèle de score'),
   -- ingest, segmentation, parse
   ('ING_TWIN_SAME_DATE',               'ingest', 'Doppelte Zeile der Quelle (gleiches Datum)', 'Ligne en double dans la source (même date)'),
   ('ING_DOCKET_MALFORMED',             'ingest', 'Geschäftsnummer nicht im Format des Bundesgerichts', 'Numéro de dossier hors du format du Tribunal fédéral'),
@@ -125,7 +139,7 @@ FROM (VALUES (
 ) AS s(js, template, changelog)
 ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
 
--- layer 3 (D-094, docs/LAYER3.md): the verify rules V3_<CODE>, one per check code of the v3 engine
+-- layer 3 (D-095, docs/LAYER3.md): the verify rules V3_<CODE>, one per check code of the v3 engine
 -- (src/layer3/registry/verify.json), and why a ruling was not summarised. Appended: no existing row changes.
 INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
   ('V3_LANGUAGE',          'verify',  'Satz in der Sprache der Fassung', 'Phrase dans la langue de la version'),

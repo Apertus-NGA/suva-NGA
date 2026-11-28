@@ -266,3 +266,62 @@ def test_a_cache_hit_is_logged_and_observed_as_replay(tmp_path):
 def test_a_base_url_without_scheme_fails_at_startup():
     with pytest.raises(ConfigError, match="https://"):
         LLMConfig.from_env("live", {**GOOD_ENV, "LLM_BASE_URL": "REMPLACE_PAR_TON_ENDPOINT"})
+
+
+# --- the shipped answers: a committed, read-only store a fresh clone replays from ---------------------------
+
+
+def _answer_once(store, content="A"):
+    """One live call against the fake gateway, cached in `store`. Returns the result."""
+    client = make(store, FakeGateway(ok(content=content)))
+    return client.chat(MSGS, max_tokens=5, prompt_version="p1")
+
+
+def test_replay_falls_back_to_the_shipped_answers_when_the_local_store_has_none(tmp_path):
+    shipped, local = tmp_path / "shipped", tmp_path / "local"
+    _answer_once(shipped, "aus dem Lieferumfang")
+    client = LLMClient(LLMConfig.from_env("replay", GOOD_ENV), store_dir=local, shipped_dir=shipped)
+    result = client.chat(MSGS, max_tokens=5, prompt_version="p1")
+    assert (result.content, result.mode) == ("aus dem Lieferumfang", "REPLAY")
+    assert not (local / "cache").exists()  # reading the shipped store writes nothing
+
+
+def test_the_local_answer_wins_over_the_shipped_one_and_live_never_writes_the_shipped_store(tmp_path):
+    shipped, local = tmp_path / "shipped", tmp_path / "local"
+    _answer_once(shipped, "alt")
+    before = sorted(p.name for p in shipped.rglob("*") if p.is_file())
+    _answer_once(local, "neu")
+    gateway = FakeGateway(ok(content="frisch"))
+    live = LLMClient(
+        LLMConfig.from_env("live", GOOD_ENV), store_dir=local, shipped_dir=shipped,
+        transport=httpx.MockTransport(gateway), sleep=lambda s: None,
+    )  # fmt: skip
+    assert live.chat(MSGS, max_tokens=5, prompt_version="p1").content == "neu"
+    assert live.chat(MSGS, max_tokens=5, prompt_version="p2").content == "frisch"  # not cached anywhere: one call
+    assert len(gateway.requests) == 1
+    assert sorted(p.name for p in shipped.rglob("*") if p.is_file()) == before
+
+
+def test_replay_without_llm_name_takes_the_model_from_the_shipped_store(tmp_path):
+    shipped = tmp_path / "shipped"
+    _answer_once(shipped)
+    client = LLMClient(LLMConfig.from_env("replay", {}), store_dir=tmp_path / "local", shipped_dir=shipped)
+    assert client.chat(MSGS, max_tokens=5, prompt_version="p1").content == "A"
+
+
+def test_export_ships_only_the_answers_a_run_used(tmp_path):
+    from src.llm.client import export_answers
+
+    local, dest = tmp_path / "local", tmp_path / "dest"
+    writer = make(local, FakeGateway(ok(content="gebraucht"), ok(content="nicht gebraucht")))
+    used = writer.chat(MSGS, max_tokens=5, prompt_version="p1")
+    writer.chat(MSGS, max_tokens=5, prompt_version="other")
+    run = LLMClient(LLMConfig.from_env("replay", GOOD_ENV), store_dir=local)
+    run.chat(MSGS, max_tokens=5, prompt_version="p1")
+    assert export_answers(dest, client=run) == 1
+    assert [p.stem for p in (dest / "cache").rglob("*.json")] == [used.cache_key]
+    assert json.loads((dest / "replay_models.json").read_text()) == {"large": "apertus-v1-5-70b"}
+    fresh = LLMClient(LLMConfig.from_env("replay", {}), store_dir=tmp_path / "empty", shipped_dir=dest)
+    assert fresh.chat(MSGS, max_tokens=5, prompt_version="p1").content == "gebraucht"
+    with pytest.raises(ReplayMiss):
+        fresh.chat(MSGS, max_tokens=5, prompt_version="other")

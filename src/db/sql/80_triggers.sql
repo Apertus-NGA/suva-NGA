@@ -826,7 +826,7 @@ CREATE OR REPLACE TRIGGER t31_check BEFORE INSERT ON gold.expert_review
 
 -- SECURITY DEFINER: the row lock below (FOR UPDATE on summ.summary) needs an UPDATE privilege the pipeline group
 -- does not have (90_roles.sql grants it SELECT and INSERT on summ.summary); the owner takes it, as for
--- ops.ensure_log_partitions. Every name in the body is schema-qualified, so the fixed search_path is safe (D-097).
+-- ops.ensure_log_partitions. Every name in the body is schema-qualified, so the fixed search_path is safe (D-098).
 CREATE OR REPLACE FUNCTION summ.before_insert_version() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE

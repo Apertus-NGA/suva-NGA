@@ -184,7 +184,7 @@ def test_a_sentence_removed_for_length_is_not_stored_as_a_failure():
 
 def test_a_claim_not_found_in_the_body_is_flagged_with_the_engines_text():
     """The API carries citations to an expert edit by matching body sentences to rendered_text: a claim must read as
-    the stored body does, or it is flagged (D-097)."""
+    the stored body does, or it is flagged (D-098)."""
     kept = _sentence(1, "Satz eins.", ["P1"])
     other = _sentence(2, "Satz (E. 9) zwei.", ["P2"])
     plan = _plan(_fiche(sentences=(kept, other), body="Satz eins.\n\nSatz zwei."))
@@ -274,7 +274,7 @@ def test_the_registry_files_validate_and_bind_one_rule_per_engine_check_code():
         for raw in reg["versions"]:
             ver = StepVersionEntry.model_validate(raw)
             model.model_validate(ver.config)
-            assert ver.decision == "D-094" and ver.validation is None
+            assert ver.decision == "D-095" and ver.validation is None
     assert [r["rule_code"] for r in verify["rules"]] == [rule_code(c) for c in CHECK_CODES]
     assert verify["versions"][0]["rules"] == [rule_code(c) for c in CHECK_CODES]
     assert all(r["kind"] == "check" for r in verify["rules"]) and verify["step"] == "verify"
@@ -304,7 +304,8 @@ def test_the_seed_labels_every_verify_rule_and_layer3_reason_in_german_and_frenc
 def test_the_default_profile_pins_the_layer3_steps():
     profiles = json.loads((ROOT / "src" / "db" / "seed" / "profiles.json").read_text())
     latest = profiles["profiles"][0]["versions"][-1]
-    assert latest["version"] == [0, 4, 0] and latest["previous"] == [0, 3, 0]
+    # V0.5.0 = main's V0.4.0 (the scorer as layer 2 V2.0.0, ranking V1.0.0) + the three layer-3 steps (D-095)
+    assert latest["version"] == [0, 5, 0] and latest["previous"] == [0, 4, 0]
     assert {k: tuple(v) for k, v in latest["steps"].items() if k in ("segment", "summarise", "verify")} == {
         "segment": (0, 1, 0),
         "summarise": (1, 0, 0),

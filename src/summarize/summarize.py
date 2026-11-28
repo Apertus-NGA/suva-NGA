@@ -1,14 +1,11 @@
 """Write a Suva fiche in German and in French, each on its own: prompts, the checker and the model call.
 
-Ported from the summary owner's branch `summarize/v3` @ a4a1504 (its runner, pipeline.py, is not ported: the
-engine is src/summarize/engine.py, the writer into summ.* is src/layer3/). Two changes from the branch: `load_env`
-reads `.env.local` / `.env` with src/cli.py's reader (the branch used a package main does not have), and the
-cache readers of main's trial script (`load_tables`, `row_for`, `gold_body`) stay for src/summarize/tally.py.
-The key stays in .env and is never printed.
+The runner is src/summarize/pipeline.py (database in, database out). The key stays in .env and is never printed.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -19,7 +16,6 @@ else:
     from prompts import VERSION, glossary_block, sigil_hint, sigils, system_prompt
 
 ROOT = Path(__file__).resolve().parents[2]
-CACHE = ROOT / "data" / "cache"  # main's legacy parquet cache, read by tally.py only
 # Tone only: one short fiche (remand) and one dismissal.
 # The text of those rulings is not put in the prompt: it leaked into the outcome.
 FEW_SHOT = ("8C_177/2025", "8C_224/2025")
@@ -32,11 +28,10 @@ ORDER_MARKERS = (
 
 def load_env() -> None:
     """Put the settings of `.env.local` / `.env` (when present) into the environment; never override it."""
-    if str(ROOT) not in sys.path:
-        sys.path.insert(0, str(ROOT))
-    from src.cli import load_dotenv
+    from suva_data.config import read_env_files
 
-    load_dotenv()
+    for key, value in read_env_files(ROOT).items():
+        os.environ.setdefault(key, value)
 
 
 def clean(text: str) -> str:
@@ -325,42 +320,6 @@ def chat(messages: list[dict], mode: str = "live", store_dir: Path | None = None
         raise SystemExit(f"gateway: {exc}") from exc
     finally:
         client.close()
-
-
-def load_tables():
-    """main's legacy parquet cache (data/cache), for tally.py; the engine never reads it."""
-    import pandas as pd
-
-    rulings_path = CACHE / "rulings.parquet"
-    gold_path = CACHE / "gold_summaries.parquet"
-    if not rulings_path.exists() or not gold_path.exists():
-        raise SystemExit(f"local cache missing: {CACHE}")
-    rulings = pd.read_parquet(rulings_path)
-    gold = pd.read_parquet(gold_path)
-    gold = gold[gold.is_current]
-    return rulings, gold
-
-
-def row_for(rulings, docket: str) -> dict:
-    found = rulings[rulings.docket == docket]
-    if found.empty:
-        raise SystemExit(f"ruling missing from the cache: {docket}")
-    row = found.iloc[0]
-    return {
-        "docket": row.docket,
-        "decision_date": str(row.decision_date)[:10],
-        "division": row.division,
-        "area": row.area if isinstance(row.area, str) and row.area.strip() else None,
-        "title": row.subject if isinstance(row.subject, str) and row.subject.strip() else None,
-        "text": clean(row.text),
-    }
-
-
-def gold_body(gold, docket: str, language: str) -> str:
-    found = gold[(gold.docket == docket) & (gold.language == language)]
-    if found.empty:
-        return ""
-    return clean(found.iloc[0].body)
 
 
 LAW_ALIASES = {

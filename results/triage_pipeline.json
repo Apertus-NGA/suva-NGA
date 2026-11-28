@@ -1,0 +1,150 @@
+{
+ "version": "triage_pipeline@2",
+ "rulings": 6464,
+ "kept_by_layer1": 1201,
+ "core_rulings_read_by_apertus": 422,
+ "apertus_readings_failed": 0,
+ "consensus_readings": [
+  "scale_area",
+  "scale_generic",
+  "scale_headnote",
+  "scale_tail",
+  "verdict",
+  "yes_strict"
+ ],
+ "training_rulings": 646,
+ "training_relevant": 59,
+ "relevant_not_kept_by_layer1": 0,
+ "threshold": 0.4681,
+ "scorer": "scorer@2",
+ "rule_weights": {
+  "area_uvmv": {
+   "sign": 1,
+   "weight": 1.2699,
+   "mean": 0.1486,
+   "scale": 0.3557
+  },
+  "area_iv": {
+   "sign": 1,
+   "weight": 2.2695,
+   "mean": 0.3127,
+   "scale": 0.4636
+  },
+  "appeal_by_institution": {
+   "sign": 1,
+   "weight": 0.3568,
+   "mean": 0.0898,
+   "scale": 0.2859
+  },
+  "five_judges": {
+   "sign": 1,
+   "weight": 0.3544,
+   "mean": 0.0573,
+   "scale": 0.2324
+  },
+  "publication": {
+   "sign": 1,
+   "weight": 0.059,
+   "mean": 0.0248,
+   "scale": 0.1554
+  },
+  "manifestly_unfounded": {
+   "sign": -1,
+   "weight": -0.2726,
+   "mean": 0.0743,
+   "scale": 0.2623
+  },
+  "suva_party": {
+   "sign": 1,
+   "weight": 1.0661,
+   "mean": 0.1037,
+   "scale": 0.3049
+  },
+  "single_judge": {
+   "sign": -1,
+   "weight": -2.2404,
+   "mean": 0.3638,
+   "scale": 0.4811
+  },
+  "consensus": {
+   "sign": 1,
+   "weight": 0.3245,
+   "mean": -0.0287,
+   "scale": 0.3253
+  },
+  "core_topics": {
+   "sign": 1,
+   "weight": 0.2444,
+   "mean": 0.9536,
+   "scale": 1.3194
+  },
+  "long_accident": {
+   "sign": 1,
+   "weight": 0.3409,
+   "mean": 0.0108,
+   "scale": 0.1035
+  },
+  "other_accident_insurer": {
+   "sign": 1,
+   "weight": 0.5704,
+   "mean": 0.0495,
+   "scale": 0.217
+  }
+ },
+ "intercept": -4.0039,
+ "out_of_quarter": {
+  "protocol": "fit on one listed quarter; on the other, promote 40% of its core rulings; folds pooled",
+  "submitted": 120,
+  "relevant_found": 55,
+  "relevant_total": 59,
+  "recall": 0.932,
+  "precision": 0.458,
+  "f2": 0.772,
+  "per_quarter": {
+   "2026 Q1": {
+    "submitted": 66,
+    "relevant_found": 29,
+    "relevant": 31
+   },
+   "2025 Q4": {
+    "submitted": 54,
+    "relevant_found": 26,
+    "relevant": 28
+   }
+  }
+ },
+ "summarised_by_suva_not_in_training": {
+  "rulings": 23,
+  "scored_above_threshold": 16,
+  "scored_below_0.10": 2
+ },
+ "by_quarter": {
+  "2025 Q3": {
+   "kept": 23,
+   "suspected_relevant": 9
+  },
+  "2025 Q4": {
+   "kept": 296,
+   "suspected_relevant": 54
+  },
+  "2026 Q1": {
+   "kept": 350,
+   "suspected_relevant": 66
+  },
+  "2026 Q2": {
+   "kept": 421,
+   "suspected_relevant": 76
+  },
+  "2026 Q3": {
+   "kept": 14,
+   "suspected_relevant": 0
+  },
+  "2026 Q4": {
+   "kept": 97,
+   "suspected_relevant": 22
+  }
+ },
+ "mode": "LIVE",
+ "layer1_apertus_failed": 0,
+ "run_id": 106
+}

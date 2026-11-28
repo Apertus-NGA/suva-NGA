@@ -23,12 +23,12 @@ jobs:
       - name: make check (lint, unit, doctrine, models registry, template layout, D-051)
         run: make check
       - name: make run, stages that need no Suva-derived artefact (no key in CI)
-        run: SERVE=0 MODE=replay make run
+        run: SERVE=0 MODE=replay make pipeline
       # Blocked by D-031 (hard due Fri 22:00): a fresh clone has no data/derived/ and no replay cache,
       # so the full replay of `make run` (T27) cannot run here until D-031 settles what may be committed.
       - name: make run replay with Suva-derived artefacts (blocked by D-031)
         if: ${{ false }}
-        run: SERVE=0 MODE=replay make run
+        run: SERVE=0 MODE=replay make pipeline
 
   # Data layer (docs/DB_DDL_PLANNING.md §15.9, D-071): fresh deploy of src/db/sql on the pinned image, a second
   # deploy to prove idempotence, then the SQL tests of tests/sql (each rolled back). Throwaway database, reachable

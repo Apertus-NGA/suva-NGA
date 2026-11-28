@@ -34,7 +34,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence is written in its fiche's language.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_PLACEHOLDER",
@@ -50,7 +50,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence holds no placeholder or template residue.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_NEW_IDENTIFIER",
@@ -66,7 +66,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence holds no article, docket, date or reference that is not in the ruling (G1).",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_MODAL_STRENGTH",
@@ -82,7 +82,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence keeps the ruling's modal strength (must, may, can).",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_GLOSSARY_TERM",
@@ -98,7 +98,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence uses the required glossary term of its language.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_SUVA_NAMED",
@@ -114,7 +114,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "Suva is named only when the ruling names it.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_OUTCOME_RESTATED",
@@ -130,7 +130,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence does not restate the outcome that code adds once.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_SPEAKER",
@@ -146,7 +146,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence attributes the statement to the right speaker (court, lower court, a party, an expert).",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_ENTAILMENT",
@@ -162,7 +162,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The ruling sentence it rests on entails it (P(Ja) at or above entailment_min), after at most one repair.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     },
     {
       "rule_code": "V3_DUPLICATE",
@@ -178,7 +178,7 @@
         "source": "engine_sentence_checks"
       },
       "description": "The sentence is not a near-duplicate of another kept sentence.",
-      "changelog": "Initial (D-094)."
+      "changelog": "Initial (D-095)."
     }
   ],
   "versions": [
@@ -225,9 +225,9 @@
       "models": {
         "judge": "apertus-v1-5-70b"
       },
-      "decision": "D-094",
+      "decision": "D-095",
       "validation": null,
-      "changelog": "Initial (D-094): one rule per engine check code. A kept sentence is a claim, verified when no check failed; a removed sentence is a text-level fail per failed code (V3_ENTAILMENT not_applicable when the engine read its checks and none failed, fail when it named no check)."
+      "changelog": "Initial (D-095): one rule per engine check code. A kept sentence is a claim, verified when no check failed; a removed sentence is a text-level fail per failed code (V3_ENTAILMENT not_applicable when the engine read its checks and none failed, fail when it named no check)."
     }
   ]
 }

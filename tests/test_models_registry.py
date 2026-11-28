@@ -17,17 +17,21 @@ MODEL_ID = re.compile(
     r"|pplx-embed[A-Za-z0-9._-]*"
     r"|bge-m3[A-Za-z0-9._-]*"
     r"|(?:gpt|claude|gemini|llama|mistral|qwen)-[A-Za-z0-9._-]+"
-    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge-|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
+    r"|[A-Za-z0-9-]+/[A-Za-z0-9._-]*(?:embed|bge(?![a-z])|e5-|gte-|llama|mistral|qwen|Apertus)[A-Za-z0-9._-]*"
     r")",
     re.I,
 )
+
+
+# Installed or built third-party files, not our code (src/web/node_modules, src/web/dist).
+SKIPPED_DIRS = {"__pycache__", "node_modules", "dist"}
 
 
 def scanned_files(root: Path = ROOT) -> list[Path]:
     files = [root / n for n in ("Makefile", "Dockerfile", "docker-compose.yml", ".env.example")]
     for d in ("src", "eval", "prompts"):
         if (root / d).is_dir():
-            files += [p for p in (root / d).rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+            files += [p for p in (root / d).rglob("*") if p.is_file() and not SKIPPED_DIRS & set(p.parts)]
     return [f for f in files if f.is_file()]
 
 
@@ -61,3 +65,13 @@ def test_a_data_file_named_bger_is_not_a_model(tmp_path):
     f = tmp_path / "x.py"
     f.write_text('BASE = "data/bger.parquet"\nEMB = "BAAI/bge-m3"\n')
     assert unregistered([f], set()) == ["x.py: BAAI/bge-m3"]
+
+
+def test_bger_paths_are_not_model_ids_but_bge_models_are(tmp_path):
+    """`bger` (Bundesgericht) in a data path or dataset name is not the `bge` embedding family."""
+    f = tmp_path / "x.py"
+    f.write_text(
+        'A = "data/bger.parquet"\nB = "suva-nga/bger-rulings"\nC = "docs/CH_BGer"\n'
+        'D = "BAAI/bge-reranker-v2"\nE = "BAAI/bge_small"\n'
+    )
+    assert unregistered([f], registered_ids()) == ["x.py: BAAI/bge-reranker-v2", "x.py: BAAI/bge_small"]

@@ -214,6 +214,39 @@ def test_the_fiche_ends_with_codes_outcome_sentence():
     assert writes == statuses.count("written")
 
 
+# --- real rulings -------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    from suva_data import db
+
+    try:
+        conn = db.connect()
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"project database not reachable: {exc}")
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("docket", ["8C_676/2024", "8C_178/2025", "8C_135/2025"])  # DE, FR, IT
+def test_real_rulings_keep_considerations_and_facts_and_drop_the_operative_part(corpus, docket):
+    from src.summarize import pipeline
+
+    row = corpus.execute("SELECT id FROM rulings WHERE docket = %s", (docket,)).fetchone()
+    if row is None:
+        pytest.skip(f"{docket} is not in the database")
+    found = cand.candidates(pipeline.load_ruling(corpus, row[0])["text"])
+    labels = {c.label for c in found.kept}
+    assert "operative" not in labels and "facts" in labels
+    assert sum(label.startswith("E.") for label in labels) >= 3
+    assert len(found.kept) >= 30
+    reasons = found.reasons()
+    assert reasons.get("operative", 0) > 0 and reasons.get("admissibility", 0) > 0
+    assert set(reasons) <= {"operative", "admissibility", "costs", "procedural_law", "citation", "party_argument",
+                            "proceedings", "reported", "recital", "review", "fragment"}  # fmt: skip
+
+
 # --- profiles -----------------------------------------------------------------------------------------------------
 
 INCOME = """Urteil vom 3. Juni 2025
@@ -496,7 +529,7 @@ def test_code_shortens_a_repeated_lead_in_and_a_long_name_after_its_first_mentio
     assert len(notes) == 2
 
 
-# --- the fake gateway of the extractive writer (the branch's pipeline tests are not ported) ---------------------------
+# --- the pipeline -------------------------------------------------------------------------------------------------
 
 
 FRENCH = [
@@ -547,6 +580,47 @@ class Echo:
             pairs = re.findall(r"(?m)^(s\d+): (.*)$", content)
             return json.dumps({"a_sentences": [{"a_id": i, "b_text": t} for i, t in pairs]})
         return json.dumps({"items": []})  # refine's terms and language steps: nothing to change
+
+
+@pytest.mark.db
+def test_the_pipeline_writes_extractive_fiches_and_stores_where_each_sentence_comes_from(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn, text=RULING)  # long enough for a choice (the shared fixture has 3 sentences)
+    echo = Echo()
+    result = pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=echo,
+                                       writer="extract")  # fmt: skip
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    stored = dict(db_conn.execute("SELECT language, body FROM summaries WHERE ruling_id = %s", (rid,)).fetchall())
+    assert params["writer"] == {"de": "extract", "fr": "extract"}
+    for language in ("de", "fr"):
+        assert stored[language] == result["languages"][language]["text"] and stored[language].strip()
+        steps = params["refine"][language]["steps"]
+        assert [s["step"] for s in steps][:3] == ["choose", "write", "flow"]
+        written = [f for f in steps[1]["findings"] if f["accepted"]]
+        assert written and all(f["evidence"] and f["quote"] for f in written)  # the source of every sentence
+    from suva_app import workspace
+
+    checks = workspace.ruling_page(db_conn, rid)["summaries"]["de"]["checks"]
+    assert checks[1]["step"] == "write" and checks[1]["findings"][0]["quote"]  # the expert sees the source
+    assert sum(v.startswith(f"{choose.VERSION}/passages") for v in echo.sent) == 1  # one reading for DE and FR
+
+
+@pytest.mark.db
+def test_a_ruling_the_extractive_writer_cannot_read_still_gets_the_prompt_written_fiches(db_conn):
+    from src.summarize import pipeline
+    from tests.test_summary_pipeline import FakeModel, _ruling
+
+    rid = _ruling(db_conn, text=RULING)  # long enough to reach the choice call, which the gateway fails
+    echo = Echo(fail_choice=True)
+    pipeline.summarise_ruling(db_conn, rid, ask=FakeModel(), model="test", refine_transport=echo,
+                              writer="extract")  # fmt: skip
+    params = db_conn.execute("SELECT params FROM model_runs WHERE kind = 'summary'").fetchone()[0]
+    assert params["writer"] == {"de": "v2", "fr": "v2"}
+    assert "choice failed" in params["extract_errors"]["_error"]
+    assert db_conn.execute("SELECT count(*) FROM summaries WHERE ruling_id = %s", (rid,)).fetchone()[0] == 2
+    assert any(v.startswith(f"{choose.VERSION}/passages") for v in echo.sent)  # the failure came from the gateway
 
 
 # --- review fixes (28 Nov) -----------------------------------------------------------------------------------------

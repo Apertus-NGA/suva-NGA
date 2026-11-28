@@ -50,7 +50,29 @@ LLM_API_KEY — your API key
 
 ### How to run this project
 
-> Added by the team. Run instructions are in [technical_report.md](technical_report.md), section 6 "Reproducibility", "How to run". In short: set `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (live calls only), then `make run`.
+> Added by the team. Full instructions: [technical_report.md](technical_report.md), section 6 "Reproducibility", "How to run".
+
+**Replay (the default, no key, no call to Apertus).** Needs git, Docker with compose, Python 3.12+ with [uv](https://docs.astral.sh/uv/), and Node for the UI build.
+
+```
+cp .env.example .env
+make run
+```
+
+`make run` starts a local database, loads the rulings from the team's public dataset when the database is empty, scores them and writes the German and French summaries from the Apertus answers committed in `replay/llm/`, then serves Suva Scout on <http://127.0.0.1:8000>. Every line it prints is labelled `REPLAY` or `LIVE`. `SERVE=0 make run` stops before serving.
+
+**Live (real Apertus calls).** Set the three variables in `.env`, then name how much to run:
+
+```
+LLM_NAME=      # an Apertus v1.5 id
+LLM_BASE_URL=  # OpenAI-compatible endpoint; it must return log-probabilities (top_logprobs)
+LLM_API_KEY=
+
+make run-live ARGS="--limit 5"   # a smoke run: the first 5 rulings read live (scores not stored), at most 5 summaries
+make run-live ARGS="--all"       # everything, live
+```
+
+**The six-schema data layer and its API** (`src/db/sql`, `src/layer1`, `src/layer2`, `src/api`, cluster in `docs/DEPLOY.md`): `make pipeline`, `make api`, `make cluster-up`. `make bridge` copies Suva Scout's scores into that database as its layer 2 and ranking step.
 
 ## 📦 Submission Requirements & Deliverables
 
@@ -94,7 +116,7 @@ All Hack Apertus projects are open-sourced. Please check our Terms & Conditions 
 | --- | --- |
 | Our code (`src/`, `tests/`, `eval/`, `Makefile`, Docker and CI files) | Apache-2.0 (`LICENSE`) |
 | Our documentation: `docs/`, `AGENTS.md`, `CLAUDE.md`, `MODELS.md`, `technical_report.md`, the report PDF | CC-BY-4.0 |
-| Datasets we create (`data/public/`) | CDLA-Permissive-2.0 |
+| Datasets we create (published on Hugging Face as `suva-nga/bger-rulings`, not in git: `data/` is git-ignored) | CDLA-Permissive-2.0 |
 | Suva's material from the template (`judgements/`, the pitch PDF) and the organisers' `challenge_description.md` | not ours: their own terms (`NOTICE`) |
 | Other third-party material | its own licence (`NOTICE`) |
 

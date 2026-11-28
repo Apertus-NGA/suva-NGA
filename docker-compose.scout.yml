@@ -1,0 +1,27 @@
+# The Suva Scout demo's own local database, started by `make run` (src/scout_cli.py). Trust login, published on
+# 127.0.0.1 only. Kept apart from docker-compose.yml: the cluster's database has passwords and no trust login.
+name: suva-scout
+
+services:
+  scout-db:
+    image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: suva
+      POSTGRES_USER: suva
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - scoutdata:/var/lib/postgresql/data
+      # Files here (the published dump) are loaded by Postgres on FIRST start only (empty volume).
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U suva -d suva"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  scoutdata:

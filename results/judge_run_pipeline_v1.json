@@ -1,0 +1,405 @@
+{
+  "rubric": "judge-v3",
+  "judge_model": "openai/gpt-oss-120b",
+  "reasoning_effort": "high",
+  "run": "pipeline_v1",
+  "skipped": {
+    "no_source": 0,
+    "source_too_long": 0,
+    "empty_summary": 0
+  },
+  "length_band_words": {
+    "de": [
+      64,
+      337
+    ],
+    "fr": [
+      84,
+      402
+    ]
+  },
+  "tokens": {
+    "prompt_tokens": 2318828,
+    "completion_tokens": 2071162,
+    "calls": 430,
+    "cost_usd": 0.8865
+  },
+  "summaries": 42,
+  "by_language": {
+    "de": {
+      "summaries": 21,
+      "mean_score": 0.654,
+      "usable_share": 0.1429,
+      "criteria": {
+        "T1": {
+          "name": "Swiss legal terminology",
+          "judged": 20,
+          "pass_rate": 0.4,
+          "ci95": [
+            0.2188,
+            0.6134
+          ],
+          "no_verdict": 1
+        },
+        "T2": {
+          "name": "Register and tone",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "T3": {
+          "name": "Language quality",
+          "judged": 20,
+          "pass_rate": 0.5,
+          "ci95": [
+            0.2993,
+            0.7007
+          ],
+          "no_verdict": 1
+        },
+        "T4": {
+          "name": "Digest economy",
+          "judged": 21,
+          "pass_rate": 0.8571,
+          "ci95": [
+            0.6536,
+            0.9502
+          ],
+          "no_verdict": 0
+        },
+        "F1": {
+          "name": "Facts supported by the ruling",
+          "judged": 21,
+          "pass_rate": 0.6667,
+          "ci95": [
+            0.4537,
+            0.8281
+          ],
+          "no_verdict": 0
+        },
+        "F2": {
+          "name": "Legal content faithful",
+          "judged": 21,
+          "pass_rate": 0.7619,
+          "ci95": [
+            0.5491,
+            0.8937
+          ],
+          "no_verdict": 0
+        },
+        "F3": {
+          "name": "Outcome and procedural posture correct",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "F4": {
+          "name": "Legal references exact",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "C1": {
+          "name": "A legal holding is stated",
+          "judged": 21,
+          "pass_rate": 0.7619,
+          "ci95": [
+            0.5491,
+            0.8937
+          ],
+          "no_verdict": 0
+        },
+        "C2": {
+          "name": "Main disputed question resolved in substance",
+          "judged": 0,
+          "pass_rate": null,
+          "ci95": [
+            0.0,
+            1.0
+          ],
+          "no_verdict": 0
+        },
+        "R1": {
+          "name": "Covers the expert reference",
+          "judged": 21,
+          "pass_rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1546
+          ],
+          "no_verdict": 0
+        }
+      },
+      "checks_flagged": {
+        "wrong_language_abbreviation": 0,
+        "wrong_language_citation_form": 0,
+        "markup_or_heading": 0,
+        "anonymisation_placeholder": 1,
+        "eszett": 0,
+        "repeated_sentence": 0,
+        "length_out_of_band": 7
+      }
+    },
+    "fr": {
+      "summaries": 21,
+      "mean_score": 0.7665,
+      "usable_share": 0.4762,
+      "criteria": {
+        "T1": {
+          "name": "Swiss legal terminology",
+          "judged": 21,
+          "pass_rate": 0.619,
+          "ci95": [
+            0.4088,
+            0.7925
+          ],
+          "no_verdict": 0
+        },
+        "T2": {
+          "name": "Register and tone",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "T3": {
+          "name": "Language quality",
+          "judged": 21,
+          "pass_rate": 0.8571,
+          "ci95": [
+            0.6536,
+            0.9502
+          ],
+          "no_verdict": 0
+        },
+        "T4": {
+          "name": "Digest economy",
+          "judged": 21,
+          "pass_rate": 0.7143,
+          "ci95": [
+            0.5004,
+            0.8619
+          ],
+          "no_verdict": 0
+        },
+        "F1": {
+          "name": "Facts supported by the ruling",
+          "judged": 21,
+          "pass_rate": 0.7619,
+          "ci95": [
+            0.5491,
+            0.8937
+          ],
+          "no_verdict": 0
+        },
+        "F2": {
+          "name": "Legal content faithful",
+          "judged": 21,
+          "pass_rate": 0.9048,
+          "ci95": [
+            0.7109,
+            0.9735
+          ],
+          "no_verdict": 0
+        },
+        "F3": {
+          "name": "Outcome and procedural posture correct",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "F4": {
+          "name": "Legal references exact",
+          "judged": 21,
+          "pass_rate": 0.9048,
+          "ci95": [
+            0.7109,
+            0.9735
+          ],
+          "no_verdict": 0
+        },
+        "C1": {
+          "name": "A legal holding is stated",
+          "judged": 21,
+          "pass_rate": 0.9524,
+          "ci95": [
+            0.7733,
+            0.9915
+          ],
+          "no_verdict": 0
+        },
+        "C2": {
+          "name": "Main disputed question resolved in substance",
+          "judged": 0,
+          "pass_rate": null,
+          "ci95": [
+            0.0,
+            1.0
+          ],
+          "no_verdict": 0
+        },
+        "R1": {
+          "name": "Covers the expert reference",
+          "judged": 21,
+          "pass_rate": 0.0476,
+          "ci95": [
+            0.0085,
+            0.2267
+          ],
+          "no_verdict": 0
+        }
+      },
+      "checks_flagged": {
+        "wrong_language_abbreviation": 0,
+        "wrong_language_citation_form": 0,
+        "markup_or_heading": 0,
+        "anonymisation_placeholder": 1,
+        "eszett": 0,
+        "repeated_sentence": 0,
+        "length_out_of_band": 8
+      }
+    }
+  },
+  "mean_score": 0.7103,
+  "usable_share": 0.3095,
+  "criteria": {
+    "T1": {
+      "name": "Swiss legal terminology",
+      "judged": 41,
+      "pass_rate": 0.5122,
+      "ci95": [
+        0.3648,
+        0.6575
+      ],
+      "no_verdict": 1
+    },
+    "T2": {
+      "name": "Register and tone",
+      "judged": 42,
+      "pass_rate": 0.9524,
+      "ci95": [
+        0.8421,
+        0.9868
+      ],
+      "no_verdict": 0
+    },
+    "T3": {
+      "name": "Language quality",
+      "judged": 41,
+      "pass_rate": 0.6829,
+      "ci95": [
+        0.5302,
+        0.8044
+      ],
+      "no_verdict": 1
+    },
+    "T4": {
+      "name": "Digest economy",
+      "judged": 42,
+      "pass_rate": 0.7857,
+      "ci95": [
+        0.6406,
+        0.8829
+      ],
+      "no_verdict": 0
+    },
+    "F1": {
+      "name": "Facts supported by the ruling",
+      "judged": 42,
+      "pass_rate": 0.7143,
+      "ci95": [
+        0.5643,
+        0.8283
+      ],
+      "no_verdict": 0
+    },
+    "F2": {
+      "name": "Legal content faithful",
+      "judged": 42,
+      "pass_rate": 0.8333,
+      "ci95": [
+        0.694,
+        0.9168
+      ],
+      "no_verdict": 0
+    },
+    "F3": {
+      "name": "Outcome and procedural posture correct",
+      "judged": 42,
+      "pass_rate": 0.9524,
+      "ci95": [
+        0.8421,
+        0.9868
+      ],
+      "no_verdict": 0
+    },
+    "F4": {
+      "name": "Legal references exact",
+      "judged": 42,
+      "pass_rate": 0.9286,
+      "ci95": [
+        0.8099,
+        0.9754
+      ],
+      "no_verdict": 0
+    },
+    "C1": {
+      "name": "A legal holding is stated",
+      "judged": 42,
+      "pass_rate": 0.8571,
+      "ci95": [
+        0.7216,
+        0.9328
+      ],
+      "no_verdict": 0
+    },
+    "C2": {
+      "name": "Main disputed question resolved in substance",
+      "judged": 0,
+      "pass_rate": null,
+      "ci95": [
+        0.0,
+        1.0
+      ],
+      "no_verdict": 0
+    },
+    "R1": {
+      "name": "Covers the expert reference",
+      "judged": 42,
+      "pass_rate": 0.0238,
+      "ci95": [
+        0.0042,
+        0.1232
+      ],
+      "no_verdict": 0
+    }
+  },
+  "checks_flagged": {
+    "wrong_language_abbreviation": 0,
+    "wrong_language_citation_form": 0,
+    "markup_or_heading": 0,
+    "anonymisation_placeholder": 2,
+    "eszett": 0,
+    "repeated_sentence": 0,
+    "length_out_of_band": 15
+  }
+}

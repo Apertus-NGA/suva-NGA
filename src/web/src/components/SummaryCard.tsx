@@ -1,0 +1,314 @@
+import { ArrowUpRight, Check, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { Summary, SummaryLanguage, SummarySentence } from "../lib/api";
+import { useI18n, type Key } from "../lib/i18n";
+import { confidenceOf, hasTrace, locate, pieces, sentencesOf } from "../lib/provenance";
+import { Popover } from "./ui/Popover";
+import { cn } from "./ui/cn";
+
+type Props = {
+  language: SummaryLanguage;
+  summary: Summary | null;
+  /** The ruling text the sources point into. */
+  text: string | null;
+  revisions: string[];
+  /** "writing": Apertus is at work (up to a minute); "saving": a quick change is being stored. */
+  busy: false | "writing" | "saving";
+  /** The sentence whose sources are highlighted in the ruling text (hovered, else selected), and the selected one. */
+  active: number | null;
+  selected: number | null;
+  onHover: (sentence: number | null) => void;
+  onSelect: (sentence: number | null) => void;
+  onConfirm: () => void;
+  onUnconfirm: () => void;
+  onSave: (body: string, confirm: boolean) => void;
+  onRevise: (reason: string, note: string) => void;
+  onShowConfidence: () => void;
+};
+
+const NEEDS_NOTE = ["key_point", "wrong_statement", "other"];
+const BADGE = "inline-flex h-[22px] shrink-0 items-center gap-1 rounded-full px-2 font-medium";
+
+/**
+ * One language of a ruling's summary: read it sentence by sentence against the ruling, edit it, ask Apertus for a
+ * defined change, validate it. Selecting a sentence shows its considerations and marks its source in the ruling.
+ */
+export function SummaryCard({ language, summary, text, revisions, busy, active, selected, onHover, onSelect, onConfirm, onUnconfirm, onSave, onRevise, onShowConfidence }: Props) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState<string | null>(null); // not null while editing
+  useEffect(() => setDraft(null), [summary?.id]);
+  const editing = draft !== null;
+
+  const validated = !!summary && (summary.validated ?? summary.confirmed) === true;
+  const state = !summary ? null : validated ? "summary.gold" : summary.origin === "expert" ? "summary.edited" : "summary.draft";
+  const sentences = sentencesOf(summary);
+  const confidence = confidenceOf(summary);
+  const problems = summary?.problems ?? [];
+
+  return (
+    <section className="rounded-xl bg-surface">
+      <header className="flex h-12 items-center justify-between gap-3 border-b border-line px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="text-[13px] font-medium text-ink">{t(`summary.${language}` as Key)}</h3>
+        </div>
+        {summary && state && (
+          <span className="flex min-w-0 items-center gap-2 text-[12px] text-faint">
+            <span className="shrink-0">{t("summary.version", { n: summary.version })}</span>
+            {(summary.needs_review === true || problems.length > 0) && !validated && (
+              <span title={t("summary.needsReview.hint")} className={cn(BADGE, "border border-line text-muted")}>
+                {t("summary.needsReview")}
+              </span>
+            )}
+            <span
+              title={validated ? t("summary.gold.hint") : undefined}
+              className={cn(BADGE, validated ? "bg-accent-wash text-accent-text" : "border border-line-strong text-ink")}
+            >
+              {validated && <Check size={12} strokeWidth={2.5} aria-hidden />}
+              {t(state as Key)}
+            </span>
+          </span>
+        )}
+      </header>
+
+      <div className="px-5 py-4">
+        {summary && !editing && confidence && (
+          <details className="group/conf mb-3 text-[12px]">
+            <summary className="flex cursor-pointer list-none items-center gap-2.5 [&::-webkit-details-marker]:hidden" title={t("summary.confidence.hint")}>
+              <span className="text-faint">{t("summary.confidence")}</span>
+              <span className="h-[3px] w-[96px] overflow-hidden rounded-full bg-line" aria-hidden>
+                <span className="block h-full rounded-full bg-ink" style={{ width: `${confidence.score}%` }} />
+              </span>
+              <span className="tabular-nums text-muted">
+                {confidence.score} · {t(`summary.level.${confidence.level}` as Key)}
+              </span>
+              <ChevronRight size={12} strokeWidth={1.75} className="text-faint transition-transform group-open/conf:rotate-90" aria-hidden />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onShowConfidence();
+                }}
+                className="ml-auto flex items-center gap-1 text-muted hover:text-ink"
+              >
+                {t("summary.confidence.how")}
+                <ArrowUpRight size={12} strokeWidth={1.75} aria-hidden />
+              </button>
+            </summary>
+            <p className="mt-2 max-w-[62ch] leading-[18px] text-muted">{t("summary.confidence.explain")}</p>
+          </details>
+        )}
+        {editing ? (
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.min(22, Math.max(8, Math.ceil(draft.length / 70)))}
+            className="w-full resize-y rounded-md border border-line-strong bg-surface p-3 font-serif text-[14px] leading-[23px] text-ink focus:border-ink focus:outline-none"
+          />
+        ) : summary && sentences.length > 0 ? (
+          <Traced body={summary.body} sentences={sentences} text={text} active={active} selected={selected} onHover={onHover} onSelect={onSelect} />
+        ) : summary ? (
+          <p className="whitespace-pre-wrap font-serif text-[14px] leading-[23px] text-ink">{summary.body}</p>
+        ) : (
+          <p className="text-[13px] text-faint">{t("summary.empty")}</p>
+        )}
+      </div>
+
+      {summary && (
+        <footer className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
+          {busy ? (
+            <Working writing={busy === "writing"} />
+          ) : editing ? (
+            <>
+              <Button primary onClick={() => onSave(draft, true)}>
+                <Check size={14} strokeWidth={2} aria-hidden />
+                {t("summary.saveConfirm")}
+              </Button>
+              <Button onClick={() => onSave(draft, false)}>{t("summary.save")}</Button>
+              <Button quiet onClick={() => setDraft(null)}>
+                {t("summary.cancel")}
+              </Button>
+            </>
+          ) : (
+            <>
+              {validated ? (
+                <Button onClick={onUnconfirm}>{t("summary.unconfirm")}</Button>
+              ) : (
+                <Button primary onClick={onConfirm}>
+                  <Check size={14} strokeWidth={2} aria-hidden />
+                  {t("summary.confirm")}
+                </Button>
+              )}
+              <Button onClick={() => setDraft(summary.body)}>{t("summary.edit")}</Button>
+              <ReviseMenu revisions={revisions} onRevise={onRevise} />
+            </>
+          )}
+        </footer>
+      )}
+    </section>
+  );
+}
+
+/** A spinner with what is going on; while Apertus writes, the seconds so far, since a summary can take a minute. */
+export function Working({ writing }: { writing: boolean }) {
+  const { t } = useI18n();
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <span className="flex h-8 items-center gap-2 text-[13px] text-muted" role="status">
+      <LoaderCircle size={14} strokeWidth={2} className="animate-spin" aria-hidden />
+      {t(writing ? "page.generating" : "page.saving")}
+      {writing && <span className="tabular-nums text-faint">{t("page.generatingHint", { s: seconds })}</span>}
+    </span>
+  );
+}
+
+type TracedProps = {
+  body: string;
+  sentences: SummarySentence[];
+  text: string | null;
+  active: number | null;
+  selected: number | null;
+  onHover: (sentence: number | null) => void;
+  onSelect: (sentence: number | null) => void;
+};
+
+/** The summary with each sentence selectable, and under it what the selected sentence rests on. */
+function Traced({ body, sentences, text, active, selected, onHover, onSelect }: TracedProps) {
+  const { t } = useI18n();
+  const shown = active !== null ? sentences[active] : undefined;
+  const sources = shown?.sources ?? [];
+  // Passages that cannot be marked in the text shown are quoted here instead.
+  const unlocated = sources.filter((source) => source.quote && !(text && locate(text, source)));
+  const notes = [
+    shown && sources.length === 0 ? t("summary.trace.noSource") : null,
+  ].filter(Boolean);
+
+  return (
+    <>
+      <p className="whitespace-pre-wrap font-serif text-[14px] leading-[23px] text-ink">
+        {pieces(body, sentences).map((piece, i) => {
+          const index = piece.sentence;
+          if (index === null || !hasTrace(sentences[index])) return <span key={i}>{piece.text}</span>;
+          const toggle = () => onSelect(selected === index ? null : index);
+          return (
+            <span
+              key={i}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selected === index}
+              onMouseEnter={() => onHover(index)}
+              onMouseLeave={() => onHover(null)}
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                toggle();
+              }}
+              className={cn(
+                "cursor-pointer rounded-[3px] box-decoration-clone transition-colors",
+                index === active ? "bg-accent-wash" : "hover:bg-wash",
+                index === selected && "underline decoration-accent decoration-1 underline-offset-4",
+              )}
+            >
+              {piece.text}
+            </span>
+          );
+        })}
+      </p>
+
+      <div className="mt-3 text-[12px] leading-[18px]" aria-live="polite">
+        {!shown ? (
+          <p className="flex min-h-[22px] items-center text-faint">{t("summary.trace.hint")}</p>
+        ) : (
+          <>
+            <div className="flex min-h-[22px] flex-wrap items-center gap-x-2 gap-y-1 text-muted">
+              {(shown.considerations ?? []).map((label) => (
+                <span key={label} className="inline-flex h-[22px] items-center rounded-full border border-line-strong px-2 font-medium tabular-nums text-ink">
+                  {label}
+                </span>
+              ))}
+              {notes.length > 0 && <span>{notes.join(" · ")}</span>}
+            </div>
+            {unlocated.length > 0 && (
+              <div className="mt-2 rounded-md border border-line px-3 py-2">
+                <div className="text-faint">{t("summary.trace.notLocated")}</div>
+                {unlocated.map((source, i) => (
+                  <blockquote key={i} className="mt-1 font-serif text-[13px] leading-5 text-ink">
+                    “{source.quote}”
+                  </blockquote>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** The defined changes an expert can ask of Apertus. Each request is stored with its reason. */
+function ReviseMenu({ revisions, onRevise }: { revisions: string[]; onRevise: (reason: string, note: string) => void }) {
+  const { t } = useI18n();
+  const [picked, setPicked] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  return (
+    <Popover
+      width={320}
+      trigger={
+        <button type="button" className="flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-[13px] text-ink hover:border-ink/40">
+          {t("summary.revise")}
+          <ChevronDown size={14} strokeWidth={1.75} className="text-faint" aria-hidden />
+        </button>
+      }
+    >
+      <ul className="p-1">
+        {revisions.map((reason) => (
+          <li key={reason}>
+            <button
+              type="button"
+              onClick={() => (NEEDS_NOTE.includes(reason) ? setPicked(reason) : onRevise(reason, ""))}
+              className={cn("flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] text-ink hover:bg-wash", picked === reason && "bg-wash font-medium")}
+            >
+              {t(`revise.${reason}` as Key)}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {picked && (
+        <div className="flex flex-col gap-2 border-t border-line p-3">
+          <textarea
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t("summary.note")}
+            rows={3}
+            className="w-full resize-none rounded-md border border-line-strong p-2 text-[13px] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
+          />
+          <Button primary disabled={!note.trim()} onClick={() => onRevise(picked, note.trim())}>
+            {t("summary.send")}
+          </Button>
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+export function Button({ primary = false, quiet = false, disabled = false, onClick, children }: { primary?: boolean; quiet?: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+        primary ? "bg-ink text-white hover:bg-ink/85" : quiet ? "text-muted hover:text-ink" : "border border-line-strong bg-surface text-ink hover:border-ink/40",
+      )}
+    >
+      {children}
+    </button>
+  );
+}

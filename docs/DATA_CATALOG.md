@@ -11,7 +11,7 @@ An exhaustive, raw list of the data that exists. It makes no recommendation and 
 | Layer 1 (deterministic pre-filter) | implemented, filled |
 | Layer 2 (Apertus relevance judge) | implemented, filled |
 | Ranking (threshold, top 30, release, export) | schema only, **empty** |
-| Layer 3 (summaries) | schema only, **empty** in this snapshot. Writer built on branch `layer3/summ-writer` (D-094 to D-097): **section 13 lists what it writes**; regenerate the counts after a layer-3 run. |
+| Layer 3 (summaries) | schema only, **empty** in this snapshot. Writer built on branch `layer3/summ-writer` (D-095 to D-098): **section 13 lists what it writes**; regenerate the counts after a layer-3 run. |
 | HTTP API | `src/api/`, `make serve` (`docs/API.md`, D-092), added after this snapshot |
 
 ## 0. How this was produced
