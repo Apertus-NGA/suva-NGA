@@ -1,6 +1,6 @@
 -- Gold (D-066): expert reviews only through gold.submit_review (actor required), verdicts paired with their
--- target, reviews never on potentially, the implied label beside the pipeline label, supersession, Suva labels
--- with closed-world negatives.
+-- target, correct | incorrect never on potentially, the implied label beside the pipeline label, supersession, Suva
+-- labels with closed-world negatives. The absolute verdicts and withdrawal (D-093): 41_expert_review_test.sql.
 BEGIN;
 \ir _fixtures.sql
 
@@ -20,7 +20,7 @@ DO $$ BEGIN
   ASSERT EXISTS (SELECT 1 FROM audit.change_log WHERE table_name = 'gold.expert_review' AND actor = 'expert-1'), 'review audited';
 END $$;
 
--- verdicts must match their target; V1 never reviews a potentially label
+-- verdicts must match their target; the relative verdicts (correct | incorrect) never review a potentially label
 SELECT pg_temp.expect_error($q$SELECT gold.submit_review('scope', '00000000-0000-4000-8000-000000000602', 'validated')$q$, 'target_chk');
 SELECT pg_temp.expect_error($q$SELECT gold.submit_review('scope', '00000000-0000-4000-8000-000000000201', 'correct')$q$, 'target_chk');
 

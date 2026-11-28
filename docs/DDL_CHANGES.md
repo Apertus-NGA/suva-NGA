@@ -6,6 +6,19 @@
 
 Each entry is measured, not read from the SQL: the baseline DDL and the new DDL are deployed into two empty databases, then compared object by object (tables, columns, constraints, indexes, ENUMs from `src/db/structure.py`, plus every view column, view definition, function and trigger). `expected/db/structure.json` is the machine-readable list of every table, column, constraint, index and ENUM of the current DDL (1,291 objects); CI fails when it does not match a fresh deploy.
 
+## 2026-11-28, branch `api/fastapi-backend` (D-093): expert decisions on any assessed ruling
+
+Measured: `main` @ `95d744a` against this branch, fresh deploys. **2 differences out of 1,291 structure objects** (`expected/db/structure.json` regenerated), plus view, function, trigger and seed changes listed below. **Every existing database needs a reset** (`docs/RUNBOOK_DB.md` §2): the guard refuses the changed ENUM and constraint.
+
+| Object | Change | Effect on the API contract |
+|---|---|---|
+| ENUM `ops.review_verdict` | + `relevant`, `not_relevant`, `withdrawn` | a reader of `gold.expert_review.verdict`, `v_scope_current.expert_verdict` or `v_summary_current.expert_verdict` meets three new values |
+| Constraint `gold.expert_review.expert_review_target_chk` | a scope review may be `relevant` \| `not_relevant` on any label (`potentially` included); `withdrawn` (scope or summary) needs `supersedes_review_id`; a scope review always has a `reviewed_label` | an expert can decide on a `potentially` ruling and take a decision back; `reviewed_label` still means the label the expert saw |
+| `triage.v_scope_current` (definition) | `expert_implied_label`: `relevant` → `in_scope`, `not_relevant` → `out_of_scope`, `withdrawn` → NULL | same columns; after a withdrawal `expert_verdict` = `withdrawn` and no implied label |
+| `gold.submit_review()` | refuses `withdrawn` without `p_supersedes` | the API passes the review it takes back |
+| `gold.check_expert_review()` | a withdrawal never supersedes another withdrawal | 409 from the API |
+| Seed `ops.json_schema` | `scope_review.payload` V1.1.0: optional `shown_status`, `shown_score_0_100` (0-100), `shown_score_raw` | the payload records what the expert saw; the database checks only that it is an object |
+
 ## 2026-11-28, PR #51 (D-091) and what landed since the catalog snapshot (PR #48, PR #49)
 
 Measured: catalog baseline `47f3e47` against `main` + PR #51. **6 differences out of about 1,740 objects, none in a table, a column or a view's columns.**

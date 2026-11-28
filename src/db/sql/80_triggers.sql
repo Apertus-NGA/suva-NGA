@@ -736,6 +736,9 @@ CREATE OR REPLACE TRIGGER t30_check BEFORE INSERT ON triage.ranking_entry
 
 -- gold -----------------------------------------------------------------------
 
+-- A scope review copies the label of its assessment; a review supersedes only a review of the same target; a
+-- withdrawal (D-093) takes back a review, never another withdrawal. That a withdrawal supersedes something at all is
+-- expert_review_target_chk's rule (40_gold.sql).
 CREATE OR REPLACE FUNCTION gold.check_expert_review() RETURNS trigger
   LANGUAGE plpgsql AS $$
 DECLARE
@@ -752,9 +755,14 @@ BEGIN
        OR sup.summary_version_id IS DISTINCT FROM NEW.summary_version_id THEN
       RAISE EXCEPTION 'expert_review: a review supersedes only a review of the same target';
     END IF;
+    IF NEW.verdict = 'withdrawn' AND sup.verdict = 'withdrawn' THEN
+      RAISE EXCEPTION 'expert_review: a withdrawal takes back a review, never a withdrawal (review %)', sup.review_id;
+    END IF;
   END IF;
   RETURN NEW;
 END $$;
+COMMENT ON FUNCTION gold.check_expert_review() IS
+  'BEFORE INSERT on gold.expert_review: reviewed_label = the label of the reviewed assessment; a review supersedes only a review of the same target; a withdrawn review supersedes a review that is not itself withdrawn (D-066, D-093).';
 CREATE OR REPLACE TRIGGER t31_check BEFORE INSERT ON gold.expert_review
   FOR EACH ROW EXECUTE FUNCTION gold.check_expert_review();
 

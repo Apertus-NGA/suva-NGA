@@ -186,6 +186,24 @@ def cmd_warmup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    """Serve the API (src/api, docs/API.md) with uvicorn on API_HOST:API_PORT (default 127.0.0.1:8000)."""
+    import uvicorn
+
+    from src.api.settings import Settings, SettingsError
+
+    try:
+        settings = Settings.from_env()
+    except SettingsError as exc:
+        print(f"serve: {exc}", file=sys.stderr)
+        return 2
+    if args.dry_run:
+        print(f"serve: would serve the API on {settings.host}:{settings.port}")
+        return 0
+    uvicorn.run("src.api.app:app", host=settings.host, port=settings.port, log_level="info")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     argv = sys.argv[1:] if argv is None else argv
@@ -201,10 +219,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--all", action="store_true")
     run.add_argument("--dry-run", action="store_true")
     sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py); flags go to the probe")
+    serve = sub.add_parser("serve", help="serve the API (src/api, docs/API.md)")
+    serve.add_argument("--dry-run", action="store_true")
     warm = sub.add_parser("warmup", help="warm the large model")
     warm.add_argument("--dry-run", action="store_true")
-    serve = sub.add_parser("serve", help="serve the FastAPI on port 8000")
-    serve.add_argument("--dry-run", action="store_true")
     stubs = {
         "crawl": "fetch Neuheiten lists 1 Oct 2025 to 15 Sep 2026 and ruling pages, >= 2 s apart (crawl brief)",
         "refit": "rerun the scoring with the current labels, expert corrections included (D-021)",
@@ -221,16 +239,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "run":
         return cmd_run(args)
-    if args.cmd == "serve":
-        if args.dry_run:
-            print("serve: FastAPI on port 8000")
-            return 0
-        import uvicorn
-
-        uvicorn.run("src.api:app", host="0.0.0.0", port=8000)
-        return 0
     if args.cmd == "warmup":
         return cmd_warmup(args)
+    if args.cmd == "serve":
+        return cmd_serve(args)
     return stub(args.cmd, args.would)
 
 
