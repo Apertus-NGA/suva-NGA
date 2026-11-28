@@ -141,7 +141,7 @@ make run-live ARGS="--limit 5"   # real Apertus calls, a smoke run; ARGS="--all"
 
 `make run` starts the database, pulls the corpus from the team's public dataset when the database is empty, scores the rulings and writes the summaries from the committed answers, then serves the interface. Every output is labelled `LIVE` or `REPLAY`. <!-- CHECK: commands, port and the ARGS run-live needs (the Scout Makefile takes ARGS="--limit N" or "--all") -->
 
-**Expected duration:** `<to fill: measured duration of make run>`.
+**Expected duration:** about 2.5 minutes for `SERVE=0 make run` from a fresh clone (measured 149 s on 28 Nov on a laptop, Docker image and Python packages already cached; the run pulls the dataset), plus the first image and package downloads on a new machine.
 
 
 ## License
