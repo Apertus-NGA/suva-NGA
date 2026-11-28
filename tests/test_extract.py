@@ -321,3 +321,60 @@ def test_trim_leaves_out_facts_then_application_and_keeps_the_answer_and_what_co
     kept, notes = write.trim(sentences, choice, "de")  # limit 303 words: three sentences of 101 words fit
     assert [w.source_id for w in kept] == ["S2", "S5", "S6"]
     assert [n.split()[0] for n in notes] == ["S1", "S3", "S4"]  # fact, then the lower-read application first
+
+
+# --- parties ------------------------------------------------------------------------------------------------------
+
+HEAD_DE = """Urteil vom 3. Juni 2025
+Verfahrensbeteiligte
+HDI Global SE, Hannover, Niederlassung Zürich/Schweiz, Hardstrasse 201, 8005 Zürich,
+vertreten durch Rechtsanwalt X.,
+Beschwerdeführerin,
+
+gegen
+
+A.________,
+vertreten durch Rechtsanwältin Y.,
+Beschwerdegegnerin.
+
+Gegenstand
+Unfallversicherung
+"""
+HEAD_FR = """Arrêt du 3 juin 2025
+Participants à la procédure
+A.________, représenté par Me Z., avocat,
+recourant,
+
+contre
+
+Caisse nationale suisse d'assurance en cas d'accidents (CNA), Fluhmattstrasse 1, 6002 Lucerne,
+intimée.
+
+Objet
+Assurance-accidents
+"""
+
+
+def test_the_parties_are_read_from_the_heading_not_guessed():
+    from src.summarize.extract import parties
+
+    de = parties.read(HEAD_DE + RULING)
+    assert (de.insurer, de.appellant, de.insured_female) == ("HDI Global SE", "insurer", True)  # not "Suva"
+    fr = parties.read(HEAD_FR + RULING)
+    assert (fr.insurer, fr.appellant, fr.insured_female) == ("Suva", "insured", False)  # the CNA is the Suva
+    line = de.describe("de")
+    assert "die Versicherte (eine Frau)" in line and "HDI Global SE" in line and "Beschwerde führt HDI Global SE" in line
+
+
+def test_the_sentence_before_is_given_and_is_part_of_the_entailment_premise():
+    before = "Das Valideneinkommen beträgt Fr. 60'000."
+    sentence = cand.Candidate("S5", "E.3", "Dieser Betrag ist der versicherten Person als Valideneinkommen anzurechnen.")
+    new = "Das Valideneinkommen von Fr. 60'000 ist der Versicherten anzurechnen."
+    fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": new}]})
+    written = write.write_sentence(sentence, "rule", "de", {"text": INCOME, "language": "de", "category": "uv"},
+                                   model_for(fake), before, "The parties: …")  # fmt: skip
+    assert written.status == "written"
+    prompt = fake.sent[0][1][-1]["content"]
+    assert before in prompt and "The parties: …" in prompt
+    premise = next(m for v, m in fake.sent if v.startswith("entail@1/write"))[-1]["content"]
+    assert before in premise and sentence.text in premise

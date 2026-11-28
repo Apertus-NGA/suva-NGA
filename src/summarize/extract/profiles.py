@@ -51,15 +51,29 @@ PROFILES = (
         "the degree of invalidity by comparing incomes (Art. 16 ATSG / LPGA)",
         _p(r"Art\. 16 (?:ATSG|LPGA)\b"),
         (
-            Item("wage_table", "which statistical wage table and line the income rests on",
-                 _p(r"\bLSE\b|\bTA1\b|\bRSS\b|Tabellenl(?:o|ö)hn|salaires? statistiques?|tabella")),
-            Item("skill_level", "the skill level applied and why",
-                 _p(r"Kompetenzniveau|niveau de comp(?:é|e)tences?|livello di competenz")),
-            Item("deduction", "whether a deduction from the table wage is made and why",
-                 _p(r"Abzug vom Tabellenlohn|leidensbedingte[nr]? Abzug|\bAbzug\b|abattement|deduzione")),
-            Item("incomes", "the income without and with the impairment compared",
-                 _p(r"Valideneinkommen|Invalideneinkommen|revenu (?:sans invalidit|d'invalide)"
-                    r"|reddito d[ai] (?:valido|invalido)")),
+            Item(
+                "wage_table",
+                "which statistical wage table and line the income rests on",
+                _p(r"\bLSE\b|\bTA1\b|\bRSS\b|Tabellenl(?:o|ö)hn|salaires? statistiques?|tabella"),
+            ),
+            Item(
+                "skill_level",
+                "the skill level applied and why",
+                _p(r"Kompetenzniveau|niveau de comp(?:é|e)tences?|livello di competenz"),
+            ),
+            Item(
+                "deduction",
+                "whether a deduction from the table wage is made and why",
+                _p(r"Abzug vom Tabellenlohn|leidensbedingte[nr]? Abzug|\bAbzug\b|abattement|deduzione"),
+            ),
+            Item(
+                "incomes",
+                "the income without and with the impairment compared",
+                _p(
+                    r"Valideneinkommen|Invalideneinkommen|revenu (?:sans invalidit|d'invalide)"
+                    r"|reddito d[ai] (?:valido|invalido)"
+                ),
+            ),
         ),
     ),  # fmt: skip
     Profile(
@@ -67,12 +81,21 @@ PROFILES = (
         "whether the accident caused the health problem (Art. 6 UVG / LAA)",
         _p(r"Art\. 6 (?:Abs\. 1 )?(?:UVG|LAA)\b"),
         (
-            Item("natural", "the natural causal link and its standard of proof",
-                 _p(r"nat(?:ü|u)rliche[nr]? Kausal|causalit(?:é|e) naturelle|nesso (?:di )?causal\w* natural")),
-            Item("adequate", "the adequate causal link and the test applied",
-                 _p(r"ad(?:ä|a)quate[nr]? Kausal|causalit(?:é|e) ad(?:é|e)quate|nesso (?:di )?causal\w* adeguat")),
-            Item("status_quo", "when the status quo ante or sine is reached",
-                 _p(r"status quo (?:sine|ante)|statu quo (?:sine|ante)")),
+            Item(
+                "natural",
+                "the natural causal link and its standard of proof",
+                _p(r"nat(?:ü|u)rliche[nr]? Kausal|causalit(?:é|e) naturelle|nesso (?:di )?causal\w* natural"),
+            ),
+            Item(
+                "adequate",
+                "the adequate causal link and the test applied",
+                _p(r"ad(?:ä|a)quate[nr]? Kausal|causalit(?:é|e) ad(?:é|e)quate|nesso (?:di )?causal\w* adeguat"),
+            ),
+            Item(
+                "status_quo",
+                "when the status quo ante or sine is reached",
+                _p(r"status quo (?:sine|ante)|statu quo (?:sine|ante)"),
+            ),
         ),
     ),  # fmt: skip
 )
