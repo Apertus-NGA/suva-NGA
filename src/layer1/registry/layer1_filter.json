@@ -1,0 +1,348 @@
+{
+  "step": "layer1_filter",
+  "doc": "docs/LAYER1.md §6; docs/DB_DDL_PLANNING.md §7",
+  "config_schema": {
+    "schema_code": "layer1_filter.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: courts, letters and rubrics kept, rubric sources, title head, normalisation, accident/contract/closed regexes."
+  },
+  "rule_schema": {
+    "schema_code": "layer1_filter.rule",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: a rule names one check of src/layer1/engine.py."
+  },
+  "rules": [
+    {
+      "rule_code": "L1_KEEP_RUBRIC",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "court_rubric_kept"
+      },
+      "description": "Court 4, 8 or 9, an allowed proceedings letter, and a matter rubric in the court's keep set.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_KEEP_RUBRIC_MISSING",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "court_rubric_missing"
+      },
+      "description": "Allowed court and letter, but no rubric to read: kept so that a blank field is never a miss (G5).",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_KEEP_ACCIDENT_TERM",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "text_accident_term"
+      },
+      "description": "The text names Suva, CNA, INSAI, the UVG/LAA/LAINF/MVG or accident or military insurance.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_KEEP_CONTRACT_TERM",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "keep",
+      "definition": {
+        "check": "text_contract_term"
+      },
+      "description": "The text names the insurance-contract act (VVG, LCA) or private daily-allowance insurance.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_FLAG_CLOSED_RUBRIC",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "flag",
+      "definition": {
+        "check": "text_contract_term_blocked"
+      },
+      "description": "A contract term matched but the rubric is closed (unemployment, old-age, tax...): it does not keep.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_DROP_WRONG_COURT",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "drop",
+      "definition": {
+        "check": "court_not_listed"
+      },
+      "description": "The court is not 4, 8 or 9 and the text names no keep term.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_DROP_WRONG_LETTER",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "drop",
+      "definition": {
+        "check": "letter_not_listed"
+      },
+      "description": "The proceedings letter is not kept on this court and the text names no keep term.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_DROP_RUBRIC_OUT",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "drop",
+      "definition": {
+        "check": "court_rubric_out"
+      },
+      "description": "The rubric is outside the court's keep set and the text names no keep term.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    },
+    {
+      "rule_code": "L1_SIGNAL_RUBRIC_FROM_TITLE",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "kind": "signal",
+      "definition": {
+        "check": "rubric_from_gegenstand"
+      },
+      "description": "No rubric field was filled: the matter was read from the start of the Gegenstand line.",
+      "changelog": "Initial: one decision branch of src/courts.py at 4c246a8."
+    }
+  ],
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "layer-1 gate, parity with src/courts.py@4c246a8",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "courts": {
+          "4": {
+            "letters": "ADFG",
+            "rubrics": [
+              "assurance responsabilité civile",
+              "diritto contrattuale",
+              "droit des contrats",
+              "haftpflichtrecht",
+              "vertragsrecht"
+            ]
+          },
+          "8": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          },
+          "9": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          }
+        },
+        "rubric_sources": [
+          "neuheiten",
+          "hf_legal_area",
+          "gegenstand_head"
+        ],
+        "title_head": {
+          "cut_at": "(",
+          "strip_trailing": ",;"
+        },
+        "normalise": {
+          "casefold": true,
+          "nfkc": false,
+          "apostrophes": false,
+          "nbsp": false
+        },
+        "accident_terms": "\\b(?:suva|cna|insai|uvg|laa|lainf|mvg|unfallversicherung|militärversicherung|assurance-accidents|assurance militaire|assicurazione contro gli infortuni|assicurazione militare)\\b",
+        "contract_terms": "(?:taggeldversicherung|\\bvvg\\b|\\blca\\b|versicherungsvertragsgesetz|loi sur le contrat d['’]assurance|legge (?:federale )?sul contratto d['’]assicurazione)",
+        "closed_rubrics": "arbeitslos|chômage|chomage|disoccupaz|alters- und hinterlassenen|vieillesse|vecchiaia|ergänzungsleistung|prestations complémentaires|prestazion\\w* complementar|sozialhilfe|aide sociale|assistenza sociale|familienzulag|allocations familiales|assegni familiari|erwerbsersatz|erwerbersatz|perte de gain|perdita di guadagno|finanzen & abgabe|finances publiques|finanze pubbliche|impôt|imposta|umsatzabgabe|droit fiscal|diritto tributario"
+      },
+      "rules": [
+        "L1_KEEP_RUBRIC",
+        "L1_KEEP_RUBRIC_MISSING",
+        "L1_KEEP_ACCIDENT_TERM",
+        "L1_KEEP_CONTRACT_TERM",
+        "L1_FLAG_CLOSED_RUBRIC",
+        "L1_DROP_WRONG_COURT",
+        "L1_DROP_WRONG_LETTER",
+        "L1_DROP_RUBRIC_OUT",
+        "L1_SIGNAL_RUBRIC_FROM_TITLE"
+      ],
+      "changelog": "Reproduces src/courts.py at 4c246a8 decision for decision (subject OR text; title fallback; closed rubrics block contract terms)."
+    },
+    {
+      "version": [
+        1,
+        1,
+        0
+      ],
+      "name": "layer-1 gate, normalised text, wider accident terms",
+      "bump_kind": "minor",
+      "previous": [
+        1,
+        0,
+        0
+      ],
+      "config": {
+        "courts": {
+          "4": {
+            "letters": "ADFG",
+            "rubrics": [
+              "assurance responsabilité civile",
+              "diritto contrattuale",
+              "droit des contrats",
+              "haftpflichtrecht",
+              "vertragsrecht"
+            ]
+          },
+          "8": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          },
+          "9": {
+            "letters": "CDFG",
+            "rubrics": [
+              "assicurazione contro gli infortuni",
+              "assicurazione malattie",
+              "assicurazione militare",
+              "assicurazione per l'invalidità",
+              "assurance militaire",
+              "assurance-accidents",
+              "assurance-invalidité",
+              "assurance-maladie",
+              "berufliche vorsorge",
+              "invalidenversicherung",
+              "krankenversicherung",
+              "militärversicherung",
+              "previdenza professionale",
+              "previdenza professionnale",
+              "prévoyance professionnelle",
+              "unfallversicherung"
+            ]
+          }
+        },
+        "rubric_sources": [
+          "neuheiten",
+          "hf_legal_area",
+          "gegenstand_head"
+        ],
+        "title_head": {
+          "cut_at": "(",
+          "strip_trailing": ",;"
+        },
+        "normalise": {
+          "casefold": true,
+          "nfkc": true,
+          "apostrophes": true,
+          "nbsp": true
+        },
+        "accident_terms": "\\b(?:suva|cna|insai|uvg|laa|lainf|mvg|unfallversicherung(?:sgesetz|en)?|unfallversicherers?|unfallversicherern|militärversicherung|assurance-accidents?|assureurs?-accidents?|assurance militaire|assicurazione (?:contro gli )?infortuni|assicuratore infortuni|assicurazione militare)\\b",
+        "contract_terms": "(?:taggeldversicherung|\\bvvg\\b|\\blca\\b|versicherungsvertragsgesetz|loi sur le contrat d['’]assurance|legge (?:federale )?sul contratto d['’]assicurazione)",
+        "closed_rubrics": "arbeitslos|chômage|chomage|disoccupaz|alters- und hinterlassenen|vieillesse|vecchiaia|ergänzungsleistung|prestations complémentaires|prestazion\\w* complementar|sozialhilfe|aide sociale|assistenza sociale|familienzulag|allocations familiales|assegni familiari|erwerbsersatz|erwerbersatz|perte de gain|perdita di guadagno|finanzen & abgabe|finances publiques|finanze pubbliche|impôt|imposta|umsatzabgabe|droit fiscal|diritto tributario"
+      },
+      "rules": [
+        "L1_KEEP_RUBRIC",
+        "L1_KEEP_RUBRIC_MISSING",
+        "L1_KEEP_ACCIDENT_TERM",
+        "L1_KEEP_CONTRACT_TERM",
+        "L1_FLAG_CLOSED_RUBRIC",
+        "L1_DROP_WRONG_COURT",
+        "L1_DROP_WRONG_LETTER",
+        "L1_DROP_RUBRIC_OUT",
+        "L1_SIGNAL_RUBRIC_FROM_TITLE"
+      ],
+      "changelog": "NFKC, typographic apostrophes and no-break spaces normalised before matching; accident terms widened to the plural and compound forms of PR #36 (Unfallversicherungsgesetz, Unfallversicherer, assureur-accidents, assicuratore infortuni). Same rules; outputs may change, so re-measured (D-064 minor)."
+    }
+  ]
+}

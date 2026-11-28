@@ -16,8 +16,8 @@ DO $$ BEGIN
          'status change must be audited with the actor';
 END $$;
 SELECT pg_temp.expect_error($q$UPDATE ops.component_version SET config = '{"x": 1}' WHERE step = 'verify'$q$, 'only .* may change');
-SELECT pg_temp.expect_error($q$DELETE FROM ops.rule WHERE rule_code = 'L1_DROP_NO_RULE'$q$, 'append-only');
-SELECT pg_temp.expect_error($q$UPDATE ops.rule SET definition = '{"x": 1}' WHERE rule_code = 'L1_DROP_NO_RULE'$q$, 'only .* may change');
+SELECT pg_temp.expect_error($q$DELETE FROM ops.rule WHERE rule_code = 'L1_DROP_RUBRIC_OUT'$q$, 'append-only');
+SELECT pg_temp.expect_error($q$UPDATE ops.rule SET definition = '{"x": 1}' WHERE rule_code = 'L1_DROP_RUBRIC_OUT'$q$, 'only .* may change');
 
 -- a new version needs a changelog, and "initial" exactly when there is no previous version
 SELECT pg_temp.expect_error($q$
@@ -44,7 +44,7 @@ SELECT pg_temp.expect_error($q$
 -- a rule of another step cannot be bound
 SELECT pg_temp.expect_error($q$
   INSERT INTO ops.component_version_rule (component_version_id, rule_id, ordinal)
-  VALUES (pg_temp.cv('verify'), pg_temp.rule('L1_KEEP_COURT_8C_9C'), 9)$q$, 'does not belong');
+  VALUES (pg_temp.cv('verify'), pg_temp.rule('L1_KEEP_RUBRIC'), 9)$q$, 'does not belong');
 
 -- a profile version V1+ refuses a draft (V0.x) step version
 INSERT INTO ops.component_version (step, name, v_major, v_minor, v_patch, config_schema_id, config, config_sha256, code_path, code_sha256, bump_kind, changelog)

@@ -40,3 +40,5 @@ tmp/
 *.log
 # Office lock files: Excel and Word write the user's name into them (G13)
 ~$*
+# Per-run outputs of the pipeline steps (decisions, logs, manifests): rebuilt by the runs, loaded into the DB (D-061)
+data/runs/

@@ -62,12 +62,12 @@ SELECT pg_temp.cv('layer2_judge'), 'judge', model_id FROM ops.model WHERE gatewa
 INSERT INTO ops.rule (step, rule_code, v_major, v_minor, v_patch, kind, definition, definition_schema_id, reason_code, status, bump_kind, changelog)
 SELECT r.step::ops.pipeline_step, r.code, 1, 0, 0, r.kind::ops.rule_kind, '{}',
        (SELECT json_schema_id FROM ops.json_schema WHERE schema_code = 'test.rule_definition'), r.code, 'active', 'initial', 'fixture'
-FROM (VALUES ('layer1_filter', 'L1_KEEP_COURT_8C_9C', 'keep'), ('layer1_filter', 'L1_DROP_NO_RULE', 'drop'),
+FROM (VALUES ('layer1_filter', 'L1_KEEP_RUBRIC', 'keep'), ('layer1_filter', 'L1_DROP_RUBRIC_OUT', 'drop'),
              ('verify', 'V1_IDS_IN_SET', 'check'), ('ranking', 'RANK_BELOW_THRESHOLD', 'drop')) AS r(step, code, kind);
 
 INSERT INTO ops.component_version_rule (component_version_id, rule_id, ordinal) VALUES
-  (pg_temp.cv('layer1_filter'), pg_temp.rule('L1_KEEP_COURT_8C_9C'), 1),
-  (pg_temp.cv('layer1_filter'), pg_temp.rule('L1_DROP_NO_RULE'), 2),
+  (pg_temp.cv('layer1_filter'), pg_temp.rule('L1_KEEP_RUBRIC'), 1),
+  (pg_temp.cv('layer1_filter'), pg_temp.rule('L1_DROP_RUBRIC_OUT'), 2),
   (pg_temp.cv('verify'), pg_temp.rule('V1_IDS_IN_SET'), 1),
   (pg_temp.cv('ranking'), pg_temp.rule('RANK_BELOW_THRESHOLD'), 1);
 
@@ -133,12 +133,12 @@ INSERT INTO triage.assessment (assessment_id, run_id, ruling_id, step, component
    'potentially', 'ok', NULL, NULL, NULL, NULL, 'Vorauswahl: Abteilung 8C.', 'REPLAY', now()),
   ('00000000-0000-4000-8000-000000000103', '00000000-0000-4000-8000-000000000001', pg_temp.rid('8C_199/2026'), 'layer1_filter',
    pg_temp.cv('layer1_filter'), pg_temp.span('layer1_filter', '8C_199/2026'), pg_temp.text_of('8C_199/2026'), repeat('c', 64),
-   'out_of_scope', 'ok', 0, 0, 'net', 'L1_DROP_NO_RULE', 'Keine Regel der Vorauswahl trifft zu.', 'REPLAY', now());
+   'out_of_scope', 'ok', 0, 0, 'net', 'L1_DROP_RUBRIC_OUT', 'Keine Regel der Vorauswahl trifft zu.', 'REPLAY', now());
 
 INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_code, effect, evidence_field, matched_text) VALUES
-  ('00000000-0000-4000-8000-000000000101', 1, pg_temp.rule('L1_KEEP_COURT_8C_9C'), 'L1_KEEP_COURT_8C_9C', 'keep', 'docket', '8C'),
-  ('00000000-0000-4000-8000-000000000102', 1, pg_temp.rule('L1_KEEP_COURT_8C_9C'), 'L1_KEEP_COURT_8C_9C', 'keep', 'docket', '8C'),
-  ('00000000-0000-4000-8000-000000000103', 1, pg_temp.rule('L1_DROP_NO_RULE'), 'L1_DROP_NO_RULE', 'drop', 'gegenstand', NULL);
+  ('00000000-0000-4000-8000-000000000101', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'docket', '8C'),
+  ('00000000-0000-4000-8000-000000000102', 1, pg_temp.rule('L1_KEEP_RUBRIC'), 'L1_KEEP_RUBRIC', 'keep', 'docket', '8C'),
+  ('00000000-0000-4000-8000-000000000103', 1, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'gegenstand', NULL);
 
 -- layer 2 ---------------------------------------------------------------------
 INSERT INTO ops.llm_call (llm_call_id, run_id, span_id, ruling_id, step, purpose, language, cache_key, cache_hit, mode, endpoint,

@@ -16,14 +16,16 @@ SET ROLE suva_owner;
 SET app.actor = 'seed';
 
 INSERT INTO ops.reason_code (code, domain, label_de, label_fr) VALUES
-  -- layer 1 (filter E) and window
-  ('L1_KEEP_COURT_8C_9C',        'triage', 'Urteil der Abteilung 8C oder 9C (Sozialversicherung, Luzern)', 'Arrêt des cours 8C ou 9C (assurances sociales, Lucerne)'),
-  ('L1_KEEP_SOCIAL_AREA',        'triage', 'Rechtsgebiet Sozialversicherung', 'Domaine des assurances sociales'),
-  ('L1_KEEP_MATTER_UV_IV_MV',    'triage', 'Gegenstand Unfall-, Invaliden- oder Militärversicherung', 'Objet : assurance-accidents, -invalidité ou militaire'),
-  ('L1_KEEP_TEXT_MENTION',       'triage', 'Text nennt die Suva oder das UVG', 'Le texte mentionne la Suva ou la LAA'),
-  ('L1_KEEP_TITLE_TERM',         'triage', 'Stichwort im Gegenstand (Versicherung, Taggeld, Haftpflicht, Rente …)', 'Mot-clé dans l''objet (assurance, indemnités journalières, responsabilité, rente …)'),
-  ('L1_KEEP_UNTITLED',           'triage', 'Ohne Gegenstand: vorsorglich behalten', 'Sans objet indiqué : conservé par prudence'),
-  ('L1_DROP_NO_RULE',            'triage', 'Keine Regel der Vorauswahl trifft zu', 'Aucune règle de présélection ne s''applique'),
+  -- layer 1 (src/layer1, rules in src/layer1/registry/layer1_filter.json) and window
+  ('L1_KEEP_RUBRIC',             'triage', 'Rechtsgebiet in der Liste der Abteilung (4, 8 oder 9)', 'Domaine juridique retenu pour cette cour (4, 8 ou 9)'),
+  ('L1_KEEP_RUBRIC_MISSING',     'triage', 'Rechtsgebiet fehlt: vorsorglich behalten', 'Domaine juridique absent : conservé par prudence'),
+  ('L1_KEEP_ACCIDENT_TERM',      'triage', 'Text nennt die Suva oder die Unfall- oder Militärversicherung', 'Le texte mentionne la Suva ou l''assurance-accidents ou militaire'),
+  ('L1_KEEP_CONTRACT_TERM',      'triage', 'Text nennt das VVG oder eine Taggeldversicherung', 'Le texte mentionne la LCA ou une assurance d''indemnités journalières'),
+  ('L1_FLAG_CLOSED_RUBRIC',      'triage', 'VVG-Begriff im Text, aber Rechtsgebiet ausgeschlossen (z. B. Arbeitslosenversicherung)', 'Terme LCA dans le texte, mais domaine exclu (p. ex. assurance-chômage)'),
+  ('L1_DROP_WRONG_COURT',        'triage', 'Andere Abteilung, und der Text nennt keinen Versicherungsbegriff', 'Autre cour, et le texte ne mentionne aucun terme d''assurance'),
+  ('L1_DROP_WRONG_LETTER',       'triage', 'Verfahrensart hier nicht berücksichtigt, und kein Versicherungsbegriff im Text', 'Type de procédure non retenu, et aucun terme d''assurance dans le texte'),
+  ('L1_DROP_RUBRIC_OUT',         'triage', 'Rechtsgebiet ausserhalb der Liste, und kein Versicherungsbegriff im Text', 'Domaine hors liste, et aucun terme d''assurance dans le texte'),
+  ('L1_SIGNAL_RUBRIC_FROM_TITLE','triage', 'Rechtsgebiet aus dem Gegenstand gelesen', 'Domaine lu dans l''objet'),
   ('OUT_OF_WINDOW',              'triage', 'Ausserhalb aller Zeitfenster', 'Hors de toutes les périodes'),
   -- layer 2, justification, ranking
   ('L2_FAILED_CALL',             'triage', 'Beurteilung durch Apertus fehlgeschlagen, wird wiederholt', 'Évaluation par Apertus échouée, nouvel essai prévu'),

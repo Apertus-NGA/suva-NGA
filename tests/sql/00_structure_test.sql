@@ -11,10 +11,10 @@ BEGIN
   SELECT count(*) INTO n
   FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace
   WHERE s.nspname IN ('ops', 'corpus', 'triage', 'gold', 'summ', 'audit') AND c.relkind IN ('r', 'p') AND NOT c.relispartition;
-  ASSERT n = 56, format('expected 56 tables, found %s', n);
+  ASSERT n = 57, format('expected 57 tables, found %s', n);
 
   SELECT count(*) INTO n FROM pg_type t JOIN pg_namespace s ON s.oid = t.typnamespace WHERE s.nspname = 'ops' AND t.typtype = 'e';
-  ASSERT n = 43, format('expected 43 ENUMs, found %s', n);
+  ASSERT n = 44, format('expected 44 ENUMs, found %s', n);
 
   SELECT string_agg(s.nspname || '.' || c.relname, ', ') INTO missing
   FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace

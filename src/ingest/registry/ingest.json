@@ -1,0 +1,68 @@
+{
+  "step": "ingest",
+  "doc": "docs/DB_DDL_PLANNING.md §8.1; D-062, D-072",
+  "config_schema": {
+    "schema_code": "ingest.config",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "changelog": "Initial: HF base dataset (pinned file, windows, publication sources, twin rule, columns read)."
+  },
+  "versions": [
+    {
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "name": "HF base dataset",
+      "bump_kind": "initial",
+      "previous": null,
+      "config": {
+        "hf_repo": "voilaj/swiss-caselaw",
+        "hf_file": "data/bger.parquet",
+        "hf_revision": "35b17aa9c3fad71011b72f78f6ab79650ec0cf96",
+        "decision_quarters": {
+          "2025Q4": {
+            "start": "2025-10-01",
+            "end": "2025-12-31"
+          },
+          "2026Q1": {
+            "start": "2026-01-01",
+            "end": "2026-03-31"
+          },
+          "2026Q2": {
+            "start": "2026-04-01",
+            "end": "2026-06-30"
+          }
+        },
+        "target_quarter": "2026Q2",
+        "publication_exact": {
+          "start": "2026-05-19",
+          "end": "2026-06-30"
+        },
+        "publication_approx": {
+          "start": "2026-04-01",
+          "end": "2026-05-18"
+        },
+        "poller_start": "2026-05-19",
+        "twin_rule": "same_date",
+        "columns": [
+          "decision_id",
+          "docket_number",
+          "decision_date",
+          "publication_date",
+          "scraped_at",
+          "language",
+          "title",
+          "legal_area",
+          "full_text",
+          "appealed_court_raw"
+        ]
+      },
+      "changelog": "Q2/2026 union (decision + publication), Q4/2025 and Q1/2026 by decision date, and the rulings of Suva's exports outside those windows (D-062). HF legal_area kept as a rubric observation (D-072)."
+    }
+  ]
+}

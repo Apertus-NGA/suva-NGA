@@ -95,6 +95,9 @@ Files of the official template are marked `[T]`: never renamed or moved (D-039);
     src/llm/         the single Apertus client (limiter, cache, replay, JSON cascade) and the gateway probe
     src/api/ src/ui/ FastAPI and the legal-expert UI
     eval/            gold manifests, runners, graders
+    experiments/     experimental workstreams (experiments/finetune/: layer-2 benchmark and fine-tune,
+                     docs/FINETUNE.md); never imported or run by make run; same G2/G3 doctrine tests as
+                     src/; outputs in data/derived/, aggregates in results/
     results/         machine-written results (aggregate only when derived from Suva data, D-031)
     expected/        reference outputs that make run compares against
     tests/           unit tests, test_doctrines.py, test_models_registry.py, test_template_layout.py,

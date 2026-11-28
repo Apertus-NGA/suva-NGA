@@ -4,12 +4,15 @@ The forbidden values are read from judgements/ at test time (tests/suva_forbidde
 written nowhere; a failure names the file, the line and the kind of match, never the value.
 Scanned: every file of the repo except judgements/ itself, the pitch PDF (Suva's), git internals, virtual
 environments, tool caches and tmp/ (scratch). That covers data/derived/, data/public/, results/, expected/,
-logs, llm_calls, caches, prompts, exports, UI pages, docs and the report. Limit: text inside compressed PDF
-streams (the report PDF) is not read; check the report's Markdown source instead.
+logs, llm_calls, caches, prompts, exports, UI pages, docs and the report. Archives (.zip, .gz) are read inside,
+member by member: their compressed bytes would hide a real value and match by chance. Limit: text inside
+compressed PDF streams (the report PDF) is not read; check the report's Markdown source instead.
 """
 
 from __future__ import annotations
 
+import gzip
+import zipfile
 from pathlib import Path
 
 from tests.suva_forbidden import Forbidden, load, scan
@@ -72,3 +75,18 @@ def test_scanner_goes_red_on_a_planted_synthetic_value(tmp_path):
         "out.jsonl:4: intranet path prefix",
     ]
     assert all("Muster" not in h and "MUH" not in h for h in hits)
+
+
+def test_scanner_reads_inside_archives(tmp_path):
+    """A value inside a compressed member is found and named by member; the compressed bytes are not scanned."""
+    fake = Forbidden(staff_codes={"MUH"})
+    bundle = tmp_path / "bundle.zip"
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("inner/a.jsonl", "clean line\n" + "Kürzel MUH.\n" * 40)
+        z.writestr("inner/b.txt", "nothing here\n")
+    (tmp_path / "f.json.gz").write_bytes(gzip.compress(b"one\ntwo\nKuerzel MUH\n"))
+    hits = scan([bundle, tmp_path / "f.json.gz"], fake, tmp_path)
+    assert hits[0] == "bundle.zip!inner/a.jsonl:2: staff code"
+    assert len([h for h in hits if h.startswith("bundle.zip!inner/a.jsonl:")]) == 40
+    assert "f.json.gz:3: staff code" in hits
+    assert not [h for h in hits if "inner/b.txt" in h or h.startswith("bundle.zip:")]

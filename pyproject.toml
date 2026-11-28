@@ -11,7 +11,7 @@ dependencies = [
     "numpy>=2.5.5",
     "openpyxl>=3.1.5",
     "pandas>=3.1.1",
-    "psycopg[binary]>=3.3.9",
+    "psycopg[binary]>=3.3.9,<4",
     "pyarrow>=22",
     "pydantic>=2.9,<3",
     "scikit-learn>=1.9.1",
@@ -51,4 +51,4 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-markers = ["db: needs the Postgres test database (docker compose up -d db)"]
+markers = ["db: needs PostgreSQL via DATABASE_URL (or `docker compose up -d db`); some tests create and drop a throwaway database"]
