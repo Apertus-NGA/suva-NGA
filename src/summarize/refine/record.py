@@ -97,7 +97,7 @@ def read(source: str, parts: dict[str, str], model: Model) -> dict:
     best: dict | None = None
     for attempt in range(2):
         try:
-            answer = model.ask(sent, "ruling_record", shape, f"{VERSION}/{attempt}", max_tokens=700)
+            answer = model.ask(sent, "ruling_record", shape, f"{VERSION}/{attempt}", max_tokens=1200)
         except ModelFailed as exc:
             best = best or {
                 "version": VERSION,

@@ -81,7 +81,7 @@ def judge_sentences(draft: Draft, ids: list[str], ctx: Context, version: str) ->
         {"a_sentence": enum(ids), "b_label": enum([*labels, "none"]), "c_opening": STRING, "d_verdict": enum(VERDICTS)}
     )
     messages = evidence.messages(ctx.parts, f"{DETECT}\n\n<summary>\n{_summary_block(draft, ids)}\n</summary>")
-    answer = ctx.model.ask(messages, "sentence_support", obj({"items": array(item)}), version, max_tokens=1200)
+    answer = ctx.model.ask(messages, "sentence_support", obj({"items": array(item)}), version, max_tokens=2000)
     out: dict[str, dict] = {}
     for entry in answer["items"]:
         found = evidence.find(entry["c_opening"], ctx.parts, entry["b_label"])

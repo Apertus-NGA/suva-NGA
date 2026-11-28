@@ -475,7 +475,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
             }
         ]
     }
-    fake = Fake(**{"context@1": [answer], "facts@5__recheck": [recheck]})
+    fake = Fake(**{"context@2": [answer], "facts@5__recheck": [recheck]})
     result = refine(short, ctx_for(fake), [ContextStep()])
     assert result.text.startswith("Der Versicherte stürzte am 7. Mai 2023 von einer Leiter")
     assert result.trace[0].status == "corrected" and result.trace[0].findings[0]["evidence"] == "facts"
@@ -484,7 +484,7 @@ def test_context_adds_the_facts_to_a_summary_under_the_band_from_a_ruling_senten
         "b_opening": "Der Versicherte stürzte am 7. Mai 2023",
         "c_text": "Der Versicherte stürzte am 9. Mai 2021 aus 12 Metern Höhe.",
     }
-    refused = refine(short, ctx_for(Fake(**{"context@1": [invented]})), [ContextStep()])
+    refused = refine(short, ctx_for(Fake(**{"context@2": [invented]})), [ContextStep()])
     assert "number 2021 not in the ruling" in refused.trace[0].findings[0]["why_not"]
 
 
@@ -556,3 +556,8 @@ def test_form_writes_the_outcome_as_its_own_last_sentence_when_the_draft_buries_
     assert Draft.from_text(result.text).sentences[-1].locked
     already = refine(DRAFT, ctx_for(Fake()), [Form()])
     assert already.text.count("Die Beschwerde wird abgewiesen.") == 1
+
+
+def test_a_pointer_with_the_consideration_number_still_finds_the_sentence():
+    parts = evidence.passages(RULING)
+    assert evidence.find("2. Streitig ist, ob die Suva ihre Leistungen", parts)[0] == "E.2"

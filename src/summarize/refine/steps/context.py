@@ -17,14 +17,15 @@ from src.summarize.refine.steps.common import NAME, guarded, polish, written_sen
 from src.summarize.refine.steps.facts import VERSION as FACTS_VERSION
 from src.summarize.refine.steps.facts import judge_sentences
 
-VERSION = "context@1"
+VERSION = "context@2"
 
 TASK = (
     "Task: the {lang} summary below of the ruling above is too short and lacks the facts a lawyer needs to "
     "understand the point. Write one or two sentences in {lang}, in the impersonal register of a case-law digest, "
     "stating only facts the ruling states: the insured event, what the insurer decided, what the lower court "
-    "decided, what the appellant claims. No medical detail, no names (say 'der Versicherte', 'l'assuré', the insurer "
-    "as the ruling names it), no point already in the summary.\n"
+    "decided, what the appellant claims. Never say how the Federal Supreme Court decided (the summary's last "
+    "sentence does). No medical detail, no names (say 'der Versicherte', 'l'assuré', the insurer as the ruling "
+    "names it), no point already in the summary.\n"
     "- a_label, b_opening: the passage and the first eight to twelve words of the ruling sentence the new text "
     "rests on most, exactly;\n- c_text: the new sentences, in {lang}.\n\n<summary>\n{summary}\n</summary>"
 )
@@ -38,7 +39,8 @@ class ContextStep(Step):
         if draft.words() >= low or not draft.sentences:
             return []
         task = TASK.format(lang=NAME[ctx.language], summary=draft.numbered())
-        shape = obj({"a_label": enum(list(ctx.parts)), "b_opening": STRING, "c_text": STRING})
+        facts_labels = [label for label in ctx.parts if label in ("facts", "text")] or list(ctx.parts)
+        shape = obj({"a_label": enum(facts_labels), "b_opening": STRING, "c_text": STRING})
         answer = ctx.model.ask(evidence.messages(ctx.parts, task), "context", shape, VERSION, max_tokens=400)
         found = evidence.find(answer["b_opening"], ctx.parts, answer["a_label"], 2)
         text = polish(answer["c_text"], ctx)

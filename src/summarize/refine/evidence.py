@@ -195,7 +195,7 @@ def sentences(passage: str) -> list[str]:
 
 def expand(opening: str, passage: str, count: int = 1) -> str | None:
     """The `count` sentences of the passage that begin at (or contain) `opening`, copied from the ruling."""
-    words = opening.split()
+    words = _HEADING.sub("", opening.strip()).split()  # the model often includes the number: "2. Le litige …"
     if len(words) < MIN_OPENING_WORDS:
         return None
     needle = normalise(" ".join(words))

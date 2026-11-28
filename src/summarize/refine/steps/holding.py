@@ -99,18 +99,20 @@ class Holding(Step):
         if need_answer:
             items.append(f'A: state how the court applied it to this case: "{evidence.as_data(answer["quote"])}"')
         item_ids = [*missing, *(["A"] if need_answer else [])]
-        shape = obj(
-            {"a_after": enum(_anchors(draft)), "b_sentences": array(obj({"a_item": enum(item_ids), "b_text": STRING}))}
-        )
-        prompt = REPAIR.format(lang=lang, what="\n".join(items), summary=draft.numbered())
+        anchors = _anchors(draft)
+        # The position is code's to decide when the model picks one it may not use: after the last allowed sentence.
+        shape = obj({"a_after": STRING, "b_sentences": array(obj({"a_item": enum(item_ids), "b_text": STRING}))})
+        prompt_anchors = f"Allowed ids for a_after: {', '.join(anchors)}.\n"
+        prompt = REPAIR.format(lang=lang, what="\n".join(items), summary=draft.numbered()) + "\n" + prompt_anchors
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         reply = ctx.model.ask(messages, "holding_repair", shape, f"{VERSION}/repair", max_tokens=700)
+        position = reply["a_after"] if reply["a_after"] in anchors else anchors[-1]
         written = []
         for entry in reply["b_sentences"]:
             label = answer["label"] if entry["a_item"] == "A" else rules[int(entry["a_item"][1:]) - 1]["label"]
             written.append(with_reference(polish(entry["b_text"], ctx), label, ctx.language))
         text = " ".join(written)
-        after_sentence = draft.get(reply["a_after"]).text
+        after_sentence = draft.get(position).text
 
         def check(before: Draft, after: Draft) -> list[str]:
             if not written:
