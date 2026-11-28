@@ -96,8 +96,11 @@ def gold(name_set: str) -> list[dict]:
                 "fiche_sentences": len(match(body[0], [s for _, s in every])),
                 "matched": len(chosen),
                 "kept": [index[c] for c in chosen if c in index],
-                "lost": [{"label": c[0], "reason": reasons.get(c, "?"), "sentence": c[1][:160]}
-                         for c in chosen if c not in index],  # fmt: skip
+                "lost": [
+                    {"label": c[0], "reason": reasons.get(c, "?"), "sentence": c[1][:160]}
+                    for c in chosen
+                    if c not in index
+                ],  # fmt: skip
                 "labels": sorted({c[0] for c in chosen}),
                 "texts": [c[1] for c in chosen],
             }
@@ -232,8 +235,11 @@ def write_all(name_set: str, name: str, choice_name: str) -> None:
                 "checks_after": checks.failing(checks.run(fiche.text, lang, ruling["text"])),
                 "model_log": model.log,
             })  # fmt: skip
-            print(f"{ruling['docket']} {lang}: {fiche.calls} calls, sentences {statuses}, "
-                  f"flow kept {sum(f.get('accepted', False) for f in fiche.flow)}/{len(fiche.flow)}", flush=True)
+            print(
+                f"{ruling['docket']} {lang}: {fiche.calls} calls, sentences {statuses}, "
+                f"flow kept {sum(f.get('accepted', False) for f in fiche.flow)}/{len(fiche.flow)}",
+                flush=True,
+            )
         return out
 
     with ThreadPoolExecutor(4) as pool:
@@ -262,8 +268,10 @@ def report(name_set: str, name: str) -> dict:
         sizes.append(len(ids))
         sent.append(recall(ids, g["gold"]["kept"]))
         picked = [words(item["text"]) for item in row["chosen"]]
-        hits = [max((len(words(s) & p) / max(1, len(words(s))) for p in picked), default=0) >= SOFT
-                for s in g["gold"]["texts"]]
+        hits = [
+            max((len(words(s) & p) / max(1, len(words(s))) for p in picked), default=0) >= SOFT
+            for s in g["gold"]["texts"]
+        ]
         soft.append(sum(hits) / len(hits))
         if row.get("scores"):
             ranked.append(len(set(top_labels(row["scores"])) & set(g["gold"]["labels"])) / len(g["gold"]["labels"]))
@@ -282,9 +290,12 @@ def report(name_set: str, name: str) -> dict:
         "soft_sentence_recall": round(statistics.mean(soft), 3) if soft else None,
         "ranked_consideration_recall": round(statistics.mean(ranked), 3) if ranked else None,
         "random_sentence_recall": round(statistics.mean(rand), 3) if rand else None,
-        "per_ruling": [{"docket": d, "sentence_recall": round(s, 2), "consideration_recall": round(c, 2)}
-                       for d, s, c in zip([d for d, g in golds.items() if g["gold"] and g["gold"]["kept"]], sent, cons,
-                                          strict=False)],  # fmt: skip
+        "per_ruling": [
+            {"docket": d, "sentence_recall": round(s, 2), "consideration_recall": round(c, 2)}
+            for d, s, c in zip(
+                [d for d, g in golds.items() if g["gold"] and g["gold"]["kept"]], sent, cons, strict=False
+            )
+        ],  # fmt: skip
         "bars": BARS,
     }
     return summary

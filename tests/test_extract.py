@@ -90,7 +90,13 @@ def test_choose_ranks_considerations_offers_only_their_sentences_and_restores_th
 
 
 def test_top_takes_the_best_considerations_by_reading():
-    assert choose.top({"E.2": 0.2, "E.3": 0.9, "E.4": 0.95, "E.5": 0.1, "E.6": 0.5, "E.7": 0.3}) == ["E.4", "E.3", "E.6", "E.7", "E.2"]
+    assert choose.top({"E.2": 0.2, "E.3": 0.9, "E.4": 0.95, "E.5": 0.1, "E.6": 0.5, "E.7": 0.3}) == [
+        "E.4",
+        "E.3",
+        "E.6",
+        "E.7",
+        "E.2",
+    ]
 
 
 def test_a_ruling_with_too_few_candidates_goes_to_a_person():
@@ -100,7 +106,11 @@ def test_a_ruling_with_too_few_candidates_goes_to_a_person():
 
 # --- write --------------------------------------------------------------------------------------------------------
 
-RULE = cand.Candidate("S9", "E.3", "Selon la jurisprudence, le droit à des prestations de l'assurance-accidents suppose un lien de causalité naturelle entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA; ATF 129 V 177 consid. 3.1).")
+RULE = cand.Candidate(
+    "S9",
+    "E.3",
+    "Selon la jurisprudence, le droit à des prestations de l'assurance-accidents suppose un lien de causalité naturelle entre l'accident et l'atteinte à la santé (art. 6 al. 1 LAA; ATF 129 V 177 consid. 3.1).",
+)
 FR = {"text": FR_RULING, "language": "fr", "category": "uv", "starred": False}
 
 
@@ -119,7 +129,9 @@ def test_a_sentence_the_source_does_not_entail_gets_one_retry_then_codes_own_cle
                    "entail@1/write": [0.2, 0.3]})  # fmt: skip
     written = write.write_sentence(RULE, "rule", "fr", FR, model_for(fake))
     assert written.status == "cleaned"
-    assert written.text.endswith("l'atteinte à la santé (art. 6 al. 1 LAA).")  # the reference parenthesis is out, the article stays
+    assert written.text.endswith(
+        "l'atteinte à la santé (art. 6 al. 1 LAA)."
+    )  # the reference parenthesis is out, the article stays
     assert "ATF" not in written.text
     retry = next(m for v, m in fake.sent if v == f"{write.VERSION}/1")
     assert "entailment 0.20 below 0.9" in retry[-1]["content"]
@@ -144,7 +156,10 @@ def test_uses_term_allows_inflection_but_not_a_missing_word():
 
 
 def test_flow_keeps_a_connective_and_refuses_a_change_that_brings_a_number():
-    texts = ["Der Anspruch setzt einen natürlichen Kausalzusammenhang voraus.", "Der Status quo sine war am 30. Juni 2023 erreicht."]
+    texts = [
+        "Der Anspruch setzt einen natürlichen Kausalzusammenhang voraus.",
+        "Der Status quo sine war am 30. Juni 2023 erreicht.",
+    ]
     fake = Fake(**{write.FLOW_VERSION: [{"a_sentences": [
         {"a_id": "s1", "b_text": "Der Anspruch setzt einen natürlichen Kausalzusammenhang voraus, mindestens zu 50 %."},
         {"a_id": "s2", "b_text": "Hier war der Status quo sine am 30. Juni 2023 erreicht."},
@@ -160,8 +175,12 @@ def test_the_fiche_ends_with_codes_outcome_sentence():
     choice = choose.Choice("Ende der Leistungspflicht", chosen, len(found.kept), found.reasons())
     fake = Fake(**{f"{write.VERSION}/0": [{"a_sentence": c.text} for c, _ in chosen],
                    write.FLOW_VERSION: [{"a_sentences": [{"a_id": f"s{n}", "b_text": c.text} for n, (c, _) in enumerate(chosen, 1)]}]})  # fmt: skip
-    fiche = write.write_fiche(choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False}, model_for(fake))
-    assert fiche.text.startswith("Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus")
+    fiche = write.write_fiche(
+        choice, "de", {"text": RULING, "language": "de", "category": "uv", "starred": False}, model_for(fake)
+    )
+    assert fiche.text.startswith(
+        "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus"
+    )
     assert fiche.text.endswith("Die Beschwerde wird abgewiesen.")
     assert [w.status for w in fiche.sentences] == ["written"] * len(chosen)
 
