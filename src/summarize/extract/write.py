@@ -191,7 +191,8 @@ def uses_term(text: str, term: str) -> bool:
 # Whole words only: "ist zu prüfen" is a "must", "ist zutreffend" and "ist zulässig" are not (review, 28 Nov).
 _MUST = re.compile(
     r"\b(?:muss|müssen|musste|mussten|darf nicht|dürfen nicht|doit|doivent|devait|devaient|il faut|il y a lieu"
-    r"|deve|devono|occorre|è tenut[oai])\b|\b(?:hat|haben|ist|sind|war|waren)\s+zu\s+[a-zäöü]+en\b",
+    r"|deve|devono|occorre|è tenut[oai])\b|\b(?:hat|haben|ist|sind|war|waren)\s+zu\s+[a-zäöü]+en\b"
+    r"|\b(?:ist|sind)\b[^.,;]{0,80}?\b[a-zäöü]{2,}zu[a-zäöü]{3,}en\b",  # "ist … auszugehen", "sind … anzurechnen"
     re.IGNORECASE,
 )
 _MAY = re.compile(r"\b(?:kann|können|konnte|darf|dürfen|peut|peuvent|pouvait|il est possible|può|possono)\b",

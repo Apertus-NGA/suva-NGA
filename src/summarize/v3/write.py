@@ -24,7 +24,7 @@ from src.summarize.refine.steps.common import CALQUES, NAME
 from src.summarize.v2.prompts import glossary_block
 from src.summarize.v3.types import Proposition, Record, Sentence
 
-VERSION = "v3-write@1"
+VERSION = "v3-write@2"
 MAX_TOKENS = 1500  # a fiche of 250 French words is about 500 tokens; the JSON around it and a margin
 WORDS = (90, 250)  # the length asked for, inside Suva's band (refine.checks.LENGTH_BAND)
 FULL_TEXT_CHARS = 30_000  # a ruling up to this size is shown whole (without its operative part)
@@ -140,8 +140,9 @@ it does not contain, and do not turn "may" into "must" or a doubt into a finding
 parties line says), and never present such a proposition as what the court holds.
 - A rule or condition said by the Federal Supreme Court is stated as general law, in the present tense, without \
 naming the court. Its answer is stated as what {court} holds in this case.
-- Do NOT state the outcome of the appeal (dismissed, admitted, sent back) and no costs: code adds that sentence \
-itself ("{OUTCOME[language]}").
+- Do NOT state the outcome of the appeal (dismissed, admitted) and no costs: code adds that sentence itself \
+("{OUTCOME[language]}"). What the court sends back, and for what, is stated when a proposition says it.
+- a_text holds only the sentence: never a proposition id (P1, P2) inside the text.
 - Replace an anonymised name (A.________) by the person's role.
 - Leave out references to other rulings and to literature (BGE/ATF numbers, docket numbers, authors).
 - Where a proposition lists required terms, use exactly those {lang} terms for it.

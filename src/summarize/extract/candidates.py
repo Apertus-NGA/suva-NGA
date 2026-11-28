@@ -114,9 +114,10 @@ _LOWER_COURT = (
     r"|Il Tribunale cantonale|I giudici cantonali|La Corte delle assicurazioni)"
 )
 _REASONED = (
-    r"(?:erwog|hat erwogen|hielt fest|hat festgehalten|stellte fest|hat festgestellt|kam zum Schluss|gelangte|"
-    r"begründete|verneinte|bejahte|a retenu|a considéré|a jugé|a estimé|a constaté|a admis|a nié|a exposé|a relevé|"
-    r"ha ritenuto|ha considerato|ha accertato|ha stabilito|ha negato)"
+    r"(?:erwog(?:en)?|ha(?:t|ben) erwogen|hielt(?:en)? fest|ha(?:t|ben) festgehalten|stellte(?:n)? fest"
+    r"|ha(?:t|ben) festgestellt|kam(?:en)? zum Schluss|gelangte(?:n)?|begründete(?:n)?|verneinte(?:n)?|bejahte(?:n)?"
+    r"|(?:a|ont) (?:retenu|considéré|jugé|estimé|constaté|admis|nié|exposé|relevé)"
+    r"|(?:ha|hanno) (?:ritenuto|considerato|accertato|stabilito|negato))"
 )
 _LOWER_OPENS = re.compile(rf"^(?:[^,.]{{0,40}},\s*)?{_LOWER_COURT}\b[^.]{{0,60}}?\b{_REASONED}\b", re.IGNORECASE)
 # The court's own voice again: it assesses what it reported.

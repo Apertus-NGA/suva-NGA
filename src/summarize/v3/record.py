@@ -193,10 +193,18 @@ def _in_reasoning(candidate: cand.Candidate) -> bool:
     return candidate.label not in ("facts", "operative")
 
 
+# The sentence itself says the lower court reasoned so, after a connective or not ("Partant, les juges cantonaux
+# ont retenu …": first live run, 28 Nov; candidates.py only marks a consideration that opens this way).
+_LOWER_SAYS = re.compile(
+    rf"^(?:[^,.]{{0,40}},\s*)?{cand._LOWER_COURT}\b[^.]{{0,60}}?\b{cand._REASONED}\b", re.IGNORECASE
+)
+
+
 def _own(candidate: cand.Candidate) -> bool:
     """A sentence code itself accepts as the court's: its voice, no argument, no reported speech."""
     return (
         candidate.voice == "court"
+        and not _LOWER_SAYS.search(candidate.text)
         and _in_reasoning(candidate)
         and not party_argument(candidate.text)
         and not reported(candidate.text)
@@ -208,7 +216,7 @@ def check(candidate: cand.Candidate, slot: str, speaker: str, who: parties.Parti
     calls the court's is checked: the harm is a position of someone else stated as the court's holding."""
     cid, notes = candidate.id, []
     if speaker == "court":
-        if candidate.voice == "lower_court":
+        if candidate.voice == "lower_court" or _LOWER_SAYS.search(candidate.text):
             speaker = "lower_court"
             notes.append(f"{cid}: speaker court -> lower_court (the court reports the lower court's reasoning)")
         elif party_argument(candidate.text):

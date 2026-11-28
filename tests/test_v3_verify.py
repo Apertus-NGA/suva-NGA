@@ -256,8 +256,14 @@ def test_code_refuses_placeholders_the_outcome_a_changed_strength_another_langua
     )
     assert any(
         "outcome of the appeal" in p
+        for p in v.code_problems("Das Bundesgericht weist die Beschwerde ab.", ("P2",), case)
+    )
+    # the court's answer may say what is confirmed or sent back (finish adds the outcome only once)
+    assert not any(
+        "outcome of the appeal" in p
         for p in v.code_problems("Das Bundesgericht weist die Beschwerde ab.", ("P4",), case)
     )
+    assert v.normalised("P1 und P2: Der Versicherte stürzte. (P3)", "de", "") == "Der Versicherte stürzte."
     assert any(
         "written in French" in p
         for p in v.code_problems("La personne assurée est tombée d'une échelle et elle est blessée.", ("P1",), case)

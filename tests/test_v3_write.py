@@ -64,7 +64,7 @@ def sent(fiche: str = "de", examples: list[dict] | None = None, rec: Record | No
 
 def test_the_glossary_of_the_matter_and_language_is_in_the_prompt_sent():
     _, system, _, version = sent("fr", category="uv")
-    assert version == f"{w.VERSION}/fr" and w.VERSION == "v3-write@1"
+    assert version == f"{w.VERSION}/fr" and w.VERSION.startswith("v3-write@")
     assert glossary_block("fr", "uv") in system
     assert glossary_block("de", "uv") not in system and glossary_block("fr", "iv") not in system
     assert "lien de causalité (pas: rapport de causalité)" in system  # the calque hints, of the fiche's language

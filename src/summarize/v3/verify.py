@@ -243,7 +243,8 @@ MISSING = """The {lang} digest does not state this point of the ruling yet. Writ
 RULES = """- Say only what the ruling's sentence(s) above say: the same content and strength (must stays must, may stays
   may), no article of law, number or reference they lack. Leave out references to other rulings and literature.
 {speakers}- Replace an anonymised name (A.________) by the role of that person; no placeholder in brackets.
-- Do not state how the appeal ended: that sentence is added separately.
+- Do not state how the appeal ended (that sentence is added separately), except what the court sends back.
+- Only the sentence: no proposition id (P1, P2) in it.
 {terms}"""
 _FRAME = {
     "de": {
@@ -381,9 +382,20 @@ class _Case:
     source_language: str
 
 
+_ID = r"P\d+(?:\s*(?:,|und|et|and|&)\s*P\d+)*"
+_ID_MARK = re.compile(rf"^\s*\(?{_ID}\)?\s*[:.–-]?\s+|\s*\({_ID}\)")
+# The accident insurer this project writes for: a fiche may name it only when the ruling does (the model wrote
+# "Suva" for an invalidity office in the first live run, and for HDI in the prompt-written fiche: LESSONS).
+_SUVA = re.compile(r"\b(?:Suva|SUVA|CNA|INSAI)\b")
+_SUVA_IN_RULING = re.compile(
+    r"Suva|SUVA|\bCNA\b|INSAI|Unfallversicherungsanstalt|Caisse nationale suisse|Istituto nazionale"
+)
+
+
 def normalised(text: str, language: str, source: str) -> str:
     """Step 1: the fiche language's forms and abbreviations; a parenthesis of references keeps only its articles."""
-    out = polish(text or "", SimpleNamespace(language=language, source=source))
+    out = _ID_MARK.sub(" ", text or "")  # "P2:", "(P1)", "P1 und P2:": the writer's bookkeeping, not text
+    out = polish(out, SimpleNamespace(language=language, source=source))
     out = _REF_PARENTHESIS.sub(_without_references, out)
     return re.sub(r"\s+([,.;:])", r"\1", out).strip()
 
@@ -418,7 +430,7 @@ def _terms(propositions: list[Proposition], case: _Case) -> list[tuple[str, str]
     out: list[tuple[str, str]] = []
     for p in propositions:
         for pair in required_terms(p.source, case.source_language, case.language, case.ruling.get("category") or ""):
-            if pair not in out:
+            if pair not in out and not pair[1].isupper():  # a statute's abbreviation is checked as an identifier
                 out.append(pair)
     return out
 
@@ -442,11 +454,16 @@ def code_problems(text: str, ids: tuple[str, ...], case: _Case) -> list[str]:
     if _BRACKETED.search(text):
         problems.append(f"a placeholder in brackets: {_BRACKETED.search(text).group(0)}")
     problems += checks.new_identifiers(text, sources, case.ruling["text"])
-    problems += strength(text, sources)
+    if len(propositions) == 1:  # a sentence joining two propositions mixes their modals: no reading by code
+        problems += strength(text, sources)
+    if _SUVA.search(text) and not _SUVA_IN_RULING.search(case.ruling["text"]):
+        insurer = case.record.parties.get("insurer") or "another insurer"
+        problems.append(f"names Suva, but the ruling does not: the insurer is {insurer}")
     lacking = [dst for _, dst in _terms(propositions, case) if not uses_term(text, dst)]
     if lacking:
         problems.append("glossary term missing: " + ", ".join(lacking))
-    if checks.restates_outcome(text):
+    # The court's answer may say what is sent back or confirmed; finish.outcome_once then adds nothing twice.
+    if checks.restates_outcome(text) and not any(p.slot == "answer" for p in propositions):
         problems.append("states the outcome of the appeal, which code adds as the last sentence")
     problems += speaker_problems(text, propositions, case.record.parties)
     return problems
@@ -480,8 +497,10 @@ def _prompt_parts(propositions: list[Proposition], case: _Case) -> tuple[str, st
         frame = _FRAME.get(language, _FRAME["de"]).get(speaker, "")
         if speaker == "court":
             speakers += (
-                "- Who speaks: this is the Federal Supreme Court's own statement. State it directly or as the "
-                f"court's ({frame}), never as the view of the lower court, a party or an expert.\n"
+                "- Who speaks: this is the Federal Supreme Court's own statement. A rule or condition is stated "
+                "directly, as general law, without naming the court; only the court's answer on this case may be "
+                f"introduced as the court's ({frame}). Never give it as the view of the lower court, a party or "
+                "an expert.\n"
             )
         else:
             speakers += (
