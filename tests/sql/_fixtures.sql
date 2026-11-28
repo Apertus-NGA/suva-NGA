@@ -79,10 +79,11 @@ SELECT pv.profile_version_id, cv.step, cv.component_version_id
 FROM ops.pipeline_profile_version pv CROSS JOIN ops.component_version cv
 WHERE pv.profile_code = 'default';
 
-INSERT INTO ops.pipeline_run (run_id, profile_version_id, kind, mode, git_dirty, params_sha256, triggered_by)
+-- a finished run: only succeeded or partial runs form the label (DDL-2)
+INSERT INTO ops.pipeline_run (run_id, profile_version_id, kind, mode, status, git_dirty, params_sha256, triggered_by, finished_at)
 VALUES ('00000000-0000-4000-8000-000000000001',
         (SELECT profile_version_id FROM ops.pipeline_profile_version WHERE profile_code = 'default'),
-        'full', 'REPLAY', false, repeat('6', 64), 'ci');
+        'full', 'REPLAY', 'succeeded', false, repeat('6', 64), 'ci', now());
 
 -- corpus ---------------------------------------------------------------------
 INSERT INTO corpus.ruling (docket, decision_date, language, gegenstand, bger_url, origin, created_by_run_id) VALUES
@@ -145,10 +146,18 @@ INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_co
   ('00000000-0000-4000-8000-000000000103', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_DROP_RUBRIC_OUT', 'drop', 'fired', 'rubric:gegenstand', 'Assicurazione contro gli infortuni', 'Assicurazione contro gli infortuni');
 
 -- layer 2 ---------------------------------------------------------------------
-INSERT INTO ops.llm_call (llm_call_id, run_id, span_id, ruling_id, step, purpose, language, cache_key, cache_hit, mode, endpoint,
+-- the question prompt, declared by the layer-2 version: a judgement's prompt is the one its call sent (DDL-1)
+INSERT INTO ops.prompt_version (role, v_major, v_minor, v_patch, template_sha256, system_template, user_template, contains_suva_material, status, bump_kind, changelog)
+VALUES ('layer2_judge.question', 1, 0, 0, repeat('8', 64), 'fixture system', 'fixture user', false, 'active', 'initial', 'fixture');
+INSERT INTO ops.component_version_prompt (component_version_id, prompt_role, prompt_version_id)
+SELECT pg_temp.cv('layer2_judge'), 'question', prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question';
+
+INSERT INTO ops.llm_call (llm_call_id, run_id, span_id, ruling_id, step, purpose, language, prompt_version_id, cache_key, cache_hit, mode, endpoint,
                           model_role, requested_model, served_model, finish_reason, parsed_ok, attempt, input_tokens, output_tokens, latency_ms, started_at)
 SELECT c.id::uuid, '00000000-0000-4000-8000-000000000001', pg_temp.span(c.step, c.docket), pg_temp.rid(c.docket), c.step::ops.pipeline_step,
-       c.purpose, c.lang::ops.lang_code, repeat(c.k, 64), false, 'REPLAY', '/chat/completions', c.role::ops.model_role,
+       c.purpose, c.lang::ops.lang_code,
+       CASE WHEN c.step = 'layer2_judge' THEN (SELECT prompt_version_id FROM ops.prompt_version WHERE role = 'layer2_judge.question') END,
+       repeat(c.k, 64), false, 'REPLAY', '/chat/completions', c.role::ops.model_role,
        'fixture-model-large', 'fixture-model-large', 'stop', true, 1, 5000, 1, 600, now()
 FROM (VALUES
   ('00000000-0000-4000-8000-000000000901', 'layer2_judge',  '8C_493/2025', 'layer2_judge',  'de', '7', 'judge'),
@@ -167,8 +176,6 @@ INSERT INTO triage.assessment (assessment_id, run_id, ruling_id, step, component
    pg_temp.cv('layer2_judge'), pg_temp.span('layer2_judge', '8C_307/2025'), '00000000-0000-4000-8000-000000000102',
    pg_temp.text_of('8C_307/2025'), pg_temp.seg('8C_307/2025'), repeat('e', 64), 'potentially', 'ok', 0.30, 30, 'judged', 'REPLAY', now());
 
-INSERT INTO ops.prompt_version (role, v_major, v_minor, v_patch, template_sha256, system_template, user_template, contains_suva_material, status, bump_kind, changelog)
-VALUES ('layer2_judge.question', 1, 0, 0, repeat('8', 64), 'fixture system', 'fixture user', false, 'active', 'initial', 'fixture');
 
 INSERT INTO triage.llm_judgement (assessment_id, llm_call_id, prompt_version_id, requested_model, served_model, question_language,
                                   logprob_yes, logprob_no, p_yes, yes_no_in_top, text_chars_total, text_chars_sent, truncation)

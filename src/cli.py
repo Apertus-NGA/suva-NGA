@@ -118,7 +118,8 @@ def run_layer2_stage(mode: str, limit: int | None) -> int:
             print(f"run S3 judgement FAILED: {exc}", file=sys.stderr)
             return 1
     print(
-        f"run S3 judgement: {out['judged']} of {out['rulings_in']} judged ({out['status']}, layer2_judge "
+        f"run S3 judgement: {out['judged']} of {out['rulings_in']} judged, {out.get('replay_misses', 0)} without a "
+        f"recorded answer ({out['status']}, layer2_judge "
         f"{out['version']}, judge {out['judge']}, {out['mode']}), files in {out['files']}"
     )
     return 0

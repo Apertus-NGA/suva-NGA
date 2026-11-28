@@ -269,7 +269,13 @@ def test_live_run_stores_every_judgement_with_its_lineage(db):
     dumped += json.dumps(rows(url, "SELECT params, raw_output FROM ops.llm_call WHERE run_id = %s", rid))
     assert KEY not in dumped and "Beschwerdegegnerin" not in dumped  # no key, no prompt text in logs (§11.5)
     manifest = json.loads((Path(out["files"]) / "manifest.json").read_text())
-    assert set(manifest["files"]) == {"layer2_judgements.jsonl", "llm_attempts.jsonl", "messages.jsonl"}
+    assert set(manifest["files"]) == {
+        "layer2_judgements.jsonl",
+        "llm_attempts.jsonl",
+        "messages.jsonl",
+        "replay_misses.jsonl",
+    }
+    assert (Path(out["files"]) / "replay_misses.jsonl").read_text() == ""  # a live run misses nothing
 
 
 def test_replay_gives_the_same_scores_from_the_cache(db):
@@ -414,3 +420,28 @@ def test_certification_compares_the_run_that_covers_the_set_not_the_latest_slice
         )
         chosen = certification_run(cur, cur.fetchone()[0], keys)
     assert chosen == full["run_id"] != slice_["run_id"]  # the slice is newer but covers 1 ruling, the run 3
+
+
+def test_replay_with_a_partial_cache_judges_what_it_has_and_counts_the_rest(db):
+    from src.layer2.run import Layer2RunFailed
+
+    url, tmp = db
+    run(url, tmp, client(tmp / "store_j", Gateway()), mode="live", limit=2)  # 8C_199 and 8C_307 only
+    out = run(url, tmp, client(tmp / "store_j", Gateway(), mode="replay"), mode="replay")
+    assert (out["status"], out["judged"], out["failed"], out["replay_misses"]) == ("partial", 2, 0, 1)
+    assert rows(url, "SELECT count(*) FROM triage.assessment WHERE run_id = %s", out["run_id"]) == [(2,)]
+    missed = [json.loads(x) for x in (Path(out["files"]) / "replay_misses.jsonl").open()]
+    assert [m["docket"] for m in missed] == ["8C_493/2025"]
+    assert rows(
+        url,
+        "SELECT count(*) FROM ops.log_event WHERE run_id = %s AND event_code = 'layer2.replay.missing'",
+        out["run_id"],
+    ) == [(1,)]
+    label = rows(
+        url,
+        """SELECT p.step::text, p.score_0_100 IS NOT NULL FROM triage.v_scope_pipeline p
+                         JOIN corpus.ruling r USING (ruling_id) WHERE r.docket = '8C_493/2025'""",
+    )
+    assert label == [("layer2_judge", True)]  # the earlier judgement keeps its place: a miss writes no row
+    with pytest.raises(Layer2RunFailed, match="none of the 3 candidates"):
+        run(url, tmp, client(tmp / "store_empty", Gateway(), mode="replay"), mode="replay")

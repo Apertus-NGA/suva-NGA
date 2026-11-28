@@ -606,3 +606,21 @@ Mutation checks (G9): a head cut off by one character, `j` removed from the Ja t
 - **Not touched:** `src/db/sql/*`, `tests/sql/*`, every layer-1 file (`src/layer1/*`, `src/courts.py`, `src/ingest/hf_base.py`, `src/ingest/gold.py`, registries, `expected/layer1/*`, `expected/ingest/*`, `tests/test_layer1_*`, `tests/test_ingest_*`), the Postgres `suva-l1-pg`, the worktree `tmp/worktrees/layer1-traceability`, layer-1 audits and handoffs.
 - **Note:** `tmp/worktrees/l2-pr42-check` was this session's throwaway merge check (§26.4); it was removed at 08:16 CET, before the message arrived. Nothing of layer 1 was in it.
 
+### 26.6 After the merge into `main` (28 Nov, 10:40–11:30 CET, branch `triage/layer2-ddl` from `14caaba`)
+
+Both layers are in `main` (PR #44 layer 1, PR #45 layer 2). The layer-1 session resolved the conflicts, passed
+`code_paths=CODE_PATHS` to `begin_run`, accepted `models`/`prompts` in `StepVersionEntry`, made `events()` idempotent by
+`(run_id, seq)` (L2-F20 fixed) and froze layer 1's copy of `courts.py` @ `4c246a8` (L2-F21 fixed). Then, on this branch:
+
+| Item | Done | Proof |
+|---|---|---|
+| Dev DB rebuilt on the merged DDL | `make db-reset && make db-deploy`, registry, base, gold, layer 1 (935 kept, recall OK), layer 2 replay 634 + 383, certification 0 difference | run ids in `ops.pipeline_run` |
+| `make run` replay with a partial cache (defect reported by the layer-1 session) | a candidate without a recorded answer is not judged in that run: no row, `replay_misses.jsonl`, metric and event, run `partial`, never a failure; no answer at all fails clearly. `SERVE=0 make run`: 383 of 935 judged, 552 without a recorded answer, `partial`, exit 0 | `src/layer2/run.py` (`REPLAY_MISS`); `tests/test_layer2_db.py::test_replay_with_a_partial_cache_judges_what_it_has_and_counts_the_rest` |
+| **DDL-1** | trigger `t31_call` on `triage.llm_judgement` (`triage.check_llm_judgement`): same run, ruling and step `layer2_judge` as the call; prompt = the call's and declared by the version; requested and served models = the call's | `tests/sql/32_layer2_test.sql` (8 refusals + 1 accepted row); red without the trigger |
+| **DDL-2** | `triage.v_scope_pipeline`: outside a release, only `succeeded`/`partial` non-eval runs, and only assessments whose upstream chain reaches the ruling's current layer-1 decision; deterministic tie-break | same test file (failed, aborted, eval ignored; partial counts; stale and rootless judgements ignored); red with the old view. Speed on the dev DB (14,144 assessments): 114 ms (old view 99 ms); two slower forms were measured and rejected: a recursive walk (22 s) and a self-join on a CTE (8 s, re-sorted once per row), replaced by three indexed hops (an upstream is always an earlier step of four) and one window pass |
+| Fixtures | the fixture run is `succeeded` (DDL-2); the layer-2 calls carry their prompt, declared by the layer-2 version (DDL-1) | `tests/sql/_fixtures.sql`; 11/11 SQL test files green |
+
+Decision to confirm (not written in `docs/DECISIONS.md`, per the layer-1 session's rule "tell the lead before taking a
+number"): **D-085 proposed**, refining D-078: in replay mode a missing recorded answer is "not judged in this run", not
+a failure. Also pending with the lead: the Q3/2025 points (audit dossier §11.2).
+
