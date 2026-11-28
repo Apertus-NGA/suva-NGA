@@ -22,7 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import config, db, export, ingest, load, reconcile as rec, verify
+from . import config, db, export, ingest, load, verify
+from . import reconcile as rec
 from .loaders import gold_summaries, labels_xlsx
 from .models import normalise_docket
 from .sources.bger_lists import BgerListAdapter

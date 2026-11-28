@@ -26,10 +26,10 @@ import ssl
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Iterator
 
 from .. import config
 from ..config import Window

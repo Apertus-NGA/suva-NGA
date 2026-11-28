@@ -2,7 +2,8 @@
 
 import pytest
 
-from suva_data import config, load, reconcile as rec, verify
+from suva_data import config, load, verify
+from suva_data import reconcile as rec
 from suva_data.models import SourceRecord
 
 pytestmark = pytest.mark.db

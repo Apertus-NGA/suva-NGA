@@ -11,10 +11,10 @@ import json
 import math
 import os
 import shutil
+from collections.abc import Iterator
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterator
 
 import pyarrow as pa
 import pyarrow.compute as pc

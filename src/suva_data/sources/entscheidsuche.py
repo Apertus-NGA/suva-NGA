@@ -26,9 +26,9 @@ import re
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Iterator
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Callable, Iterator
 
 from .. import config, textnorm
 from ..config import Window

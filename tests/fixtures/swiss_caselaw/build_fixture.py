@@ -7,7 +7,6 @@ Real rows, laid out like the Hugging Face repo: data/bger.parquet, graph/statute
 
 from pathlib import Path
 
-import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 

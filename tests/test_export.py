@@ -3,7 +3,8 @@
 import pyarrow.parquet as pq
 import pytest
 
-from suva_data import config, export, load, reconcile as rec
+from suva_data import config, export, load
+from suva_data import reconcile as rec
 from suva_data.models import SourceRecord
 
 pytestmark = pytest.mark.db

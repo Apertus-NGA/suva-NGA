@@ -509,10 +509,10 @@ def hits_with_truncated_gold(keep_chars=3000):
 
 def test_html_to_text_strips_tags_scripts_and_entities():
     raw = (
-        "<html><head><title>T</title><style>p{color:red}</style><script>var a='<p>x</p>';</script></head>"
-        "<body><p>Art.&nbsp;8 <a href='#'>ATSG</a>&amp; Co</p><div>Zeile<br>zwei</div><table><tr><td>A</td><td>B</td></tr>"
-        "</table>f&uuml;r</body></html>"
-    ).encode("utf-8")
+        b"<html><head><title>T</title><style>p{color:red}</style><script>var a='<p>x</p>';</script></head>"
+        b"<body><p>Art.&nbsp;8 <a href='#'>ATSG</a>&amp; Co</p><div>Zeile<br>zwei</div><table><tr><td>A</td><td>B</td></tr>"
+        b"</table>f&uuml;r</body></html>"
+    )
     text = es.html_to_text(raw)
     assert textnorm.normalise(text) == "T Art.\xa08 ATSG& Co Zeile zwei A B für".replace("\xa0", " ")
     assert "\xa0" in text and "color" not in text and "var a" not in text
