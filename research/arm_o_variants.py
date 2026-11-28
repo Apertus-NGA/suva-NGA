@@ -31,6 +31,7 @@ from suva_data import db  # noqa: E402
 
 OUT = ROOT / "research" / "out"
 FEATURES_DIR = ROOT / "data" / "derived" / "triage_features"
+LOGIT_PREFIXES = ("f_stmt_p_", "f_topic_shared_", "f_cons_p_", "f_cons_own_", "f_cons_verified_")
 READINGS = ("verdict", "yes_strict", "scale_generic", "scale_area", "scale_headnote", "scale_tail")
 FACTS = sc.FEATURES[:8]
 RUBRIC = [
@@ -114,7 +115,7 @@ def build_table(kept: list[dict], extra: pd.DataFrame | None) -> tuple[dict[str,
         added += [f"{c}_{size}" for c in cols]
     for c in added:  # neutral value for rulings no reading covers: the mean of the rulings read
         df[c] = df[c].fillna(df[c].mean())
-    for c in [c for c in added if c.startswith(("f_stmt_p_", "f_topic_shared_"))]:  # extreme probabilities
+    for c in [c for c in added if c.startswith(LOGIT_PREFIXES)]:  # extreme probabilities
         df[f"{c}_logit"] = logit(df[c])
         added.append(f"{c}_logit")
     # Consensus+ : the six readings and the new ones, each standardised over the core rulings and averaged with
@@ -178,6 +179,13 @@ def main(argv: list[str] | None = None) -> int:
             sets[f"facts8+consensus+stmt_p_logit[{size}]"] = [*base_cols, f"f_stmt_p_{size}_logit"]
             sets[f"facts8+consensus+stmt_p_logit+shared_logit_iv[{size}]"] = [
                 *base_cols, f"f_stmt_p_{size}_logit", f"f_topic_shared_{size}_logit_iv"]
+    for size in ("small", "large"):
+        for c in (f"f_cons_p_{size}_logit", f"f_cons_verified_{size}_logit", f"f_cons_own_{size}_logit"):
+            if c in added:
+                sets[f"facts8+consensus+{c}"] = [*base_cols, c]
+        if f"f_cons_own_{size}_logit" in added and f"f_stmt_p_{size}_logit" in added:
+            sets[f"facts8+consensus+stmt_p_logit+cons_own_logit[{size}]"] = [
+                *base_cols, f"f_stmt_p_{size}_logit", f"f_cons_own_{size}_logit"]
     variants = []
     for name, cols in sets.items():
         variants.append(vr.Variant(f"LR {name}", cols, vr.logistic))
