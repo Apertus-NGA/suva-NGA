@@ -1,7 +1,7 @@
 # Apertus as a feature extractor, then logistic regression or XGBoost
 
 > **Status: EXPERIMENT, 28 Nov 2026.** Branch `triage/apertus-features`. The pipeline (`src/triage/pipeline.py`,
-> D-073) is unchanged. Numbers: `results/triage_features.json` (aggregates only, D-031), written by
+> D-103, numbered D-073 before D-099) is unchanged. Numbers: `results/triage_features.json` (aggregates only, D-031), written by
 > `research/arm_o_variants.py`. Per-ruling answers: `data/derived/triage_features/` (git-ignored).
 
 ## 1. Question and answer
