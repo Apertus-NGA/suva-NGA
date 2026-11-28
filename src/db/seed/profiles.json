@@ -240,6 +240,57 @@
           "decision": "D-083"
         }
       ]
+    },
+    {
+      "code": "summaries_8b",
+      "name": "Summaries on the 8B judge (layer 3 while G-14 is open)",
+      "is_default": false,
+      "description": "The default profile's steps with the 8B judge (layer2_judge V1.0.0, D-076) as layer 2, plus layer 3. The default profile pins the scorer as layer2_judge V2.0.0 (D-094), which src/layer2 cannot run yet (docs/LAYER3.md G-14): make layer2 PROFILE=summaries_8b, then make layer3 PROFILE=summaries_8b.",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "changelog": "ingest V1.0.0, layer1_filter V1.1.0, layer2_judge V1.0.0 (the 8B judge), segment V0.1.0, summarise V1.0.0, verify V1.0.0 (D-095).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ],
+            "layer2_judge": [
+              1,
+              0,
+              0
+            ],
+            "segment": [
+              0,
+              1,
+              0
+            ],
+            "summarise": [
+              1,
+              0,
+              0
+            ],
+            "verify": [
+              1,
+              0,
+              0
+            ]
+          },
+          "decision": "D-095"
+        }
+      ]
     }
   ]
 }

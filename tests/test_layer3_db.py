@@ -148,6 +148,9 @@ class BrokenEngine:
 
 
 DEPLOYED: dict[str, bool] = {}
+# The default profile pins the scorer as layer2_judge V2.0.0, which src/layer2 cannot run yet (docs/LAYER3.md G-14):
+# layer 2 and layer 3 run on summaries_8b (src/db/seed/profiles.json).
+PROFILE = "summaries_8b"
 
 
 def _version_trigger_runs_as_owner(url) -> bool:
@@ -225,7 +228,7 @@ def db(tmp_path_factory):
         with pipeline(url) as conn:
             loaded = load_registries(conn)
             assert any("summarise.json: V1.0.0" in line for line in loaded) and "suva_house V1.0.0" in loaded
-            assert "default V0.4.0" in loaded
+            assert "default V0.5.0" in loaded and "summaries_8b V0.1.0" in loaded
             with conn.cursor() as cur:
                 cur.execute("SELECT config FROM ops.component_version WHERE step = 'ingest'")
                 cfg = IngestConfig.model_validate(cur.fetchone()[0])
@@ -236,7 +239,12 @@ def db(tmp_path_factory):
             client = LLMClient(
                 llm, store_dir=tmp / "store", transport=httpx.MockTransport(Gateway()), sleep=lambda s: 0
             )
-            assert run_layer2(conn, mode="live", runs_dir=tmp / "runs", actor="test", client=client)["judged"] == 3
+            assert (
+                run_layer2(conn, mode="live", profile=PROFILE, runs_dir=tmp / "runs", actor="test", client=client)[
+                    "judged"
+                ]
+                == 3
+            )
         yield url, tmp
     finally:
         with psycopg.connect(base, autocommit=True) as admin:
@@ -248,7 +256,7 @@ def run3(url, tmp, engine, **kw):
 
     with pipeline(url) as conn:
         return run_layer3(conn, actor="test", engine=engine, few_shot=(), store=tmp / "store", runs_dir=tmp / "runs",
-                          **kw)  # fmt: skip
+                          profile=PROFILE, **kw)  # fmt: skip
 
 
 def test_a_run_stores_the_pair_with_claims_citations_checks_calls_and_closes_the_request(db):
@@ -498,11 +506,11 @@ def test_a_current_expert_edit_stays_current_and_few_shot_dockets_are_never_summ
     engine = FakeEngine()
     with pipeline(url) as conn:
         res = run_layer3(conn, actor="test", engine=engine, few_shot=("8C_493/2025",), store=tmp / "store",
-                         runs_dir=tmp / "runs", limit=1, requests=False)  # fmt: skip
+                         profile=PROFILE, runs_dir=tmp / "runs", limit=1, requests=False)  # fmt: skip
     assert engine.seen == ["8C_199/2026"] and res["rulings_in"] == 1
     with pipeline(url) as conn, pytest.raises(LookupError, match="few-shot"):
         run_layer3(conn, actor="test", engine=engine, few_shot=("8C_493/2025",), dockets=["8C_493/2025"],
-                   store=tmp / "store", runs_dir=tmp / "runs")  # fmt: skip
+                   profile=PROFILE, store=tmp / "store", runs_dir=tmp / "runs")  # fmt: skip
 
 
 def test_the_deployed_ddl_lets_the_pipeline_group_insert_a_summary_version(db):
@@ -520,7 +528,7 @@ def test_the_real_engine_is_wired_through_the_writer_and_a_replay_miss_is_counte
     url, tmp = db
     with pipeline(url) as conn, pytest.raises(Layer3RunFailed) as failed:
         run_layer3(conn, mode="replay", actor="test", store=tmp / "empty_store", runs_dir=tmp / "runs", limit=2,
-                   requests=False)  # fmt: skip
+                   profile=PROFILE, requests=False)  # fmt: skip
     assert failed.value.replay_only
     summaries = Path(str(failed.value).split("files in ")[1].split(";")[0]) / "summaries.jsonl"
     lines = [json.loads(line) for line in summaries.read_text().splitlines()]
