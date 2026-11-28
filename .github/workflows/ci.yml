@@ -58,3 +58,5 @@ jobs:
         run: make db-reset && make db-deploy
       - name: SQL tests
         run: make db-test
+      - name: Python tests against PostgreSQL (layer 1 end to end, throwaway database)
+        run: uv run --frozen pytest -m db

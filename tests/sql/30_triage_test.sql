@@ -19,7 +19,7 @@ CREATE FUNCTION pg_temp.l1(p_scope text, p_outcome text, p_reason text, p_rep in
                           pg_temp.span('layer1_filter', '8C_307/2025'), repeat('0', 64), %L, %L, %L, 'REPLAY', now())$s$,
                 p_rep, p_scope, p_outcome, p_reason) $f$;
 SELECT pg_temp.expect_error(pg_temp.l1('out_of_scope', 'ok', NULL, 5), 'assessment_reason_chk');
-SELECT pg_temp.expect_error(pg_temp.l1('out_of_scope', 'failed', 'L1_DROP_NO_RULE', 5), 'assessment_failure_chk');
+SELECT pg_temp.expect_error(pg_temp.l1('out_of_scope', 'failed', 'L1_DROP_RUBRIC_OUT', 5), 'assessment_failure_chk');
 SELECT pg_temp.expect_error(pg_temp.l1('in_scope', 'ok', NULL, 5), 'assessment_layer1_chk');
 SELECT pg_temp.expect_error($q$
   INSERT INTO triage.assessment (run_id, ruling_id, step, repetition_idx, component_version_id, span_id, input_fingerprint, in_suva_scope, outcome, score_0_100, mode, started_at)
@@ -74,7 +74,7 @@ SELECT pg_temp.expect_error($q$
   VALUES ('00000000-0000-4000-8000-000000000101', 2, pg_temp.rule('V1_IDS_IN_SET'), 'V1_IDS_IN_SET', 'flag', 'docket')$q$, 'not a rule');
 SELECT pg_temp.expect_error($q$
   INSERT INTO triage.assessment_reason (assessment_id, ordinal, rule_id, reason_code, effect, evidence_field)
-  VALUES ('00000000-0000-4000-8000-000000000101', 2, pg_temp.rule('L1_DROP_NO_RULE'), 'L1_KEEP_COURT_8C_9C', 'drop', 'docket')$q$, 'rule''s reason code');
+  VALUES ('00000000-0000-4000-8000-000000000101', 2, pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'L1_KEEP_RUBRIC', 'drop', 'docket')$q$, 'rule''s reason code');
 SELECT pg_temp.expect_error($q$
   INSERT INTO triage.llm_judgement (assessment_id, llm_call_id, prompt_version_id, requested_model, question_language, yes_no_in_top, text_chars_total, text_chars_sent, truncation)
   VALUES ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000901',

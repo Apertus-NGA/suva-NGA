@@ -1,8 +1,13 @@
 # DB_DDL_PLANNING: the data layer (PostgreSQL) for rulings, scope labels, versions, logs and summaries
 
-> **Status: v0.4 — Phase 1 (doctrine freeze) and Phase 2 (SQL/schema) delivered on branch `platform/db-ddl`, 28 Nov 2026, 02:45 CET.** Decisions recorded as D-061 to D-071 in `docs/DECISIONS.md`. The DDL is in `src/db/sql/` (15 files, 56 tables), its tests in `tests/sql/` (8 files, green on PostgreSQL 17) and `tests/test_db_deploy.py`; `make db-reset`, `make db-deploy`, `make db-test`; a CI `db` job. Next: Phase 3 (docs sync) and Phase 5 (loaders, step writers). Owner: platform (the lead, while D-024 is open).
+> **Status: v0.4 — Phase 1 (doctrine freeze) and Phase 2 (SQL/schema) delivered on branch `platform/db-ddl`, 28 Nov 2026, 02:45 CET.** Decisions recorded as D-061 to D-071 in `docs/DECISIONS.md`. The DDL is in `src/db/sql/` (15 files, 57 tables), its tests in `tests/sql/` (8 files, green on PostgreSQL 17) and `tests/test_db_deploy.py`; `make db-reset`, `make db-deploy`, `make db-test`; a CI `db` job. Next: Phase 3 (docs sync) and Phase 5 (loaders, step writers). Owner: platform (the lead, while D-024 is open).
 > Evidence: the read-only audit of 27 Nov (`tmp/audits/audit-data-layer-2026-11-27.md`, git-ignored) and DuckDB queries on the pinned HF file (`bger.parquet`, commit `35b17aa9c3fad71011b72f78f6ab79650ec0cf96`, SHA-256 `d2b2df1d…`). Numbers marked *estimate* are not measured.
 > Reading order: §0, §7 (versions and registry), §9 (scope label), §11 (logs), §12 (expert reviews), §13 (summaries), §17 (open questions).
+
+**Changes in v0.5 (28 Nov, layer 1 on the DB, branch `triage/layer1-enterprise`):**
+- One table added: `corpus.subject_observation` (a ruling's rubric per source, D-072), so 57 tables; enum `subject_source`.
+- Layer-1 reason codes are the `L1_*` codes of `docs/LAYER1.md` §6.2 (D-073), replacing the filter-E codes of v0.4.
+- §19.2: DB-11 (HF bger part), DB-13 and the layer-1 part of DB-14 done; DB-10 in part (registry loader and the files-then-DB writer, without the protocols and the tee).
 
 **Changes in v0.4:**
 - Phase 2 delivered (§19.2: DB-01 to DB-09 done). One table added while writing the SQL: `ops.user_request` (the "add another judgement" and "summarise this ruling" requests of the UI, §5), so 56 tables. Audit moved to its own file, `13_audit.sql`.
@@ -38,7 +43,7 @@
 - **Summaries:** one (ruling, preset) pair has immutable versions; **each version is always a German + French pair**; each text is split into claims; claims cite considerations through a database link (G1) and carry the verifier's checks.
 - **Presets live in the DB** and can be selected at run time. Perspective goes from 0 (insured person) to 10 (insurer), using written anchors at 0, 3, 5, 7 and 10. The perspective changes emphasis, never facts. `suva_house` is the mandatory preset for every in-scope ruling.
 - **Roles follow least privilege:** an owner role that never logs in, three groups, and experts writing only through narrow functions. A **Postgres service in CI from now on** runs the SQL tests.
-- **Scope:** 56 tables in P0 (built: `src/db/sql/`), many of them small lookup or join tables. P1 adds parties, references, splits and search.
+- **Scope:** 57 tables in P0 (built: `src/db/sql/`), many of them small lookup or join tables. P1 adds parties, references, splits and search.
 
 ---
 
@@ -251,7 +256,7 @@ audit.change_log ← triggers on every mutable row
 | `summ` (10) | perspective_anchor, preset, preset_version, preset_version_prompt, summary, summary_version, summary_text, summary_claim, claim_citation, verification_check | |
 | `audit` (1) | change_log | |
 
-P0 = 56 tables. Expected volumes:
+P0 = 57 tables. Expected volumes:
 - about 6,055 rulings
 - considerations: 150,000 to 250,000 rows per segmentation version (*estimate*)
 - assessments: one per ruling per step per run
@@ -320,7 +325,7 @@ Columns:
 | `config_schema_id` | FK `ops.json_schema` |
 | `config` | jsonb, CHECK it is an object |
 | `config_sha256` | |
-| `code_path`, `code_sha256` | e.g. the file of filter E |
+| `code_path`, `code_sha256` | e.g. `src/layer1/engine.py` and `src/layer1/models.py` |
 | `git_commit` | |
 | `status` | `draft` \| `active` \| `deprecated` \| `retired` |
 | `bump_kind`, `previous_version_id`, `changelog` | |
@@ -376,10 +381,10 @@ The tables that store results point to the **exact rule version** that fired: `t
 
 | Step | Configuration template (keys) | Rules (initial set) |
 |---|---|---|
-| `ingest` | `sources.hf_bger.revision`, `windows[]` (populations to build), `twin_rule: same_date`, `excluded_fields: [judges, clerks, legal_area, outcome, marked_for_publication]` | `ING_TWIN_SAME_DATE` |
+| `ingest` | `sources.hf_bger.revision`, `windows[]` (populations to build), `twin_rule: same_date`, `columns[]` (read list; `judges`, `clerks`, `outcome`, `marked_for_publication` never in it; `legal_area` read as a rubric observation, D-072) | `ING_TWIN_SAME_DATE` |
 | `segment` | `method: hf_erwaegungen \| own_splitter`, `hf_file.revision`, `min_citable_depth: 1`, `locate_offsets: true`, `expected_count_source: hf_structure`, `acceptance: {count_match_min, coverage_min}` | `SEG_COUNT_MATCH`, `SEG_COVERAGE`, `SEG_OFFSET_FOUND` |
 | `parse` | `dispositive_markers{de,fr,it}`, `bench_pattern`, `outcome_patterns{…}`, `parties_markers{…}` | `PAR_OUTCOME_*` |
-| `layer1_filter` | `keep_untitled: true`, `area_sources: [gegenstand, legal_area]`, `text_mentions: [Suva, CNA, INSAI, LAA, …]`, `default: drop` | from filter E: `L1_KEEP_COURT_8C_9C`, `L1_KEEP_SOCIAL_AREA`, `L1_KEEP_MATTER_UV_IV_MV`, `L1_KEEP_TEXT_MENTION`, `L1_KEEP_TITLE_TERM`, `L1_KEEP_UNTITLED`, default `L1_DROP_NO_RULE` |
+| `layer1_filter` | `courts{digit: {letters, rubrics}}`, `rubric_sources: [neuheiten, hf_legal_area, gegenstand_head]`, `normalise{casefold, nfkc, apostrophes, nbsp}`, `accident_terms`, `contract_terms`, `closed_rubrics` (model: `src/layer1/models.py`) | `L1_KEEP_RUBRIC`, `L1_KEEP_RUBRIC_MISSING`, `L1_KEEP_ACCIDENT_TERM`, `L1_KEEP_CONTRACT_TERM`, `L1_FLAG_CLOSED_RUBRIC`, `L1_DROP_WRONG_COURT`, `L1_DROP_WRONG_LETTER`, `L1_DROP_RUBRIC_OUT`, `L1_SIGNAL_RUBRIC_FROM_TITLE` (D-073; `docs/LAYER1.md` §6.2) |
 | `layer2_judge` | `model_role: judge`, `question_prompt` (ref), `answer_tokens: [Ja, Nein]`, `top_logprobs: 20`, `text_cap: {head: 12000, tail: 2000}`, `score_mapping: p_yes_x100`, `temperature: 0`, `max_tokens: 1` | `L2_FAIL_NO_YESNO_TOKEN` |
 | `justification` | `model_role`, `json_mode_cascade`, `max_tokens: 400`, `key_statement_max: 300`, `repair_attempts: 1` | `JUS_PARTY_SUVA_ACTING_ONLY_IF_PARTY`, `JUS_ACTING_PARTY_IN_BLOCK`, `JUS_EVIDENCE_IN_SET` |
 | `ranking` | `threshold_policy: f2_cross_quarter_frozen`, `threshold_ref`, `tie_break`, `populations: [2026Q2_union, 2026Q2_publication]`, `top_k: [10, 30]` | `RANK_BELOW_THRESHOLD` |
@@ -411,7 +416,8 @@ Built from the pinned HF files only (bger.ch Neuheiten pages add observations la
 Loader rules:
 - **Twins:** a `-DYYYYMMDD` row is dropped only when its base row has the same date (18 rows); 6B_920/2025 and 7B_1356/2025 are real second decisions. Every source row is kept in `corpus.ruling_source_ref`, with `is_twin`.
 - **Taken from HF:** `decision_id`, `docket_number`, `decision_date`, `publication_date`, `scraped_at`, `language`, `title` (empty for 47 of the 2,096), `full_text` (present for 2,096 of 2,096), `appealed_court_raw`, `cited_decisions`, `content_hash`, `source_url`.
-- **Never taken:** `judges`, `clerks` (D-038), `legal_area` (empty for 1,683 of 2,096), `outcome`, `marked_for_publication` (D-011).
+- **Never taken:** `judges`, `clerks` (D-038), `outcome`, `marked_for_publication` (D-011).
+- **Taken as a rubric observation:** `legal_area` (empty for 1,683 of 2,096), into `corpus.subject_observation` only when filled (D-072).
 - Counts go to `results/ingestion.json` and `ops.run_metric`; a mismatch fails the run (`docs/DATA.md` §10).
 
 ### 8.2 What `erwaegungen_paragraphs` is
@@ -457,6 +463,7 @@ A splitter version becomes **primary** for the corpus only when its acceptance c
 | `corpus.ruling_source_ref` | (`source`, `external_id`) PK, `ruling_id`, `snapshot_id`, `is_twin` |
 | `corpus.publication_observation` | `ruling_id`, `source` (`neuheiten` \| `hf_poller` \| `hf_first_seen`), `quality` (`exact` \| `approx_first_seen`), `observed_date`, `star`, `sachgebiet`, `snapshot_id`; UNIQUE (`ruling_id`, `source`); CHECK `hf_first_seen` ⇔ `approx_first_seen` |
 | `corpus.ruling_text` | `text_id` (`uuid5(ruling, source, sha)`), `ruling_id`, `source` (`hf` \| `bger` \| `entscheidsuche`), `content` (CHECK non-blank), `content_sha256`, `char_length`, `clean_length`, `is_primary` (partial UNIQUE), `snapshot_id` |
+| `corpus.subject_observation` | `observation_id`, `ruling_id`, `source` (`neuheiten` \| `hf_legal_area`), `rubric` (CHECK non-blank), `star`, `snapshot_id`; UNIQUE (`ruling_id`, `source`); written only when the source has a value (D-072) |
 | `corpus.segmentation` | §8.3 |
 | `corpus.consideration` | `consideration_id` (`uuid5(segmentation, ordinal)`), `segmentation_id`, `ordinal` (UNIQUE per segmentation; generated `cid = 'c' || ordinal`), `e_number`, `depth`, `parent_consideration_id`, generated `is_citable` (`depth >= 1`), `char_start` / `char_end`, `content`, `content_sha256` |
 | `corpus.ruling_parse` | one row per (text, parser version): `parties_block`, `bench_size`, `operative_part`, `outcome`, `outcome_rule_id` (FK `ops.rule`), section offsets, `component_version_id`, `span_id` |
@@ -482,7 +489,7 @@ No assessment means not assessed yet: shown as `not_assessed` in views, never st
 ### 9.2 State machine (one ruling, one run, one profile version)
 
 ```text
- not_assessed ── layer1_filter ──┬──▶ out_of_scope   (reason e.g. L1_DROP_NO_RULE; score_source 'net')
+ not_assessed ── layer1_filter ──┬──▶ out_of_scope   (reason e.g. L1_DROP_RUBRIC_OUT; score_source 'net')
                                  └──▶ potentially ── layer2_judge ──▶ potentially, score_0_100 = 100 × P(Ja)/(P(Ja)+P(Nein))
                                                         │ failed ──▶ potentially, score_source 'failed', work item failed
                                                         ▼
@@ -995,11 +1002,11 @@ None in this file. Every new question goes to `docs/DECISIONS.md` §2 as `OPEN` 
 | DB-07 ✅ | `summ` tables, pair trigger, `create_expert_version`, gap view, release gate | DB-05 | gate refuses a release with a gap; a version without its pair fails at commit |
 | DB-08 ✅ | Roles and grants (`90_roles.sql`) | DB-01..07 | API login cannot UPDATE an assessment (test) |
 | DB-09 | CI `db` job | DB-01..08 | green on a PR (job written 28 Nov; first run on the PR) |
-| DB-10 | `Registry`, `Store`, `Telemetry` protocols; file, Postgres and tee implementations; registry loader for the seed files of §7.7 (models from `MODELS.md`) | DB-09 | unit tests with a declared fake |
-| DB-11 | Base dataset loader (HF bger, structure) | DB-10 | counts of §8.1 reproduced |
+| DB-10 (in part) | `Registry`, `Store`, `Telemetry` protocols; file, Postgres and tee implementations; registry loader for the seed files of §7.7 (models from `MODELS.md`) | DB-09 | unit tests with a declared fake |
+| DB-11 ✅ (HF bger; structure with DB-12) | Base dataset loader (HF bger, structure) | DB-10 | counts of §8.1 reproduced |
 | DB-12 | Splitter track: download the 4.99 GB file, segmentation V0.x on samples, acceptance criteria, promotion to V1.0.0 | DB-11 | criteria of OQ-20 met, written before measuring |
-| DB-13 | Gold loader (`judgements/`, D-051 fields dropped) | DB-10 | 59 + 1 rows, 55 summaries, T31 green |
-| DB-14 | Step writers: layer 1, layer 2, justification, ranking, export | DB-11, DB-12 | every assessment has a span and its pinned version |
+| DB-13 ✅ | Gold loader (`judgements/`, D-051 fields dropped) | DB-10 | 59 + 1 rows, 55 summaries, T31 green |
+| DB-14 (layer 1 ✅) | Step writers: layer 1, layer 2, justification, ranking, export | DB-11, DB-12 | every assessment has a span and its pinned version |
 | DB-15 | Summary writer + verifier writer | DB-14 | gap view empty for the release |
 | DB-16 | API reads and writes on views and functions | DB-07, DB-08 | 5 must-haves + reviews + timeline read the DB |
 | DB-17 | Authored export and reload | DB-16 | a rebuild keeps reviews, edits and presets |

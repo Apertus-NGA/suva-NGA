@@ -41,7 +41,7 @@ SELECT pg_temp.expect_error($q$UPDATE summ.summary_text SET body = 'edited in pl
 -- verifier checks are verify rules of kind check
 SELECT pg_temp.expect_error($q$
   INSERT INTO summ.verification_check (target_kind, claim_id, rule_id, status, run_id)
-  VALUES ('claim', '00000000-0000-4000-8000-000000000721', pg_temp.rule('L1_DROP_NO_RULE'), 'pass', '00000000-0000-4000-8000-000000000001')$q$, 'verify check rule');
+  VALUES ('claim', '00000000-0000-4000-8000-000000000721', pg_temp.rule('L1_DROP_RUBRIC_OUT'), 'pass', '00000000-0000-4000-8000-000000000001')$q$, 'verify check rule');
 INSERT INTO summ.verification_check (target_kind, claim_id, rule_id, status, run_id)
 VALUES ('claim', '00000000-0000-4000-8000-000000000721', pg_temp.rule('V1_IDS_IN_SET'), 'pass', '00000000-0000-4000-8000-000000000001');
 

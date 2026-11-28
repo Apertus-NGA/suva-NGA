@@ -1,0 +1,90 @@
+{
+  "profiles": [
+    {
+      "code": "default",
+      "name": "Default pipeline",
+      "is_default": true,
+      "description": "The pipeline whose label is shown and used (D-063). Draft (V0.x) until every step has a V1+ version.",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "changelog": "Draft: ingest V1.0.0 and layer1_filter V1.0.0 (parity with src/courts.py at 4c246a8).",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "version": [
+            0,
+            2,
+            0
+          ],
+          "bump_kind": "minor",
+          "previous": [
+            0,
+            1,
+            0
+          ],
+          "changelog": "layer1_filter V1.1.0 adopted (D-073): measured on the HF base it keeps every ruling V1.0.0 keeps plus 4, recall 82/82 unchanged.",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              1,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "code": "layer1_reference",
+      "name": "Layer-1 reference (src/courts.py parity)",
+      "is_default": false,
+      "description": "Pins layer1_filter V1.0.0, the version that reproduces src/courts.py at 4c246a8: every validation run measures parity against it.",
+      "versions": [
+        {
+          "version": [
+            0,
+            1,
+            0
+          ],
+          "bump_kind": "initial",
+          "previous": null,
+          "changelog": "layer1_filter V1.0.0 on ingest V1.0.0.",
+          "steps": {
+            "ingest": [
+              1,
+              0,
+              0
+            ],
+            "layer1_filter": [
+              1,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
