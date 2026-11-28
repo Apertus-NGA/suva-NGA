@@ -29,7 +29,7 @@ from src.summarize.refine import checks, entail, evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj
 from src.summarize.refine.steps.common import CALQUES, NAME, new_terms, polish
 
-VERSION = "write@3"
+VERSION = "write@5"
 TRIM_VERSION = "trim@1"
 TRIM_SHARE = 0.9  # of the upper end of Suva's band (checks.LENGTH_BAND)
 _KEEP_ORDER = {"fact": 0, "application": 1, "condition": 2, "rule": 3, "holding": 4}
@@ -48,8 +48,8 @@ ADAPT = """Adapt this sentence of the ruling for the {lang} digest.
 - Keep its content exactly: the same rule, conditions, facts and strength; every article of law as it is.
 - Take out references to other rulings and to literature (BGE/ATF, Urteil/arrêt, E./consid., authors, RS/SR).
 - Replace an anonymised name (A.________) by the role of that person in this case ({roles}).
-- A pronoun or "this" that points to something outside the sentence: write what it refers to (the sentence
-  before is given only for that).
+- A pronoun or "this" that points to something outside the sentence: write what it refers to (that is what
+  <before> is for). Write only the one sentence in <sentence>.
 - If the sentence needs nothing of this, give it back unchanged.
 - a_sentence: the adapted sentence."""
 TRANSLATE = """Translate this sentence of a {source_lang} ruling into Swiss legal {lang} for the digest.
@@ -60,8 +60,8 @@ TRANSLATE = """Translate this sentence of a {source_lang} ruling into Swiss lega
 - Keep its content exactly: the same rule, conditions, facts and strength; every article of law and number.
 - Leave out references to other rulings and to literature (BGE/ATF, Urteil/arrêt, E./consid., authors, RS/SR).
 - Replace an anonymised name (A.________) by the role of that person in this case ({roles}).
-- A pronoun or "this" that points to something outside the sentence: write what it refers to (the sentence
-  before is given only for that).
+- A pronoun or "this" that points to something outside the sentence: write what it refers to (that is what
+  <before> is for). Write only the one sentence in <sentence>.
 {terms}- a_sentence: the sentence in {lang}."""
 FLOW = """These sentences of a {lang} case-law digest come from different places of one ruling. Make them read as one
 text, and change nothing else:
@@ -224,10 +224,12 @@ def write_sentence(candidate: cand.Candidate, role: str, language: str, ruling: 
         if not problems:
             written.text, written.status = new, "written"
             return written
-        written.problems = problems
+        written.problems += [f"attempt {attempt + 1}: {p}" for p in problems]
+        # Run x7: a retry asked only to "fix that" came back longer, often with the sentence before it added.
         messages = [*messages, {"role": "assistant", "content": answer["a_sentence"][:2000]},
                     {"role": "user", "content": "Not kept: " + "; ".join(problems) + ". Write it again, fixing "
-                     "exactly that, and keep the content of the ruling's sentence."}]  # fmt: skip
+                     "exactly that: one sentence, about as long as the ruling's sentence, with its content and "
+                     "nothing more."}]  # fmt: skip
     if same:
         copy = cleaned(candidate.text, language, ruling["text"])
         if not _PLACEHOLDER.search(copy):
@@ -293,6 +295,19 @@ def with_admissibility(text: str, language: str, source: str) -> str:
     if plain and first and _SO_FAR.search(first.group(1)) and plain in text and qualified not in text:
         return text.replace(plain, qualified, 1)
     return text
+
+
+# A pronoun or demonstrative among the first three words: the sentence may need the one before it (run x6 gave
+# the sentence before to every call, and the model wrote both into one: 9 refused for length or a placeholder).
+_REFERS_BACK = re.compile(
+    r"^(?:\S+\s+){0,2}(?:er|sie|ihm|ihr|ihn|ihnen|dies\w*|derartig\w*|solch\w*|il|elle|ils|elles|lui|leur|ce|cet|cette"
+    r"|ces|celui-ci|celle-ci|ceux-ci|cela|egli|essa|esso|essi|questo|questa|questi|tale|tali|ciò)\b",
+    re.IGNORECASE,
+)
+
+
+def needs_context(sentence: str) -> bool:
+    return bool(_REFERS_BACK.search(sentence))
 
 
 def _previous(text: str) -> dict[tuple[str, str], str]:
