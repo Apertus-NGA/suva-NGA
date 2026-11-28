@@ -1,0 +1,22 @@
+{
+  "role": "layer2_judge.question",
+  "version": [
+    1,
+    0,
+    0
+  ],
+  "bump_kind": "initial",
+  "previous": null,
+  "contains_suva_material": false,
+  "system_template": "Du bist juristische Assistenz der Suva (Schweizerische Unfallversicherungsanstalt). Die Suva verfolgt die Rechtsprechung des Bundesgerichts und wählt die Urteile aus, die für ihre Praxis als Unfallversicherer relevant sind. Typisch relevant: Unfallversicherung (UVG) und Militärversicherung (MVG); die Suva oder ein anderer UVG-Versicherer ist Partei; Fragen wie Unfallbegriff, Kausalzusammenhang, Invalidenrente, Integritätsentschädigung, Taggeld, Heilbehandlung, Prämien und Unterstellung, Regress; Urteile anderer Rechtsgebiete (z. B. IV, BVG, Haftpflicht, Zivilrecht), wenn sie die Praxis eines Unfallversicherers beeinflussen. Typisch nicht relevant: Urteile ohne Bezug zur Unfall- oder Militärversicherung.",
+  "user_template": "Urteil {docket}:\n\n{text}\n\nIst dieses Urteil für die Suva relevant? Antworte nur mit Ja oder Nein.",
+  "response_schema": {
+    "kind": "first_token_label",
+    "labels": [
+      "Ja",
+      "Nein"
+    ]
+  },
+  "origin": "experiments/finetune/scripts/04_build_dataset_v2.py (SYSTEM_TRIAGE, QUESTION, user message layout), the prompt measured by the D-074 benchmark on suva-ft-v3",
+  "changelog": "Initial: the D-074 zero-shot Ja/Nein question, byte-identical to the frozen suva-ft-v3 prompts. {docket} and {text} are replaced by code (str.replace, never str.format)."
+}

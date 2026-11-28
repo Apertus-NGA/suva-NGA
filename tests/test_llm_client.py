@@ -230,3 +230,39 @@ def test_first_token_label_call_accepts_the_designed_length_cut(tmp_path):
     assert r.logprobs == lp and gw.requests[0]["top_logprobs"] == 20
     with pytest.raises(InputRejected):  # only for real label calls
         make(tmp_path, FakeGateway()).chat(MSGS, max_tokens=50, prompt_version="p0", first_token_only=True)
+
+
+# --- trace and observer (docs/LAYER2_IMPLEMENTATION_PLANNING.md L2-D09) --------------------------------------
+
+
+def test_observer_sees_every_attempt_with_its_trace_and_the_key_ignores_the_trace(tmp_path):
+    seen = []
+    gw = FakeGateway((429, {"error": "slow down"}, {"retry-after": "1"}), ok())
+    client = make(tmp_path, gw)
+    client.observer = seen.append
+    trace = {"run_id": "r1", "ruling_id": "x1", "step": "layer2_judge", "repetition": 0}
+    result = client.chat(MSGS, max_tokens=1, prompt_version="p0", trace=trace)
+    assert [r["error"] for r in seen] == ["rate", None] and all(r["trace"] == trace for r in seen)
+    assert all(r["endpoint"] == "/chat/completions" and r["cache_hit"] is False for r in seen)
+    assert (
+        seen[-1]["cache_key"]
+        == result.cache_key
+        == make(tmp_path, FakeGateway()).chat(MSGS, max_tokens=1, prompt_version="p0").cache_key
+    )  # same key without a trace: answered from the cache
+
+
+def test_a_cache_hit_is_logged_and_observed_as_replay(tmp_path):
+    make(tmp_path, FakeGateway(ok(content="A"))).chat(MSGS, max_tokens=1, prompt_version="p0")
+    seen = []
+    client = make(tmp_path, FakeGateway(), env={}, mode="replay")
+    client.observer = seen.append
+    client.chat(MSGS, max_tokens=1, prompt_version="p0", trace={"ruling_id": "x2"})
+    assert len(seen) == 1 and seen[0]["cache_hit"] is True and seen[0]["mode"] == "REPLAY"
+    assert seen[0]["content"] == "A" and seen[0]["attempt"] == 1 and seen[0]["trace"] == {"ruling_id": "x2"}
+    assert logged(tmp_path)[-1]["cache_hit"] is True
+    assert "Authorization" not in json.dumps(seen[0]) and "api_key" not in json.dumps(seen[0])
+
+
+def test_a_base_url_without_scheme_fails_at_startup():
+    with pytest.raises(ConfigError, match="https://"):
+        LLMConfig.from_env("live", {**GOOD_ENV, "LLM_BASE_URL": "REMPLACE_PAR_TON_ENDPOINT"})

@@ -45,8 +45,12 @@ def begin_run(
     code_paths: Sequence[str],
     actor: str,
     mode: str = "LIVE",
+    resolved_models: dict | None = None,
+    model_override: bool = False,
 ) -> Run:
-    """Open a run and its root span. `code_paths`: the source files of the step, recorded with their hash (F-09)."""
+    """Open a run and its root span. `code_paths`: the source files of the step, recorded with their hash (F-09).
+    `resolved_models`: the models actually used per role; `model_override`: they differ from the declared ones
+    (the judges' LLM_NAME, D-064). Both are fixed at insert: the run row only lets its status change."""
     if not code_paths:
         raise ValueError(f"begin_run({operation}): name the step's code paths (params.code_sha256, F-09)")
     commit, dirty = git_state()
@@ -55,10 +59,20 @@ def begin_run(
     with conn.cursor() as cur:
         cur.execute(
             """INSERT INTO ops.pipeline_run (profile_version_id, kind, mode, git_commit, git_dirty, params,
-               params_sha256,
-                                             triggered_by, actor)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, 'cli', %s) RETURNING run_id::text""",
-            (profile_version_id, kind, mode, commit, dirty, params_json, sha256_text(params_json), actor),
+               params_sha256, resolved_models, model_override, triggered_by, actor)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'cli', %s) RETURNING run_id::text""",
+            (
+                profile_version_id,
+                kind,
+                mode,
+                commit,
+                dirty,
+                params_json,
+                sha256_text(params_json),
+                json.dumps(resolved_models or {}, sort_keys=True),
+                model_override,
+                actor,
+            ),
         )
         run_id = cur.fetchone()[0]
         cur.execute("SELECT set_config('app.run_id', %s, false)", (run_id,))
@@ -72,16 +86,17 @@ def begin_run(
     return Run(run_id, span_id, profile_version_id, component_version_id)
 
 
-def finish_run(cur: psycopg.Cursor, run: Run) -> None:
-    """Close the root span and the run as succeeded, inside the step's transaction."""
+def finish_run(cur: psycopg.Cursor, run: Run, status: str = "succeeded") -> None:
+    """Close the root span and the run, inside the step's transaction. `partial`: the run is usable, some items
+    failed and wait for the next run (they stay `potentially`, never a negative: D-063)."""
+    if status not in ("succeeded", "partial"):
+        raise ValueError(f"finish_run closes a usable run only (succeeded or partial), not {status!r}")
     cur.execute("UPDATE ops.span SET status = 'ok', ended_at = now() WHERE span_id = %s", (run.span_id,))
-    cur.execute(
-        "UPDATE ops.pipeline_run SET status = 'succeeded', finished_at = now() WHERE run_id = %s", (run.run_id,)
-    )
+    cur.execute("UPDATE ops.pipeline_run SET status = %s, finished_at = now() WHERE run_id = %s", (status, run.run_id))
 
 
-def fail_run(conn: psycopg.Connection, run: Run, error: BaseException) -> None:
-    """After a rollback: close the root span and the run as failed, with the error."""
+def fail_run(conn: psycopg.Connection, run: Run, error: BaseException, status: str = "failed") -> None:
+    """After a rollback: close the root span and the run as failed (or aborted, on Ctrl-C), with the error."""
     conn.rollback()
     message = f"{type(error).__name__}: {error}"[:500]
     with conn.cursor() as cur:
@@ -90,8 +105,8 @@ def fail_run(conn: psycopg.Connection, run: Run, error: BaseException) -> None:
             (message, run.span_id),
         )
         cur.execute(
-            "UPDATE ops.pipeline_run SET status = 'failed', finished_at = now(), error_summary = %s WHERE run_id = %s",
-            (message, run.run_id),
+            "UPDATE ops.pipeline_run SET status = %s, finished_at = now(), error_summary = %s WHERE run_id = %s",
+            (status if status in ("failed", "aborted") else "failed", message, run.run_id),
         )
     conn.commit()
 
