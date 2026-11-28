@@ -36,19 +36,20 @@ Runtime checks:
 
 ## 2. Development tools (E2 and E6)
 
-Each member fills their own rows: tool, every model actually used, and what for. Members are named by handle, as in `docs/EVENT.md` §7, never by name (G13).
+Members are named by handle, as in `docs/EVENT.md` §7 (G13). Confirmed by each member on 28 Nov.
 
 | Member | Tool | Model(s) and version | Used for |
 |---|---|---|---|
-| to be confirmed by each member | Claude Code (coding agent; reads `CLAUDE.md`, which imports `AGENTS.md`) | Anthropic `claude-opus-5-5` (the session that wrote the compliance fixes of 28 Nov); other sessions' models to be confirmed | code, research, review |
-| to be confirmed by each member | Cursor (IDE agent; named as a reader of `AGENTS.md`) | to be confirmed by each member: the repo does not show whether or with which model it was used | to be confirmed |
-| to be confirmed by each member | any other chat or IDE assistant | to be confirmed by each member | to be confirmed |
-
-Only what the repository itself shows is filled in above. Each member confirms or completes their own rows (tool, every model and version actually used, purpose) before submission; nothing here is inferred.
+| TheDiRocco | Claude Code (VS Code extension) | Anthropic Claude Opus 5.5 and Claude Fable 5.2 | code, review, docs, analysis, planning |
+| TheDiRocco | GitHub Copilot (VS Code) | Copilot autocomplete | code completion |
+| TheDiRocco | ChatGPT (web) | OpenAI GPT-6 Luna | questions during development |
+| bananagoo | Claude Code (terminal in VS Code) | Anthropic Claude Opus 5.5 and Claude Fable 5.2 | code, review, docs, analysis, planning |
+| bananagoo | GitHub Copilot (VS Code) | Copilot autocomplete | code completion |
+| RabahSend | Cursor | xAI Grok 4.7; Cursor Auto mode (model chosen by Cursor per request) | code, review, docs, analysis, planning |
 
 ## 3. Pre-event preparation
 
-Research and preparation notes written before the event with AI assistants are declared here and in section 8 of `technical_report.md` (D-043, D-029). To be confirmed by each member: the repository holds no record of pre-event tools or models, so none is listed yet.
+The project kit (docs and rules) was written before the event by TheDiRocco with Anthropic Claude Opus 5.5 in claude.ai. It is declared as pre-existing material and committed unchanged as tag `kit-v0` (D-029); it is also listed in section 7 of `technical_report.md`.
 
 ## 4. Development-time models (research experiments; never called by `make run`)
 
