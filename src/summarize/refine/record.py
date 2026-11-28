@@ -17,16 +17,16 @@ from src.summarize import finish
 from src.summarize.refine import evidence
 from src.summarize.refine.model import STRING, Model, ModelFailed, array, enum, obj  # noqa: F401
 
-VERSION = "record@4"
-MAX_RULES = 2
+VERSION = "record@5"
+MAX_RULES = 3
 
 TASK = (
     "Point at these sentences of the ruling:\n"
     "- a_question: where the court states what is in dispute before it ('Streitig ist', 'Est litigieux', "
     "'Le litige porte sur', 'È litigioso', 'Zu prüfen ist').\n"
-    "- b_rules: the one or two legal rules the court states and applies to decide this case: general statements a "
-    "lawyer can reuse (a test, a condition, a presumption, the meaning of an article), not the facts. Only from "
-    "the considerations listed for rules. Most rulings have one.\n"
+    "- b_rules: the legal rules the court states and applies to decide this case, one to three: general statements "
+    "a lawyer can reuse (a test, a condition, a presumption, the meaning of an article), not the facts. Only from "
+    "the considerations listed for rules. Give each rule once, the most important first.\n"
     "- c_answer: where the court applies the rule to the facts of this case and gives its reason (why the "
     "appeal fails or succeeds); not the sentence that only states the outcome ('Le recours doit être rejeté', "
     "'Die Beschwerde ist abzuweisen').\n"

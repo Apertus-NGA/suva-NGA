@@ -238,15 +238,44 @@ RECORD = {
 }  # fmt: skip
 
 
-def test_holding_inserts_the_rule_with_the_reference_added_by_code():
-    detect = {"a_rule_sentence": "none", "b_answer_sentence": "none"}
-    repair = {"a_after": "s2", "b_text": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen "
-              "Kausalzusammenhang voraus. Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen."}  # fmt: skip
-    recheck = {"a_rule_sentence": "s3", "b_answer_sentence": "s3"}
-    fake = Fake(**{"holding@1__detect": [detect], "holding@1__repair": [repair], "holding@1__recheck": [recheck]})
-    result = refine(DRAFT, ctx_for(fake, RECORD), [Holding()])
-    assert "einstellen (E. 2.1)." in result.text
+def test_holding_inserts_each_missing_rule_with_the_reference_added_by_code():
+    record = {
+        **RECORD,
+        "rules": [
+            *RECORD["rules"],
+            {"label": "E.3", "quote": "Gemäss den Berichten war der Status quo sine am 30. Juni 2023 erreicht."},
+        ],
+    }
+    detect = {
+        "a_rules": [{"a_rule": "R1", "b_sentence": "none"}, {"a_rule": "R2", "b_sentence": "s1"}],
+        "b_answer_sentence": "none",
+    }
+    repair = {"a_after": "s2", "b_sentences": [
+        {"a_item": "R1", "b_text": "Die Leistungspflicht des Unfallversicherers setzt einen natürlichen Kausalzusammenhang voraus."},
+        {"a_item": "A", "b_text": "Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen."},
+    ]}  # fmt: skip
+    recheck = {
+        "a_rules": [{"a_rule": "R1", "b_sentence": "s3"}, {"a_rule": "R2", "b_sentence": "s1"}],
+        "b_answer_sentence": "s4",
+    }
+    fake = Fake(**{"holding@2__detect": [detect], "holding@2__repair": [repair], "holding@2__recheck": [recheck]})
+    result = refine(DRAFT, ctx_for(fake, record), [Holding()])
+    assert (
+        "voraus (E. 2.1). Da der Status quo sine erreicht war, durfte die Suva die Leistungen einstellen (E. 3)."
+        in result.text
+    )
     assert result.trace[0].status == "corrected"
+    assert "R2 (E.3)" in fake.sent[0][1][1]["content"]
+
+
+def test_holding_refuses_an_insert_when_the_re_check_still_misses_a_rule():
+    detect = {"a_rules": [{"a_rule": "R1", "b_sentence": "none"}], "b_answer_sentence": "s3"}
+    repair = {"a_after": "s1", "b_sentences": [{"a_item": "R1", "b_text": "Die Suva muss immer zahlen."}]}
+    recheck = {"a_rules": [{"a_rule": "R1", "b_sentence": "none"}], "b_answer_sentence": "s3"}
+    fake = Fake(**{"holding@2__detect": [detect], "holding@2__repair": [repair], "holding@2__recheck": [recheck]})
+    result = refine(DRAFT, ctx_for(fake, RECORD), [Holding()])
+    assert result.text == Draft.from_text(DRAFT).render()
+    assert "R1 still not found" in result.trace[0].findings[0]["why_not"]
 
 
 def test_holding_is_skipped_without_a_checked_record():
@@ -350,9 +379,9 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
     rule = {"a_label": "E.4.1", "b_opening": "Nach Art. 6 Abs. 1 UVG werden", "c_sentences": "1"}
     answer = {"a_label": "E.4.2", "b_opening": "Hier fehlt der natürliche Kausalzusammenhang", "c_sentences": "1"}
     fake = Fake(**{
-        "record@4__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer}],
+        "record@5__0": [{"a_question": rule, "b_rules": [rule], "c_answer": answer}],
         "facts@5__detect": [{"items": []}, {"items": []}],
-        "holding@1__detect": [{"a_rule_sentence": "s1", "b_answer_sentence": "s1"}] * 2,
+        "holding@2__detect": [{"a_rules": [{"a_rule": "R1", "b_sentence": "s1"}], "b_answer_sentence": "s1"}] * 2,
         "terms@1": [{"items": []}, {"items": []}],
         "language@1__detect": [{"items": []}, {"items": []}],
     })  # fmt: skip
@@ -366,7 +395,7 @@ def test_the_pipeline_stores_the_refined_fiche_its_draft_and_every_step(db_conn)
         ]  # fmt: skip
         assert refine["draft"] and stored[language] == result["languages"][language]["text"]
     assert params["refine"]["record"]["status"] == "ok"
-    assert sum(v.startswith("record@4") for v, _ in fake.sent) == 1  # one shared reading for both languages
+    assert sum(v.startswith("record@5") for v, _ in fake.sent) == 1  # one shared reading for both languages
 
 
 def test_an_injected_ask_without_a_refine_transport_is_refused():
