@@ -5,12 +5,10 @@ PY ?= $(if $(shell command -v uv 2>/dev/null),uv run --frozen python,python3)
 MODE ?= replay
 SERVE ?= 1
 ARGS ?=
-# DB target: DATABASE_URL when set (CI), else psql inside the compose service db (docs/DB_DDL_PLANNING.md §15)
-DB_TARGET ?= $(if $(DATABASE_URL),,--compose)
 
 WRITE ?= 0
 
-.PHONY: help run run-live serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up db-deploy db-reset db-test
+.PHONY: help run run-live serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -56,12 +54,3 @@ check: ## lint, unit tests, doctrine, models-registry, template-layout and D-051
 
 db-up: ## start the local Postgres (compose service db) and wait until it is healthy
 	docker compose up -d --wait db
-
-db-deploy: ## apply src/db/sql/NN_*.sql in order (idempotent)
-	$(PY) -m src.db.deploy deploy $(DB_TARGET)
-
-db-reset: ## fresh deploy: drop the six schemas, re-apply src/db/sql (refuses if expert rows would be lost)
-	$(PY) -m src.db.deploy reset --yes $(DB_TARGET)
-
-db-test: ## SQL tests in tests/sql, each in a transaction rolled back
-	$(PY) -m src.db.deploy test $(DB_TARGET)
