@@ -7,7 +7,7 @@ numbers say.
 - **Challenge:** Identification of relevant Federal Court judgements and preparation of a legal summary
 - **Event:** On-site Zurich
 - **Team:** NGA - Need GPUs for Apertus — TheDiRocco, RabahSend, bananagoo
-- **Demo:** `<to fill: link to video>`
+- **Demo:** <https://youtu.be/TL9me1PCdXk>
 
 ## 1. Summary
 
