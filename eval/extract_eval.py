@@ -250,7 +250,7 @@ def write_all(name_set: str, name: str, choice_name: str, frame: str = "none") -
     print(f"{len(rows)} fiches -> {REFINE_OUT / f'refined_{name_set}_{name}.jsonl'}")
 
 
-def run(name_set: str, name: str) -> None:
+def run(name_set: str, name: str, writer: str = "extract") -> None:
     """Both fiches of each ruling through the pipeline's own path (pipeline.write with the extractive writer and
     its v2 fallback), one ruling at a time and timed; nothing is stored. Rows in refine_eval's format, the v2
     draft beside each fiche."""
@@ -276,7 +276,8 @@ def run(name_set: str, name: str) -> None:
             lexicons = {lang: pipeline.lexicon(conn, lang, docket) for lang in pipeline.LANGUAGES}
             start = time.perf_counter()
             result = pipeline.write(ruling, shots, functools.partial(pipeline._chat, mode="live"), None, lexicons,
-                                    lambda budget: Model(transport, budget=budget, labeler=labeler))  # fmt: skip
+                                    lambda budget: Model(transport, budget=budget, labeler=labeler),
+                                    writer)  # fmt: skip
             seconds = round(time.perf_counter() - start, 1)
             for lang, fiche in result["languages"].items():
                 trace = (fiche.get("extract") or {}).get("trace", [])
@@ -354,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", default="c1")
     parser.add_argument("--passages", default="rank", choices=("rank", "list"))
     parser.add_argument("--frame", default="none", choices=("none", "question", "v2"), help="how a fiche opens")
+    parser.add_argument("--writer", default="extract", choices=("extract", "v3"), help="the writer `run` uses")
     parser.add_argument("--no-profiles", action="store_true", help="choose without the profiles (profiles.py)")
     parser.add_argument("--choice", default="c6", help="the stored choice a `write` run starts from")
     args = parser.parse_args(argv)
@@ -368,7 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         choose_all(args.set, args.name, args.passages, not args.no_profiles)
         return 0
     elif args.command == "run":
-        run(args.set, args.name)
+        run(args.set, args.name, args.writer)
         return 0
     elif args.command == "write":
         write_all(args.set, args.name, args.choice, args.frame)
