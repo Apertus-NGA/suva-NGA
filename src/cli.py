@@ -318,6 +318,42 @@ def cmd_run(args: argparse.Namespace, stages=None) -> int:
         return 1
 
 
+def cmd_replay_cache(args: argparse.Namespace) -> int:
+    """Fill replay/llm (committed) with the answers one full replay run reads, so a fresh clone needs no gateway:
+    the triage of every ruling, and the summaries of every ruling that holds a model-written summary now.
+    No gateway call and nothing written to the database (each summary is replayed, then rolled back)."""
+    from src.llm.client import SHIPPED_STORE, ReplayMiss, client_from_env, export_answers
+    from src.summarize import pipeline as sp
+    from src.triage import pipeline as tp
+    from suva_data import db
+
+    client = client_from_env("replay")
+    with db.connect() as conn:
+        failed = tp.failures(tp.run(conn, client))
+        if any(failed):
+            print(f"replay-cache: FAILED: triage is missing answers {failed}; run `make triage MODE=live` first")
+            return 1
+        ids = conn.execute(
+            "SELECT DISTINCT s.ruling_id, r.docket FROM summaries s JOIN rulings r ON r.id = s.ruling_id "
+            "WHERE s.origin = 'model' ORDER BY r.docket"
+        ).fetchall()
+        replayed, missing = 0, []
+        for ruling_id, docket in ids:
+            try:
+                with conn.transaction(force_rollback=True):
+                    sp.summarise_ruling(conn, ruling_id, mode="replay")
+                replayed += 1
+            except ReplayMiss:
+                missing.append(docket)
+    added = export_answers(SHIPPED_STORE)
+    total = sum(1 for _ in (SHIPPED_STORE / "cache").rglob("*.json"))
+    print(
+        f"replay-cache: {added} answers added, {total} in {SHIPPED_STORE.relative_to(REPO_ROOT)}; "
+        f"summaries replayable: {replayed} of {len(ids)}" + (f"; not cached: {', '.join(missing)}" if missing else "")
+    )
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     try:
         return serve()
@@ -372,6 +408,7 @@ def main(argv: list[str] | None = None) -> int:
         help="summarise at most N rulings (SUMMARY_LIMIT, default %(default)s; 0 skips)",
     )
     sub.add_parser("serve", help="serve the API and the UI (builds src/web/dist first when missing)")
+    sub.add_parser("replay-cache", help="fill replay/llm with the cached answers one full run reads (no gateway)")
     sub.add_parser("smoke-llm", help="gateway probe (src/llm/probe.py); flags go to the probe")
     warm = sub.add_parser("warmup", help="warm the large model")
     warm.add_argument("--dry-run", action="store_true")
@@ -393,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_run(args)
     if args.cmd == "serve":
         return cmd_serve(args)
+    if args.cmd == "replay-cache":
+        return cmd_replay_cache(args)
     if args.cmd == "warmup":
         return cmd_warmup(args)
     return stub(args.cmd, args.would)

@@ -12,7 +12,7 @@ RUN_FLAGS = $(if $(SUMMARY_LIMIT),--summary-limit $(SUMMARY_LIMIT),) $(if $(filt
 
 WRITE ?= 0
 
-.PHONY: help run run-live serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up
+.PHONY: help run run-live replay-cache serve smoke-llm warmup crawl triage refit eval eval-private claims check db-up
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -22,6 +22,9 @@ run: ## end to end, REPLAY (no gateway call): db up + migrate, ingest if empty, 
 
 run-live: ## the same, LIVE (needs LLM_*); ARGS="--limit N": smoke, triage of the first N rulings not written, N summaries; ARGS="--all": full triage written
 	$(PY) -m src.cli run --mode live $(RUN_FLAGS) $(ARGS)
+
+replay-cache: ## fill replay/llm (committed) with the cached Apertus answers one full run reads; no gateway call
+	$(PY) -m src.cli replay-cache
 
 serve: ## serve the API and the UI on 127.0.0.1:8000 (builds src/web/dist with npm first when missing)
 	$(PY) -m src.cli serve
