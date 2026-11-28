@@ -965,7 +965,7 @@ wheels = [
 [[package]]
 name = "suva-nga"
 version = "0.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
