@@ -1,4 +1,17 @@
-"""bger.ch daily-list adapter. Offline: fixture pages only, urllib is mocked, no database."""
+"""bger.ch daily-list adapter. Offline: fixture pages only, urllib is mocked, no database.
+
+MOCK DECLARED (G9):
+- `urllib.request.urlopen` in `suva_data.sources.bger_lists` is replaced in every test by `refuse` (autouse
+  fixture `no_network`: any request fails the test), and by `FakeSite` where a test installs the `site`
+  fixture. `FakeSite` serves cp1252 list pages built from `tests/fixtures/bger_lists/20251212.html`, the
+  bot-protection page `block_page.html`, HTTP errors or connection resets, and records every request (URL,
+  User-Agent, TLS context) for the assertions.
+- `time.sleep` in that module is recorded instead of slept (`no_network`), so the politeness delay is
+  asserted without waiting.
+- The compatibility-shim tests prepend `src/` to `sys.path` and point `bger_news.CACHE` at a temporary
+  snapshot copied from the fixtures.
+Real: the parser, the adapter, the snapshot files it writes (asserted on disk) and the fixture pages.
+"""
 
 from __future__ import annotations
 

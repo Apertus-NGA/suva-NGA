@@ -1,4 +1,15 @@
-"""Swiss Case Law adapter. Offline: real rows in tests/fixtures/swiss_caselaw/, no network, no database."""
+"""Swiss Case Law adapter. Offline: real rows in tests/fixtures/swiss_caselaw/, no network, no database.
+
+MOCK DECLARED (G9):
+- `hf_hub_download` in `suva_data.sources.swiss_caselaw` is replaced in every test by `refuse` (autouse
+  fixture `no_network`), and by `fake_download`, which copies the fixture file and records the requested
+  repo, file, type and revision, in the download test.
+- `config.SWISS_CASELAW_FILES` is re-pinned to the fixtures' own sha256 (fixture `adapter`), or to a wrong
+  hash in the checksum-mismatch test.
+- `swiss_caselaw._sha256` is wrapped to count calls (the real hash still runs) in the checksum-cache test.
+- `Scalar` stands in for a numpy scalar in the JSON-conversion test.
+Real: the fixture parquet rows, the adapter, and the snapshot files it writes (asserted on disk).
+"""
 
 from __future__ import annotations
 
