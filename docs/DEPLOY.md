@@ -2,7 +2,7 @@
 
 > **Status: PROPOSED (D-090), Sat 28 Nov 2026.** Owner: platform (the lead, while D-024 is open). Files: `docker-compose.yml`, `Dockerfile`, `.dockerignore`, the `cluster-*` targets of the `Makefile`, `src/db/logins.py`, `src/ingest/fetch.py`, `src/db/schema_guard.py`, `tests/test_cluster.py`, `tests/test_schema_guard.py`, the CI job `cluster`.
 > **Increment 2** (Sat 28 Nov, after the layer-1 traceability merge, PR #44): schema guard on every deploy, ingest closure in `load`, golden certification and self-verification in `make run` S2, release gate `validate`, a `data/derived` slot for replayed layer 2, and CI running the whole chain on the base dataset.
-> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), layer 2 (S3, §10), and the release gate. The next stages run inside it as soon as `make run` calls them: the cluster calls make targets, so a new stage needs no change here. The API and UI service is ready but off (profile `ui`): `make serve` is a stub until the FastAPI app lands, after layer 3 (summaries).
+> What the cluster runs today: the data layer, the loaders with their closure check, layer 1 with its golden certification, its blocking recall check and its self-verification (`make run` stage S2), layer 2 (S3, §10), and the release gate. The next stages run inside it as soon as `make run` calls them: the cluster calls make targets, so a new stage needs no change here. The API service is ready but off (profile `ui`): `make serve` runs the FastAPI app (`docs/API.md`); the UI build stage comes with the UI.
 
 ## 1. What runs where
 
@@ -14,7 +14,7 @@
                       │        │    └─────── load (suva_pipeline: registry, base dataset, labels)    │
                       │        └──────────── pipeline (suva_pipeline: make run SERVE=0)  ──┐         │
                       │  llm (profile sovereign: Apertus on vLLM, GPU, offline) ◀──────────┤         │
-                      │  app (profile ui, suva_api: make serve, after layer 3)             │         │
+                      │  app (profile ui, suva_api: make serve, the API)                   │         │
                       └────────────────────────────────────────────────────────────────────┼─────────┘
                         network egress: fetch (Hugging Face, once), pipeline and app ──────┘──▶ LLM_BASE_URL
 ```
@@ -66,7 +66,7 @@ Measured Sat 28 Nov on a laptop (arm64, the `linux/amd64` image emulated, other 
 
 Increment 2, same laptop: the whole chain with the new checks took 93 s on an adopted database and the release gate 101 s; both green (golden matched, recall 82/82 on both profiles, 6,055 records verified, closure OK).
 
-Other commands: `make cluster-config` (checks the compose file with the current `.env`, every profile), `make cluster-build`, `make cluster-backup`, `docker compose --profile ui up -d app` once `make serve` exists.
+Other commands: `make cluster-config` (checks the compose file with the current `.env`, every profile), `make cluster-build`, `make cluster-backup`, `docker compose --profile ui up -d app` (set `SUVA_API_PASSWORD` first).
 
 ## 4. Security
 
@@ -121,7 +121,7 @@ Region: Switzerland North, for data residency.
 
 ## 9. Limits
 
-- The `app` service waits for `make serve` (FastAPI, after layer 3).
+- The `app` service runs `make serve` (the API, `docs/API.md`); runs launched from it stay off unless `API_RUNS_ENABLED=1`.
 - Layer 2 runs in the cluster (§10); a complete replay needs the 23 reference rulings' answers. Layer 3 and the app: §10.
 - CI (job `cluster`) runs the whole chain on the base dataset, cached between runs, and the release gate; the GPU profile is tested by hand only.
 - `make db-up` (the developer database) now needs `POSTGRES_PASSWORD` in `.env`: `make cluster-env` sets it. A database volume created before this change keeps its old authentication until it is recreated.

@@ -85,7 +85,7 @@ BEGIN
     ('member_basis',           ARRAY['decision_date','publication_exact','publication_approx','reference']),
     ('label_source',           ARRAY['suva_relevance_list','suva_summary_export']),
     ('review_target',          ARRAY['scope','summary_version']),
-    ('review_verdict',         ARRAY['correct','incorrect','validated','rejected']),
+    ('review_verdict',         ARRAY['correct','incorrect','validated','rejected','relevant','not_relevant','withdrawn']),
     ('creator_kind',           ARRAY['pipeline','expert']),
     ('summary_style',          ARRAY['rule_statement','narrative','by_ruling_language']),
     ('summary_version_origin', ARRAY['generated','repaired','regenerated','expert_edit']),
@@ -105,9 +105,18 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Values added to a type after its first release. The loop above creates a type only when it is missing, so an existing
+-- database keeps its old values: ADD VALUE appends them, in the order of the array (a fresh database gets the same
+-- order). deploy runs without a wrapping transaction: each ALTER commits at once, before a later file uses the value
+-- (a value added inside an open transaction cannot be used until it commits). D-092.
+ALTER TYPE ops.review_verdict ADD VALUE IF NOT EXISTS 'relevant';
+ALTER TYPE ops.review_verdict ADD VALUE IF NOT EXISTS 'not_relevant';
+ALTER TYPE ops.review_verdict ADD VALUE IF NOT EXISTS 'withdrawn';
+
 COMMENT ON TYPE ops.in_suva_scope IS 'The scope label (D-063): in_scope = True, out_of_scope = False (always with a reason code), potentially = passed layer 1 and not decided yet, or failed and waiting for a retry.';
 COMMENT ON TYPE ops.pipeline_step IS 'Pipeline steps in pipeline order (docs/DB_DDL_PLANNING.md §7.3). Views sort on this order.';
 COMMENT ON TYPE ops.rule_outcome IS 'What one rule of a step version did for one assessment (triage.assessment_reason): fired = condition true, its effect applies; not_fired = evaluated, condition false; not_applicable = a precondition failed (detail.why); blocked = condition true but neutralised by another rule (detail.blocked_by). F-01, F-02.';
+COMMENT ON TYPE ops.review_verdict IS 'An expert verdict (gold.expert_review, D-066, D-092). Scope review: relevant | not_relevant = the expert''s own label (in_scope | out_of_scope) on any pipeline label, potentially included; correct | incorrect = the older relative form, on in_scope or out_of_scope only. Summary review: validated | rejected. withdrawn (scope or summary) takes back the review it supersedes: the target then has no expert opinion.';
 
 -- ---------------------------------------------------------------------------
 -- Shared functions

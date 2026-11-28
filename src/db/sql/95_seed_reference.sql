@@ -3,8 +3,8 @@
 -- Date: 2026-11-28
 -- Description: The reason-code vocabulary (German and French labels shown to lawyers; a layer-1 drop label
 --              states only its own condition, F-03), the perspective anchors (draft until the summarise
---              owner writes their rubrics), the mandatory preset suva_house (anchor 5), and the V1 review
---              payload schemas (empty payloads).
+--              owner writes their rubrics), the mandatory preset suva_house (anchor 5), and the review payload
+--              schemas (V1.0.0 empty; scope_review.payload V1.1.0 records what the expert saw, D-092).
 --              Step versions, rules, prompts and profiles are NOT seeded here: the registry loader writes
 --              them from reviewed seed files, and models come from MODELS.md (D-064).
 -- SGBD: PostgreSQL 17
@@ -100,6 +100,29 @@ FROM (VALUES
    '{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false, "properties": {}}'::jsonb,
    'V1: the verdict (validated | rejected) is a column; the payload is empty.')
 ) AS s(code, js, changelog)
+ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
+
+-- scope_review.payload V1.1.0 (D-092): what the expert saw when deciding (the pipeline status and the score on screen),
+-- so each (seen, given) pair is a training example. All optional. A minor bump of V1.0.0, which stays in place and
+-- active (versions are immutable; readers take the highest active version, as gold.submit_review does). The DB checks
+-- only that a payload is an object: the writer validates it against this schema (§7.4).
+INSERT INTO ops.json_schema (subject, schema_code, v_major, v_minor, v_patch, json_schema, template, schema_sha256, status, bump_kind,
+                             previous_version_id, changelog, created_by_actor)
+SELECT 'review_payload', 'scope_review.payload', 1, 1, 0, s.js, s.template,
+       encode(sha256(convert_to(s.js::text, 'UTF8')), 'hex'), 'active', 'minor',
+       -- V1.0.0, inserted above; a missing one fails json_schema_bump_chk instead of skipping V1.1.0 silently
+       (SELECT p.json_schema_id FROM ops.json_schema p
+        WHERE p.schema_code = 'scope_review.payload' AND p.v_major = 1 AND p.v_minor = 0 AND p.v_patch = 0),
+       s.changelog, 'seed'
+FROM (VALUES (
+   '{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false,
+     "properties": {
+       "shown_status":      {"type": "string", "description": "the status the screen showed (the pipeline label, e.g. potentially)"},
+       "shown_score_0_100": {"type": ["number", "null"], "minimum": 0, "maximum": 100, "description": "the displayed score, 0-100"},
+       "shown_score_raw":   {"type": ["number", "null"], "description": "the stored raw score (e.g. layer 2''s logit)"}}}'::jsonb,
+   '{"shown_status": "potentially", "shown_score_0_100": 64, "shown_score_raw": 0.58}'::jsonb,
+   'V1.1 (D-092): optional shown_status, shown_score_0_100, shown_score_raw = what the expert saw when deciding. The verdict stays a column: relevant | not_relevant on any label, correct | incorrect on in_scope or out_of_scope, withdrawn.')
+) AS s(js, template, changelog)
 ON CONFLICT (schema_code, v_major, v_minor, v_patch) DO NOTHING;
 
 RESET app.actor;

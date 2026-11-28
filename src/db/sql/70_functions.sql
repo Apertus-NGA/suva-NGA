@@ -40,7 +40,8 @@ BEGIN
 END $$;
 COMMENT ON FUNCTION ops.submit_request(ops.request_kind, text, text, uuid, text) IS 'UI request: add a judgement by docket or bger.ch link, or a summary of any ruling under any preset. The pipeline accepts it into a run.';
 
--- Expert review of a scope label (V1: correct | incorrect) or of a summary version (validated | rejected).
+-- Expert review of a scope label (relevant | not_relevant on any label; correct | incorrect on in_scope or out_of_scope)
+-- or of a summary version (validated | rejected); withdrawn takes back the review given in p_supersedes (D-092).
 CREATE OR REPLACE FUNCTION gold.submit_review(
   p_target_kind  ops.review_target,
   p_target_id    uuid,
@@ -66,6 +67,9 @@ BEGIN
   IF schema_id IS NULL THEN
     RAISE EXCEPTION 'no active review schema for %', p_target_kind;
   END IF;
+  IF p_verdict = 'withdrawn' AND p_supersedes IS NULL THEN
+    RAISE EXCEPTION 'a withdrawn review takes back an earlier review of the same target: pass its review_id as p_supersedes';
+  END IF;
 
   IF p_target_kind = 'scope' THEN
     SELECT a.in_suva_scope INTO label FROM triage.assessment a WHERE a.assessment_id = p_target_id;
@@ -86,7 +90,7 @@ BEGIN
   END IF;
   RETURN rid;
 END $$;
-COMMENT ON FUNCTION gold.submit_review(ops.review_target, uuid, ops.review_verdict, jsonb, text, uuid) IS 'The only way to write gold.expert_review (D-066). Takes the latest active review schema; copies the label the expert saw.';
+COMMENT ON FUNCTION gold.submit_review(ops.review_target, uuid, ops.review_verdict, jsonb, text, uuid) IS 'The only way to write gold.expert_review (D-066, D-092). Takes the latest active review schema (scope_review.payload V1.1.0: shown_status, shown_score_0_100, shown_score_raw = what the expert saw; the DB checks only that the payload is an object); copies the label of the assessment. Scope: relevant | not_relevant on any label, correct | incorrect on in_scope or out_of_scope. Summary: validated | rejected. withdrawn requires p_supersedes, the review it takes back (same target, never a withdrawal).';
 
 -- Expert edit of one language of a summary version: creates version n+1 (expert_edit), copies the other
 -- language unchanged (texts, claims, citations), writes the edited language, and makes the new version current.
